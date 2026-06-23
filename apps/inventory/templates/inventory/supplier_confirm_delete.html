@@ -1,0 +1,16 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Supprimer fournisseur - El Amine ERP{% endblock %}
+
+{% block page_title %}Supprimer fournisseur{% endblock %}
+
+{% block content %}
+<div class="card card-dashboard p-4 bg-white">
+    <p>Voulez-vous vraiment supprimer le fournisseur <strong>{{ supplier.name }}</strong> ?</p>
+    <form method="post">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger">Supprimer</button>
+        <a href="{% url 'supplier_list' %}" class="btn btn-secondary">Annuler</a>
+    </form>
+</div>
+{% endblock %}

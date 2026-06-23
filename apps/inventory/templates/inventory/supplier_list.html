@@ -1,0 +1,44 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Fournisseurs - El Amine ERP{% endblock %}
+
+{% block page_title %}Fournisseurs{% endblock %}
+
+{% block content %}
+<div class="card card-dashboard p-4 bg-white">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5>Liste des fournisseurs</h5>
+        <a href="{% url 'supplier_create' %}" class="btn btn-success">Ajouter fournisseur</a>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>Nom</th>
+                    <th>Téléphone</th>
+                    <th>Wilaya</th>
+                    <th>Email</th>
+                    <th>RC</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for supplier in suppliers %}
+                    <tr>
+                        <td>{{ supplier.name }}</td>
+                        <td>{{ supplier.phone }}</td>
+                        <td>{{ supplier.wilaya }}</td>
+                        <td>{{ supplier.email }}</td>
+                        <td>{{ supplier.rc_number }}</td>
+                        <td>
+                            <a href="{% url 'supplier_update' supplier.pk %}" class="btn btn-sm btn-secondary">Modifier</a>
+                            <a href="{% url 'supplier_delete' supplier.pk %}" class="btn btn-sm btn-danger">Supprimer</a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="5" class="text-center">Aucun fournisseur enregistré.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

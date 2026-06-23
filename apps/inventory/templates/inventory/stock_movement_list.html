@@ -1,0 +1,44 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Mouvements stock - El Amine ERP{% endblock %}
+
+{% block page_title %}Mouvements de stock{% endblock %}
+
+{% block content %}
+<div class="card card-dashboard p-4 bg-white">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5>Liste des mouvements</h5>
+        <a href="{% url 'stock_movement_create' %}" class="btn btn-success">Ajouter mouvement</a>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>Produit</th>
+                    <th>Type</th>
+                    <th>Quantité</th>
+                    <th>Motif</th>
+                    <th>Date</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for movement in movements %}
+                    <tr>
+                        <td>{{ movement.product.name }}</td>
+                        <td>{{ movement.get_movement_type_display }}</td>
+                        <td>{{ movement.quantity }}</td>
+                        <td>{{ movement.reason }}</td>
+                        <td>{{ movement.created_at|date:'d/m/Y H:i' }}</td>
+                        <td>
+                            <a href="{% url 'stock_movement_delete' movement.pk %}" class="btn btn-sm btn-danger">Supprimer</a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="6" class="text-center">Aucun mouvement de stock enregistré.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

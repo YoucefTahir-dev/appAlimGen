@@ -1,0 +1,39 @@
+version: '3.9'
+services:
+  db:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_DB: gestio_stock
+      POSTGRES_USER: gestio_user
+      POSTGRES_PASSWORD: gestio_pass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - gestio_net
+
+  web:
+    build: .
+    command: gunicorn gestio_stock.wsgi:application --bind 0.0.0.0:8000
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - DJANGO_DEBUG=False
+      - DATABASE_HOST=db
+      - DATABASE_NAME=gestio_stock
+      - DATABASE_USER=gestio_user
+      - DATABASE_PASSWORD=gestio_pass
+      - DATABASE_PORT=5432
+    depends_on:
+      - db
+    networks:
+      - gestio_net
+
+volumes:
+  postgres_data:
+
+networks:
+  gestio_net:
+    driver: bridge

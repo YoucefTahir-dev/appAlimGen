@@ -1,0 +1,35 @@
+.sidebar {
+    width: 260px;
+    min-height: 100vh;
+    position: fixed;
+    top: 0;
+    left: 0;
+    padding-top: 20px;
+}
+
+#page-wrapper {
+    margin-left: 260px;
+}
+
+.nav-link {
+    color: rgba(255,255,255,0.85);
+}
+
+.nav-link:hover, .nav-link.active {
+    color: #00b894;
+}
+
+.card-dashboard {
+    border: none;
+    border-radius: 18px;
+    box-shadow: 0 12px 24px rgba(0,0,0,0.08);
+}
+
+.table thead {
+    background: #f8f9fa;
+}
+
+.bg-brand {
+    background-color: #1e3a2a;
+    color: #fff;
+}

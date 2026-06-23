@@ -1,0 +1,43 @@
+{% extends 'base/base.html' %}
+
+{% block title %}{{ title }} - El Amine ERP{% endblock %}
+
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="card card-dashboard p-4 bg-white">
+    <form method="post">
+        {% csrf_token %}
+        <div class="row g-3">
+            <div class="col-md-6">{{ form.reference.label_tag }}{{ form.reference }}</div>
+            <div class="col-md-6">{{ form.supplier.label_tag }}{{ form.supplier }}</div>
+            <div class="col-md-6">{{ form.tax_rate.label_tag }}{{ form.tax_rate }}</div>
+        </div>
+        <hr>
+        {{ formset.management_form }}
+        <div class="table-responsive">
+            <table class="table table-bordered align-middle">
+                <thead>
+                    <tr>
+                        <th>Produit</th>
+                        <th>Quantité</th>
+                        <th>Prix d\'achat</th>
+                        <th>Supprimer</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for form_line in formset %}
+                        <tr>
+                            <td>{{ form_line.product }}</td>
+                            <td>{{ form_line.quantity }}</td>
+                            <td>{{ form_line.purchase_price }}</td>
+                            <td>{{ form_line.DELETE }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <button class="btn btn-success">Enregistrer</button>
+    </form>
+</div>
+{% endblock %}

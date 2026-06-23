@@ -1,0 +1,20 @@
+{% extends 'base/base.html' %}
+
+{% block title %}{{ title }} - El Amine ERP{% endblock %}
+
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="card card-dashboard p-4 bg-white">
+    <form method="post">
+        {% csrf_token %}
+        <div class="row g-3">
+            <div class="col-md-6">{{ form.product.label_tag }}{{ form.product }}</div>
+            <div class="col-md-6">{{ form.movement_type.label_tag }}{{ form.movement_type }}</div>
+            <div class="col-md-6">{{ form.quantity.label_tag }}{{ form.quantity }}</div>
+            <div class="col-md-6">{{ form.reason.label_tag }}{{ form.reason }}</div>
+        </div>
+        <button class="btn btn-success mt-3">Enregistrer</button>
+    </form>
+</div>
+{% endblock %}

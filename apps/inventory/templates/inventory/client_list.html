@@ -1,0 +1,44 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Clients - El Amine ERP{% endblock %}
+
+{% block page_title %}Clients{% endblock %}
+
+{% block content %}
+<div class="card card-dashboard p-4 bg-white">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5>Liste des clients</h5>
+        <a href="{% url 'client_create' %}" class="btn btn-success">Ajouter client</a>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>Nom</th>
+                    <th>Téléphone</th>
+                    <th>Wilaya</th>
+                    <th>Email</th>
+                    <th>Solde</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for client in clients %}
+                    <tr>
+                        <td>{{ client.name }}</td>
+                        <td>{{ client.phone }}</td>
+                        <td>{{ client.wilaya }}</td>
+                        <td>{{ client.email }}</td>
+                        <td>{{ client.balance|floatformat:2 }} DZD</td>
+                        <td>
+                            <a href="{% url 'client_update' client.pk %}" class="btn btn-sm btn-secondary">Modifier</a>
+                            <a href="{% url 'client_delete' client.pk %}" class="btn btn-sm btn-danger">Supprimer</a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="5" class="text-center">Aucun client enregistré.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

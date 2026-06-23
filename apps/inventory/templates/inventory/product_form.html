@@ -1,0 +1,39 @@
+{% extends 'base/base.html' %}
+
+{% block title %}{{ title }} - El Amine ERP{% endblock %}
+
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="card card-dashboard p-4 bg-white">
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="row g-3">
+            {% if form.instance.pk %}
+            <div class="col-12 mb-2">
+                <label class="form-label">Référence</label>
+                <input type="text" class="form-control" value="{{ form.instance.reference }}" readonly />
+            </div>
+            {% endif %}
+            <div class="col-md-6">{{ form.barcode.label_tag }}{{ form.barcode }}</div>
+            <div class="col-md-6">{{ form.name.label_tag }}{{ form.name }}</div>
+            <div class="col-md-6">{{ form.brand_text.label_tag }}{{ form.brand_text }}</div>
+            <div class="col-md-4">{{ form.purchase_price.label_tag }}{{ form.purchase_price }}</div>
+            <div class="col-md-4">{{ form.sale_price.label_tag }}{{ form.sale_price }}</div>
+            <div class="col-md-4">{{ form.quantity.label_tag }}{{ form.quantity }}</div>
+            <div class="col-md-4">{{ form.minimum_stock.label_tag }}{{ form.minimum_stock }}</div>
+            <div class="col-md-8">{{ form.photo.label_tag }}{{ form.photo }}</div>
+            {% if form.instance.pk and form.instance.qr_code %}
+            <div class="col-md-4 text-center">
+                <label class="form-label">QR Code</label>
+                <div>
+                    <img src="{{ form.instance.qr_code.url }}" alt="QR" class="img-fluid" style="max-width:150px;" />
+                </div>
+            </div>
+            {% endif %}
+            <div class="col-12">{{ form.description.label_tag }}{{ form.description }}</div>
+        </div>
+        <button class="btn btn-success mt-3">Enregistrer</button>
+    </form>
+</div>
+{% endblock %}
