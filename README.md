@@ -47,6 +47,9 @@ Application web ERP pour la gestion commerciale, achats, ventes et stock.
 - `apps/inventory`: produits, stock, fournisseurs, clients
 - `apps/commerce`: achats, ventes, factures, paiements
 
+## GitHub CI
+Ce dépôt utilise GitHub Actions pour exécuter les tests automatiquement sur chaque push ou pull request vers `main`.
+
 ## Logo
 Placez le logo de l'entreprise dans `static/img/logo.png`.
 
