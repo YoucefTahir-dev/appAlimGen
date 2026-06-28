@@ -2,7 +2,7 @@ from django.db import models
 from django.db.models import F
 from django.utils import timezone
 
-from apps.inventory.models import Client, Product, ProductPackaging, Supplier
+from apps.inventory.models import Client, Product, Supplier
 
 
 class Purchase(models.Model):
@@ -104,42 +104,36 @@ class InvoiceSequence(models.Model):
 class SaleLine(models.Model):
     sale = models.ForeignKey(Sale, on_delete=models.CASCADE, related_name='lines')
     product = models.ForeignKey(Product, on_delete=models.PROTECT)
-    packaging = models.ForeignKey(ProductPackaging, on_delete=models.PROTECT, null=True, blank=True)
     quantity = models.PositiveIntegerField('Quantité')
     unit_price = models.DecimalField('Prix unitaire', max_digits=12, decimal_places=2)
 
     @property
     def stock_quantity(self):
-        unit_quantity = self.packaging.unit_quantity if self.packaging_id and self.packaging else 1
-        return self.quantity * unit_quantity
+        return self.quantity
 
     @property
     def minimum_sale_price(self):
-        unit_quantity = self.packaging.unit_quantity if self.packaging_id and self.packaging else 1
-        return self.product.purchase_price * unit_quantity
+        return self.product.purchase_price
 
     def line_total(self):
         return self.quantity * self.unit_price
 
     def save(self, *args, **kwargs):
         if self.pk is None:
-            stock_quantity = self.stock_quantity
             super().save(*args, **kwargs)
-            self.product.quantity = F('quantity') - stock_quantity
+            self.product.quantity = F('quantity') - self.quantity
             self.product.save(update_fields=['quantity'])
             self.product.refresh_from_db(fields=['quantity'])
         else:
-            old = SaleLine.objects.select_related('product', 'packaging').get(pk=self.pk)
-            old_stock_quantity = old.stock_quantity
-            new_stock_quantity = self.stock_quantity
-            quantity_diff = new_stock_quantity - old_stock_quantity
+            old = SaleLine.objects.select_related('product').get(pk=self.pk)
+            quantity_diff = self.quantity - old.quantity
             product_changed = old.product_id != self.product_id
             super().save(*args, **kwargs)
             if product_changed:
-                old.product.quantity = F('quantity') + old_stock_quantity
+                old.product.quantity = F('quantity') + old.quantity
                 old.product.save(update_fields=['quantity'])
                 old.product.refresh_from_db(fields=['quantity'])
-                self.product.quantity = F('quantity') - new_stock_quantity
+                self.product.quantity = F('quantity') - self.quantity
                 self.product.save(update_fields=['quantity'])
                 self.product.refresh_from_db(fields=['quantity'])
             elif quantity_diff != 0:
@@ -148,7 +142,7 @@ class SaleLine(models.Model):
                 self.product.refresh_from_db(fields=['quantity'])
 
     def delete(self, *args, **kwargs):
-        self.product.quantity = F('quantity') + self.stock_quantity
+        self.product.quantity = F('quantity') + self.quantity
         self.product.save(update_fields=['quantity'])
         self.product.refresh_from_db(fields=['quantity'])
         super().delete(*args, **kwargs)

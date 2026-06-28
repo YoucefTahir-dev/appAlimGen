@@ -120,7 +120,7 @@ def get_company_logo_path(company):
 
 def build_invoice_context(sale):
     company = CompanySettings.objects.first()
-    lines = list(sale.lines.select_related('product', 'packaging').all())
+    lines = list(sale.lines.select_related('product').all())
     tax_rate = Decimal(str(sale.tax_rate or 0))
     discount = Decimal(str(sale.discount or 0))
     total_ht = sum((line.line_total() for line in lines), Decimal('0.00'))
@@ -228,12 +228,11 @@ def generate_invoice_pdf(response, sale):
     ]))
     story.extend([client_table, Spacer(1, 7 * mm)])
 
-    table_data = [['N°', 'Produit', 'Cond.', 'Qté', 'PU', 'TVA', 'Montant HT', 'TTC']]
+    table_data = [['N°', 'Produit', 'Qté', 'PU', 'TVA', 'Montant HT', 'TTC']]
     for index, line in enumerate(context['lines'], start=1):
         table_data.append([
             str(index),
             Paragraph(line.product.name, styles['ERPSmall']),
-            line.packaging.name if line.packaging else '-',
             str(line.quantity),
             money(line.unit_price),
             f"{context['tax_rate']}%",
@@ -241,7 +240,7 @@ def generate_invoice_pdf(response, sale):
             money(line.line_total() + (line.line_total() * context['tax_rate'] / Decimal('100'))),
         ])
 
-    products_table = Table(table_data, colWidths=[9 * mm, 47 * mm, 24 * mm, 13 * mm, 24 * mm, 16 * mm, 25 * mm, 25 * mm], repeatRows=1)
+    products_table = Table(table_data, colWidths=[9 * mm, 63 * mm, 15 * mm, 25 * mm, 18 * mm, 34 * mm, 20 * mm], repeatRows=1)
     products_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), BRAND_COLOR),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
@@ -251,7 +250,7 @@ def generate_invoice_pdf(response, sale):
         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#fbfcfd')]),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('ALIGN', (0, 1), (0, -1), 'CENTER'),
-        ('ALIGN', (3, 1), (-1, -1), 'RIGHT'),
+        ('ALIGN', (2, 1), (-1, -1), 'RIGHT'),
         ('PADDING', (0, 0), (-1, -1), 5),
     ]))
     story.extend([products_table, Spacer(1, 7 * mm)])

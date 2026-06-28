@@ -43,10 +43,9 @@ class PaymentForm(forms.ModelForm):
 class SaleLineForm(forms.ModelForm):
     class Meta:
         model = SaleLine
-        fields = ('product', 'packaging', 'quantity', 'unit_price')
+        fields = ('product', 'quantity', 'unit_price')
         widgets = {
             'product': forms.Select(attrs={'class': 'form-select'}),
-            'packaging': forms.Select(attrs={'class': 'form-select'}),
             'quantity': forms.NumberInput(attrs={'class': 'form-control'}),
             'unit_price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
         }
@@ -54,25 +53,10 @@ class SaleLineForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
         product = cleaned_data.get('product')
-        packaging = cleaned_data.get('packaging')
         unit_price = cleaned_data.get('unit_price')
 
-        if product and not packaging:
-            packaging = product.packagings.filter(is_active=True, unit_quantity=1).order_by('pk').first()
-            if packaging:
-                cleaned_data['packaging'] = packaging
-                self.instance.packaging = packaging
-
-        if product and packaging:
-            if packaging.product_id != product.pk:
-                raise ValidationError('Le conditionnement sélectionné ne correspond pas au produit.')
-            if not packaging.is_active:
-                raise ValidationError('Le conditionnement sélectionné est inactif.')
-
-        if product and unit_price is not None:
-            minimum_price = product.purchase_price * (packaging.unit_quantity if packaging else 1)
-            if unit_price < minimum_price:
-                raise ValidationError("Le prix de vente est inférieur au coût d'achat. Vente refusée.")
+        if product and unit_price is not None and unit_price < product.purchase_price:
+            raise ValidationError("Le prix de vente est inférieur au coût d'achat. Vente refusée.")
 
         return cleaned_data
 
@@ -92,22 +76,18 @@ class BaseSaleLineFormSet(BaseInlineFormSet):
                 continue
 
             product = cleaned_data.get('product')
-            packaging = cleaned_data.get('packaging')
             quantity = cleaned_data.get('quantity') or 0
             if not product:
                 continue
 
-            unit_quantity = packaging.unit_quantity if packaging else 1
-            required_quantity = quantity * unit_quantity
-
-            required_by_product[product.pk] = required_by_product.get(product.pk, 0) + required_quantity
+            required_by_product[product.pk] = required_by_product.get(product.pk, 0) + quantity
             if product.pk not in available_by_product:
                 available_by_product[product.pk] = product.quantity
 
             if form.instance and form.instance.pk:
-                old_line = SaleLine.objects.select_related('product', 'packaging').get(pk=form.instance.pk)
+                old_line = SaleLine.objects.select_related('product').get(pk=form.instance.pk)
                 if old_line.product_id == product.pk:
-                    available_by_product[product.pk] += old_line.stock_quantity
+                    available_by_product[product.pk] += old_line.quantity
 
         errors = []
         for product_id, required_quantity in required_by_product.items():

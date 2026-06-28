@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Category, Brand, Unit, Product, ProductPackaging, StockMovement, Client, Supplier
+from .models import Category, Brand, Unit, Product, StockMovement, Client, Supplier
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
@@ -19,12 +19,6 @@ class ProductAdmin(admin.ModelAdmin):
     search_fields = ('reference', 'barcode', 'name')
     list_filter = ('category', 'brand')
     readonly_fields = ('reference', 'barcode', 'qr_code', 'barcode_image')
-
-@admin.register(ProductPackaging)
-class ProductPackagingAdmin(admin.ModelAdmin):
-    list_display = ('product', 'name', 'unit_quantity', 'default_sale_price', 'barcode', 'is_active')
-    list_filter = ('is_active',)
-    search_fields = ('product__name', 'product__reference', 'barcode', 'name')
 
 @admin.register(StockMovement)
 class StockMovementAdmin(admin.ModelAdmin):

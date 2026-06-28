@@ -133,7 +133,7 @@ def purchase_delete(request, pk):
 
 @seller_required
 def sale_invoice_pdf(request, pk):
-    sale = get_object_or_404(Sale.objects.select_related('client').prefetch_related('lines__product', 'lines__packaging'), pk=pk)
+    sale = get_object_or_404(Sale.objects.select_related('client').prefetch_related('lines__product'), pk=pk)
     response = HttpResponse(content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename=facture_{sale.invoice_number}.pdf'
     generate_invoice_pdf(response, sale)
@@ -142,7 +142,7 @@ def sale_invoice_pdf(request, pk):
 
 @seller_required
 def sale_invoice_preview(request, pk):
-    sale = get_object_or_404(Sale.objects.select_related('client').prefetch_related('lines__product', 'lines__packaging'), pk=pk)
+    sale = get_object_or_404(Sale.objects.select_related('client').prefetch_related('lines__product'), pk=pk)
     context = build_invoice_context(sale)
     context['auto_print'] = request.GET.get('print') == '1'
     return render(request, 'commerce/sale_invoice_preview.html', context)

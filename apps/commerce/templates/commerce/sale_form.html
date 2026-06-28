@@ -31,7 +31,6 @@
                 <thead>
                     <tr>
                         <th>Produit</th>
-                        <th>Conditionnement</th>
                         <th>Quantité</th>
                         <th>Prix unitaire</th>
                         <th>Supprimer</th>
@@ -41,14 +40,13 @@
                     {% for form_line in formset %}
                         {% if form_line.non_field_errors %}
                             <tr>
-                                <td colspan="5">
+                                <td colspan="4">
                                     <div class="alert alert-danger mb-0">{{ form_line.non_field_errors }}</div>
                                 </td>
                             </tr>
                         {% endif %}
                         <tr>
                             <td>{{ form_line.product }}</td>
-                            <td>{{ form_line.packaging }}</td>
                             <td>{{ form_line.quantity }}</td>
                             <td>{{ form_line.unit_price }}</td>
                             <td>{{ form_line.DELETE }}</td>

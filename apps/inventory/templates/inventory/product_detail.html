@@ -41,42 +41,6 @@
         </div>
     </div>
 
-    <div class="mt-4">
-        <h4 class="h5">Conditionnements</h4>
-        <div class="table-responsive">
-            <table class="table table-sm align-middle">
-                <thead>
-                    <tr>
-                        <th>Nom</th>
-                        <th>Unités de base</th>
-                        <th>Prix par défaut</th>
-                        <th>Code-barres</th>
-                        <th>Statut</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for packaging in product.packagings.all %}
-                        <tr>
-                            <td>{{ packaging.name }}</td>
-                            <td>{{ packaging.unit_quantity }}</td>
-                            <td>{{ packaging.default_sale_price|floatformat:2 }} DZD</td>
-                            <td>{{ packaging.barcode|default:"-" }}</td>
-                            <td>
-                                {% if packaging.is_active %}
-                                    <span class="badge text-bg-success">Actif</span>
-                                {% else %}
-                                    <span class="badge text-bg-secondary">Inactif</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                    {% empty %}
-                        <tr><td colspan="5" class="text-center">Aucun conditionnement défini.</td></tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-
     <div class="form-actions mt-4">
         <a href="{% url 'product_update' product.pk %}" class="btn btn-primary">Modifier</a>
         <a href="{% url 'product_list' %}" class="btn btn-secondary">Retour</a>

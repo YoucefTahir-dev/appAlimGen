@@ -79,7 +79,6 @@
                 <tr>
                     <th>N°</th>
                     <th>Produit</th>
-                    <th>Conditionnement</th>
                     <th class="text-end">Qté</th>
                     <th class="text-end">PU</th>
                     <th class="text-end">TVA</th>
@@ -91,7 +90,6 @@
                     <tr>
                         <td>{{ forloop.counter }}</td>
                         <td>{{ line.product.name }}</td>
-                        <td>{{ line.packaging.name|default:"-" }}</td>
                         <td class="text-end">{{ line.quantity }}</td>
                         <td class="text-end">{{ line.unit_price|floatformat:2 }} DZD</td>
                         <td class="text-end">{{ sale.tax_rate|floatformat:2 }}%</td>
