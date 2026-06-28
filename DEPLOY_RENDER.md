@@ -11,7 +11,8 @@
 1. Pousser le code sur GitHub.
 2. Dans Render, choisir **New > Blueprint**.
 3. Sélectionner ce dépôt.
-4. Render lit `render.yaml`, crée la base PostgreSQL et le service web.
+4. Render lit `render.yaml` et crée le service web.
+5. Renseigner manuellement `DATABASE_URL` avec l’URL PostgreSQL existante.
 
 ## Déploiement manuel
 
@@ -31,9 +32,15 @@ Variables minimales :
 
 - `DJANGO_DEBUG=False`
 - `SECRET_KEY=<clé longue et aléatoire>`
-- `DATABASE_URL=<connection string PostgreSQL Render>`
+- `DATABASE_URL=<connection string PostgreSQL existante>`
 - `ALLOWED_HOSTS=<votre-app>.onrender.com`
 - `CSRF_TRUSTED_ORIGINS=https://<votre-app>.onrender.com`
+
+Exemple de variable `DATABASE_URL` :
+
+```text
+postgresql://user:password@host/database
+```
 
 ## Vérification
 

@@ -14,7 +14,7 @@
 
 ## Base de données
 
-- [ ] PostgreSQL Render connecté via `DATABASE_URL`
+- [ ] PostgreSQL existant connecté via `DATABASE_URL`
 - [ ] Migrations appliquées
 - [ ] Sauvegardes Render configurées
 - [ ] Données locales sensibles non déployées

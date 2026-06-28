@@ -1,9 +1,3 @@
-databases:
-  - name: gestio-stock-db
-    plan: free
-    databaseName: gestio_stock
-    user: gestio_user
-
 services:
   - type: web
     name: gestio-stock-web
@@ -19,9 +13,7 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: DATABASE_URL
-        fromDatabase:
-          name: gestio-stock-db
-          property: connectionString
+        sync: false
       - key: ALLOWED_HOSTS
         value: ".onrender.com"
       - key: CSRF_TRUSTED_ORIGINS
