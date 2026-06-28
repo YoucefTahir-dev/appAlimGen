@@ -16,7 +16,7 @@ class ProductModelTests(TestCase):
         self.brand = Brand.objects.create(name='Brand1')
         self.unit = Unit.objects.create(name='Unit1')
         User = get_user_model()
-        self.user = User.objects.create_user(username='tester', password='pass')
+        self.user = User.objects.create_user(username='tester', password='pass', role=User.MANAGER)
 
     def test_reference_and_qr_generated_on_save(self):
         p = Product.objects.create(

@@ -30,8 +30,10 @@
                         <td>{{ sale.total|floatformat:2 }} DZD</td>
                         <td>
                             <a class="btn btn-sm btn-primary" href="{% url 'sale_invoice_pdf' sale.pk %}">PDF</a>
-                            <a class="btn btn-sm btn-secondary" href="{% url 'sale_update' sale.pk %}">Modifier</a>
-                            <a class="btn btn-sm btn-danger" href="{% url 'sale_delete' sale.pk %}">Supprimer</a>
+                            {% if can_manage %}
+                                <a class="btn btn-sm btn-secondary" href="{% url 'sale_update' sale.pk %}">Modifier</a>
+                                <a class="btn btn-sm btn-danger" href="{% url 'sale_delete' sale.pk %}">Supprimer</a>
+                            {% endif %}
                         </td>
                     </tr>
                 {% empty %}

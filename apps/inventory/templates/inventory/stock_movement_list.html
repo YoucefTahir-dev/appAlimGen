@@ -8,7 +8,9 @@
 <div class="card card-dashboard p-4 bg-white">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h5>Liste des mouvements</h5>
-        <a href="{% url 'stock_movement_create' %}" class="btn btn-success">Ajouter mouvement</a>
+        {% if can_manage %}
+            <a href="{% url 'stock_movement_create' %}" class="btn btn-success">Ajouter mouvement</a>
+        {% endif %}
     </div>
     <div class="table-responsive">
         <table class="table table-hover align-middle">
@@ -30,9 +32,11 @@
                         <td>{{ movement.quantity }}</td>
                         <td>{{ movement.reason }}</td>
                         <td>{{ movement.created_at|date:'d/m/Y H:i' }}</td>
-                        <td>
-                            <a href="{% url 'stock_movement_delete' movement.pk %}" class="btn btn-sm btn-danger">Supprimer</a>
-                        </td>
+                        {% if can_manage %}
+                            <td>
+                                <a href="{% url 'stock_movement_delete' movement.pk %}" class="btn btn-sm btn-danger">Supprimer</a>
+                            </td>
+                        {% endif %}
                     </tr>
                 {% empty %}
                     <tr><td colspan="6" class="text-center">Aucun mouvement de stock enregistré.</td></tr>

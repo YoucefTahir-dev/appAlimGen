@@ -1,22 +1,22 @@
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
+from apps.accounts.permissions import manager_required, seller_required
 from .forms import SaleForm, SaleLineFormSet, PurchaseForm, PurchaseLineFormSet
 from .models import Sale, Purchase
 from .utils import generate_invoice_pdf
 
-@login_required
+@seller_required
 def sale_list(request):
     sales = Sale.objects.select_related('client').all()
     return render(request, 'commerce/sale_list.html', {'sales': sales})
 
-@login_required
+@manager_required
 def purchase_list(request):
     purchases = Purchase.objects.select_related('supplier').all()
     return render(request, 'commerce/purchase_list.html', {'purchases': purchases})
 
-@login_required
+@seller_required
 def sale_create(request):
     form = SaleForm(request.POST or None)
     formset = SaleLineFormSet(request.POST or None, prefix='lines')
@@ -35,7 +35,7 @@ def sale_create(request):
         return redirect('sale_list')
     return render(request, 'commerce/sale_form.html', {'form': form, 'formset': formset, 'title': 'Nouvelle facture'})
 
-@login_required
+@manager_required
 def purchase_create(request):
     form = PurchaseForm(request.POST or None)
     formset = PurchaseLineFormSet(request.POST or None, prefix='lines')
@@ -54,7 +54,7 @@ def purchase_create(request):
         return redirect('purchase_list')
     return render(request, 'commerce/purchase_form.html', {'form': form, 'formset': formset, 'title': 'Nouvel achat'})
 
-@login_required
+@manager_required
 def sale_update(request, pk):
     sale = get_object_or_404(Sale, pk=pk)
     form = SaleForm(request.POST or None, instance=sale)
@@ -73,7 +73,7 @@ def sale_update(request, pk):
         return redirect('sale_list')
     return render(request, 'commerce/sale_form.html', {'form': form, 'formset': formset, 'title': 'Modifier la facture'})
 
-@login_required
+@manager_required
 def sale_delete(request, pk):
     sale = get_object_or_404(Sale, pk=pk)
     if request.method == 'POST':
@@ -82,7 +82,7 @@ def sale_delete(request, pk):
         return redirect('sale_list')
     return render(request, 'commerce/sale_confirm_delete.html', {'sale': sale})
 
-@login_required
+@manager_required
 def purchase_update(request, pk):
     purchase = get_object_or_404(Purchase, pk=pk)
     form = PurchaseForm(request.POST or None, instance=purchase)
@@ -101,7 +101,7 @@ def purchase_update(request, pk):
         return redirect('purchase_list')
     return render(request, 'commerce/purchase_form.html', {'form': form, 'formset': formset, 'title': 'Modifier l\'achat'})
 
-@login_required
+@manager_required
 def purchase_delete(request, pk):
     purchase = get_object_or_404(Purchase, pk=pk)
     if request.method == 'POST':
@@ -110,7 +110,7 @@ def purchase_delete(request, pk):
         return redirect('purchase_list')
     return render(request, 'commerce/purchase_confirm_delete.html', {'purchase': purchase})
 
-@login_required
+@seller_required
 def sale_invoice_pdf(request, pk):
     sale = get_object_or_404(Sale, pk=pk)
     response = HttpResponse(content_type='application/pdf')

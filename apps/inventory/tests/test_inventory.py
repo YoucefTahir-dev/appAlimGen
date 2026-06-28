@@ -7,7 +7,7 @@ from apps.inventory.models import Product, Category, Brand, Unit, Client, Suppli
 class InventoryViewTests(TestCase):
     def setUp(self):
         User = get_user_model()
-        self.user = User.objects.create_user(username='tester', password='pass')
+        self.user = User.objects.create_user(username='tester', password='pass', role=User.MANAGER)
         self.client.login(username='tester', password='pass')
         self.cat = Category.objects.create(name='Cat1')
         self.brand = Brand.objects.create(name='Brand1')

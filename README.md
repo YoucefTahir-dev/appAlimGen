@@ -32,6 +32,43 @@ Application web ERP pour la gestion commerciale, achats, ventes et stock.
 
 5. Accéder à l'application : http://localhost:8000
 
+## Installation Windows (service)
+
+Si vous ne souhaitez pas utiliser Docker et que vous êtes sur Windows, vous pouvez installer l'application comme un service Windows en mode production avec Waitress.
+
+1. Ouvrir PowerShell en tant qu'administrateur.
+2. Créer l'environnement virtuel et installer les dépendances :
+
+   ```cmd
+   .\scripts\ensure_venv.bat
+   ```
+
+3. Exécuter les migrations :
+
+   ```cmd
+   .\.venv\Scripts\python.exe manage.py migrate
+   ```
+
+4. Installer et démarrer le service Windows :
+
+   ```cmd
+   .\scripts\manage_windows_service.bat install
+   ```
+
+5. Gérer le service :
+
+   ```cmd
+   .\scripts\manage_windows_service.bat status
+   .\scripts\manage_windows_service.bat stop
+   .\scripts\manage_windows_service.bat start
+   .\scripts\manage_windows_service.bat restart
+   .\scripts\manage_windows_service.bat uninstall
+   ```
+
+Le service écoute par défaut sur le port `8000` et enregistre les logs dans le dossier `logs/`.
+
+> Assurez-vous d'abord que `.env` est configuré et que `DJANGO_DEBUG=False` en production.
+
 ## Fonctionnalités
 - Authentification sécurisée
 - Gestion des produits et stocks

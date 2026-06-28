@@ -8,7 +8,9 @@
 <div class="card card-dashboard p-4 bg-white">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h5>Liste des achats</h5>
-        <a href="{% url 'purchase_create' %}" class="btn btn-success">Nouveau bon d'achat</a>
+        {% if can_manage %}
+            <a href="{% url 'purchase_create' %}" class="btn btn-success">Nouveau bon d'achat</a>
+        {% endif %}
     </div>
     <div class="table-responsive">
         <table class="table table-hover align-middle">
@@ -28,10 +30,12 @@
                         <td>{{ purchase.supplier.name }}</td>
                         <td>{{ purchase.created_at|date:'d/m/Y' }}</td>
                         <td>{{ purchase.total|floatformat:2 }} DZD</td>
-                        <td>
-                            <a class="btn btn-sm btn-secondary" href="{% url 'purchase_update' purchase.pk %}">Modifier</a>
-                            <a class="btn btn-sm btn-danger" href="{% url 'purchase_delete' purchase.pk %}">Supprimer</a>
-                        </td>
+                        {% if can_manage %}
+                            <td>
+                                <a class="btn btn-sm btn-secondary" href="{% url 'purchase_update' purchase.pk %}">Modifier</a>
+                                <a class="btn btn-sm btn-danger" href="{% url 'purchase_delete' purchase.pk %}">Supprimer</a>
+                            </td>
+                        {% endif %}
                     </tr>
                 {% empty %}
                     <tr><td colspan="5" class="text-center">Aucun achat enregistré.</td></tr>

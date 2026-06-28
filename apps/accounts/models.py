@@ -12,6 +12,7 @@ class User(AbstractUser):
     ]
 
     role = models.CharField(max_length=16, choices=ROLE_CHOICES, default=SELLER)
+    force_password_change = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = 'Utilisateur'

@@ -1,14 +1,13 @@
 import openpyxl
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse, HttpResponseRedirect
+from django.http import HttpResponse
 from django.shortcuts import render, get_object_or_404, redirect
-from django.urls import reverse
+from apps.accounts.permissions import manager_required, seller_required
 from .forms import ProductForm, ClientForm, SupplierForm, StockMovementForm, ImportExcelForm
 from .models import Product, Client, Supplier, StockMovement
 from django.http import FileResponse
 
-@login_required
+@seller_required
 def product_list(request):
     products = Product.objects.select_related('category', 'brand', 'unit')
     query = request.GET.get('q')
@@ -16,7 +15,7 @@ def product_list(request):
         products = products.filter(name__icontains=query) | products.filter(reference__icontains=query) | products.filter(barcode__icontains=query)
     return render(request, 'inventory/product_list.html', {'products': products})
 
-@login_required
+@manager_required
 def product_create(request):
     form = ProductForm(request.POST or None, request.FILES or None)
     if form.is_valid():
@@ -25,7 +24,7 @@ def product_create(request):
         return redirect('product_list')
     return render(request, 'inventory/product_form.html', {'form': form, 'title': 'Ajouter un produit'})
 
-@login_required
+@manager_required
 def product_update(request, pk):
     product = get_object_or_404(Product, pk=pk)
     form = ProductForm(request.POST or None, request.FILES or None, instance=product)
@@ -35,7 +34,7 @@ def product_update(request, pk):
         return redirect('product_list')
     return render(request, 'inventory/product_form.html', {'form': form, 'title': 'Modifier le produit'})
 
-@login_required
+@manager_required
 def product_delete(request, pk):
     product = get_object_or_404(Product, pk=pk)
     if request.method == 'POST':
@@ -44,7 +43,7 @@ def product_delete(request, pk):
         return redirect('product_list')
     return render(request, 'inventory/product_confirm_delete.html', {'product': product})
 
-@login_required
+@manager_required
 def product_import(request):
     form = ImportExcelForm(request.POST or None, request.FILES or None)
     if form.is_valid():
@@ -67,7 +66,7 @@ def product_import(request):
         return redirect('product_list')
     return render(request, 'inventory/product_import.html', {'form': form})
 
-@login_required
+@manager_required
 def product_export(request):
     workbook = openpyxl.Workbook()
     sheet = workbook.active
@@ -89,12 +88,12 @@ def product_export(request):
     workbook.save(response)
     return response
 
-@login_required
+@manager_required
 def client_list(request):
     clients = Client.objects.all()
     return render(request, 'inventory/client_list.html', {'clients': clients})
 
-@login_required
+@seller_required
 def client_create(request):
     form = ClientForm(request.POST or None)
     if form.is_valid():
@@ -103,7 +102,7 @@ def client_create(request):
         return redirect('client_list')
     return render(request, 'inventory/client_form.html', {'form': form, 'title': 'Ajouter un client'})
 
-@login_required
+@manager_required
 def client_update(request, pk):
     client_obj = get_object_or_404(Client, pk=pk)
     form = ClientForm(request.POST or None, instance=client_obj)
@@ -113,7 +112,7 @@ def client_update(request, pk):
         return redirect('client_list')
     return render(request, 'inventory/client_form.html', {'form': form, 'title': 'Modifier le client'})
 
-@login_required
+@manager_required
 def client_delete(request, pk):
     client_obj = get_object_or_404(Client, pk=pk)
     if request.method == 'POST':
@@ -122,12 +121,12 @@ def client_delete(request, pk):
         return redirect('client_list')
     return render(request, 'inventory/client_confirm_delete.html', {'client': client_obj})
 
-@login_required
+@manager_required
 def supplier_list(request):
     suppliers = Supplier.objects.all()
     return render(request, 'inventory/supplier_list.html', {'suppliers': suppliers})
 
-@login_required
+@manager_required
 def supplier_create(request):
     form = SupplierForm(request.POST or None)
     if form.is_valid():
@@ -136,7 +135,7 @@ def supplier_create(request):
         return redirect('supplier_list')
     return render(request, 'inventory/supplier_form.html', {'form': form, 'title': 'Ajouter un fournisseur'})
 
-@login_required
+@manager_required
 def supplier_update(request, pk):
     supplier_obj = get_object_or_404(Supplier, pk=pk)
     form = SupplierForm(request.POST or None, instance=supplier_obj)
@@ -146,7 +145,7 @@ def supplier_update(request, pk):
         return redirect('supplier_list')
     return render(request, 'inventory/supplier_form.html', {'form': form, 'title': 'Modifier le fournisseur'})
 
-@login_required
+@manager_required
 def supplier_delete(request, pk):
     supplier_obj = get_object_or_404(Supplier, pk=pk)
     if request.method == 'POST':
@@ -155,12 +154,12 @@ def supplier_delete(request, pk):
         return redirect('supplier_list')
     return render(request, 'inventory/supplier_confirm_delete.html', {'supplier': supplier_obj})
 
-@login_required
+@seller_required
 def stock_movement_list(request):
     movements = StockMovement.objects.select_related('product').order_by('-created_at')
     return render(request, 'inventory/stock_movement_list.html', {'movements': movements})
 
-@login_required
+@manager_required
 def stock_movement_create(request):
     form = StockMovementForm(request.POST or None)
     if form.is_valid():
@@ -169,7 +168,7 @@ def stock_movement_create(request):
         return redirect('stock_movement_list')
     return render(request, 'inventory/stock_movement_form.html', {'form': form, 'title': 'Ajouter un mouvement de stock'})
 
-@login_required
+@manager_required
 def stock_movement_delete(request, pk):
     movement = get_object_or_404(StockMovement, pk=pk)
     if request.method == 'POST':
@@ -179,13 +178,13 @@ def stock_movement_delete(request, pk):
     return render(request, 'inventory/stock_movement_confirm_delete.html', {'movement': movement})
 
 
-@login_required
+@seller_required
 def product_detail(request, pk):
     product = get_object_or_404(Product, pk=pk)
     return render(request, 'inventory/product_detail.html', {'product': product})
 
 
-@login_required
+@seller_required
 def product_qr_download(request, pk):
     product = get_object_or_404(Product, pk=pk)
     if not product.qr_code:

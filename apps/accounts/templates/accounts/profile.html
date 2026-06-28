@@ -1,0 +1,33 @@
+{% extends 'base/base.html' %}
+{% block title %}Mon Profil{% endblock %}
+
+{% block page_title %}Mon Profil{% endblock %}
+
+{% block content %}
+<div class="row gy-4">
+    <div class="col-lg-6">
+        <div class="card card-dashboard p-4 bg-white">
+            <h2 class="h5 mb-4">Informations du compte</h2>
+            <form method="post">{% csrf_token %}
+                {{ profile_form.non_field_errors }}
+                <div class="mb-3">{{ profile_form.first_name.label_tag }}{{ profile_form.first_name }}</div>
+                <div class="mb-3">{{ profile_form.last_name.label_tag }}{{ profile_form.last_name }}</div>
+                <div class="mb-3">{{ profile_form.email.label_tag }}{{ profile_form.email }}</div>
+                <button class="btn btn-primary" name="update_profile" type="submit">Mettre à jour</button>
+            </form>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card card-dashboard p-4 bg-white">
+            <h2 class="h5 mb-4">Changer mon mot de passe</h2>
+            <form method="post">{% csrf_token %}
+                {{ password_form.non_field_errors }}
+                <div class="mb-3">{{ password_form.old_password.label_tag }}{{ password_form.old_password }}</div>
+                <div class="mb-3">{{ password_form.new_password1.label_tag }}{{ password_form.new_password1 }}</div>
+                <div class="mb-3">{{ password_form.new_password2.label_tag }}{{ password_form.new_password2 }}</div>
+                <button class="btn btn-success" name="change_password" type="submit">Enregistrer</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

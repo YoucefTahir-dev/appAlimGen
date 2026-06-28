@@ -1,5 +1,6 @@
 from django import forms
-from django.forms import inlineformset_factory
+from django.core.exceptions import ValidationError
+from django.forms import BaseInlineFormSet, inlineformset_factory
 from .models import Purchase, PurchaseLine, Sale, SaleLine, Payment
 
 class PurchaseForm(forms.ModelForm):
@@ -35,13 +36,53 @@ class PaymentForm(forms.ModelForm):
             'payment_type': forms.Select(attrs={'class': 'form-select'}),
         }
 
+class BaseSaleLineFormSet(BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+
+        required_by_product = {}
+        available_by_product = {}
+
+        for form in self.forms:
+            cleaned_data = getattr(form, 'cleaned_data', None)
+            if not cleaned_data or cleaned_data.get('DELETE'):
+                continue
+
+            product = cleaned_data.get('product')
+            quantity = cleaned_data.get('quantity') or 0
+            if not product:
+                continue
+
+            required_by_product[product.pk] = required_by_product.get(product.pk, 0) + quantity
+            if product.pk not in available_by_product:
+                available_by_product[product.pk] = product.quantity
+
+            if form.instance and form.instance.pk:
+                old_line = SaleLine.objects.select_related('product').get(pk=form.instance.pk)
+                if old_line.product_id == product.pk:
+                    available_by_product[product.pk] += old_line.quantity
+
+        errors = []
+        for product_id, required_quantity in required_by_product.items():
+            available_quantity = available_by_product.get(product_id, 0)
+            if required_quantity > available_quantity:
+                errors.append(
+                    f'Stock insuffisant pour ce produit : demandé {required_quantity}, disponible {available_quantity}.'
+                )
+
+        if errors:
+            raise ValidationError(errors)
+
+
 PurchaseLineFormSet = inlineformset_factory(Purchase, PurchaseLine, fields=('product', 'quantity', 'purchase_price'), extra=1, can_delete=True, widgets={
     'product': forms.Select(attrs={'class': 'form-select'}),
     'quantity': forms.NumberInput(attrs={'class': 'form-control'}),
     'purchase_price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
 })
 
-SaleLineFormSet = inlineformset_factory(Sale, SaleLine, fields=('product', 'quantity', 'unit_price'), extra=1, can_delete=True, widgets={
+SaleLineFormSet = inlineformset_factory(Sale, SaleLine, formset=BaseSaleLineFormSet, fields=('product', 'quantity', 'unit_price'), extra=1, can_delete=True, widgets={
     'product': forms.Select(attrs={'class': 'form-select'}),
     'quantity': forms.NumberInput(attrs={'class': 'form-control'}),
     'unit_price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),

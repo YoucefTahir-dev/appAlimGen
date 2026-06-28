@@ -1,11 +1,11 @@
-from django.contrib.auth.decorators import login_required
 from django.db.models import Sum, F
 from django.shortcuts import render
 from django.utils import timezone
+from apps.accounts.permissions import seller_required
 from apps.inventory.models import Product, Client, Supplier
 from apps.commerce.models import Sale, Purchase
 
-@login_required
+@seller_required
 def dashboard(request):
     today = timezone.localtime(timezone.now()).date()
     total_products = Product.objects.count()

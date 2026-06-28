@@ -19,11 +19,18 @@
         </div>
         <ul class="nav flex-column p-2">
             <li class="nav-item"><a class="nav-link text-white" href="{% url 'dashboard' %}"><i class="bi bi-speedometer2 me-2"></i> Tableau de bord</a></li>
+            <li class="nav-item"><a class="nav-link text-white" href="{% url 'profile' %}"><i class="bi bi-person-circle me-2"></i> Mon profil</a></li>
             <li class="nav-item"><a class="nav-link text-white" href="{% url 'product_list' %}"><i class="bi bi-box-seam me-2"></i> Produits</a></li>
-            <li class="nav-item"><a class="nav-link text-white" href="{% url 'client_list' %}"><i class="bi bi-people me-2"></i> Clients</a></li>
-            <li class="nav-item"><a class="nav-link text-white" href="{% url 'supplier_list' %}"><i class="bi bi-truck me-2"></i> Fournisseurs</a></li>
+            {% if can_manage %}
+                <li class="nav-item"><a class="nav-link text-white" href="{% url 'client_list' %}"><i class="bi bi-people me-2"></i> Clients</a></li>
+                <li class="nav-item"><a class="nav-link text-white" href="{% url 'supplier_list' %}"><i class="bi bi-truck me-2"></i> Fournisseurs</a></li>
+            {% else %}
+                <li class="nav-item"><a class="nav-link text-white" href="{% url 'client_create' %}"><i class="bi bi-person-plus me-2"></i> Nouveau client</a></li>
+            {% endif %}
             <li class="nav-item"><a class="nav-link text-white" href="{% url 'sale_list' %}"><i class="bi bi-receipt me-2"></i> Ventes</a></li>
-            <li class="nav-item"><a class="nav-link text-white" href="{% url 'purchase_list' %}"><i class="bi bi-cart-plus me-2"></i> Achats</a></li>
+            {% if can_manage %}
+                <li class="nav-item"><a class="nav-link text-white" href="{% url 'purchase_list' %}"><i class="bi bi-cart-plus me-2"></i> Achats</a></li>
+            {% endif %}
         </ul>
     </nav>
     <main class="content flex-fill p-4">

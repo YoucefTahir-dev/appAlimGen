@@ -16,6 +16,11 @@
         </div>
         <hr>
         {{ formset.management_form }}
+        {% if formset.non_form_errors %}
+            <div class="alert alert-danger">
+                {{ formset.non_form_errors }}
+            </div>
+        {% endif %}
         <div class="table-responsive">
             <table class="table table-bordered align-middle">
                 <thead>

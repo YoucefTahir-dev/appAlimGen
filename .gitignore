@@ -4,6 +4,8 @@ __pycache__/
 *.env
 staticfiles/
 media/
+logs/
+scripts/nssm/
 .DS_Store
 .vscode/
 *.sqlite3
