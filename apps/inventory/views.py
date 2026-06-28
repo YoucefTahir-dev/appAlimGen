@@ -181,6 +181,9 @@ def stock_movement_delete(request, pk):
 @seller_required
 def product_detail(request, pk):
     product = get_object_or_404(Product, pk=pk)
+    if not product.barcode or not product.barcode_image or not product.qr_code:
+        product.save()
+        product.refresh_from_db()
     return render(request, 'inventory/product_detail.html', {'product': product})
 
 
@@ -191,3 +194,15 @@ def product_qr_download(request, pk):
         messages.error(request, 'Aucun QR code disponible pour ce produit.')
         return redirect('product_detail', pk=pk)
     return FileResponse(product.qr_code.open('rb'), as_attachment=True, filename=f"{product.reference}_qr.png")
+
+
+@seller_required
+def product_barcode_download(request, pk):
+    product = get_object_or_404(Product, pk=pk)
+    if not product.barcode_image:
+        product.save()
+        product.refresh_from_db()
+    if not product.barcode_image:
+        messages.error(request, 'Aucun code-barres disponible pour ce produit.')
+        return redirect('product_detail', pk=pk)
+    return FileResponse(product.barcode_image.open('rb'), as_attachment=True, filename=f"{product.reference}_barcode.svg")

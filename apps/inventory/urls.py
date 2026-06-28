@@ -19,6 +19,7 @@ from .views import (
     stock_movement_delete,
     product_detail,
     product_qr_download,
+    product_barcode_download,
 )
 
 urlpatterns = [
@@ -28,6 +29,7 @@ urlpatterns = [
     path('products/<int:pk>/delete/', product_delete, name='product_delete'),
     path('products/<int:pk>/', product_detail, name='product_detail'),
     path('products/<int:pk>/download_qr/', product_qr_download, name='product_qr_download'),
+    path('products/<int:pk>/download_barcode/', product_barcode_download, name='product_barcode_download'),
     path('products/import/', product_import, name='product_import'),
     path('products/export/', product_export, name='product_export'),
     path('clients/', client_list, name='client_list'),

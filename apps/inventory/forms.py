@@ -2,6 +2,12 @@ from django import forms
 from .models import Product, Client, Supplier, StockMovement, Brand
 
 class ProductForm(forms.ModelForm):
+    barcode_display = forms.CharField(
+        label='Code-barres',
+        required=False,
+        disabled=True,
+        widget=forms.TextInput(attrs={'class': 'form-control', 'readonly': 'readonly'})
+    )
     brand_text = forms.CharField(
         label='Marque',
         required=False,
@@ -10,9 +16,8 @@ class ProductForm(forms.ModelForm):
 
     class Meta:
         model = Product
-        fields = ['barcode', 'name', 'purchase_price', 'sale_price', 'quantity', 'minimum_stock', 'description', 'photo']
+        fields = ['name', 'purchase_price', 'sale_price', 'quantity', 'minimum_stock', 'description', 'photo']
         widgets = {
-            'barcode': forms.TextInput(attrs={'class': 'form-control'}),
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'purchase_price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'sale_price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
@@ -23,6 +28,7 @@ class ProductForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields['barcode_display'].initial = self.instance.barcode if self.instance and self.instance.pk else 'Généré automatiquement'
         if self.instance and self.instance.pk and self.instance.brand:
             self.fields['brand_text'].initial = self.instance.brand.name
 

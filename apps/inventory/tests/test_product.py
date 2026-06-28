@@ -18,9 +18,8 @@ class ProductModelTests(TestCase):
         User = get_user_model()
         self.user = User.objects.create_user(username='tester', password='pass', role=User.MANAGER)
 
-    def test_reference_and_qr_generated_on_save(self):
+    def test_reference_qr_and_barcode_generated_on_save(self):
         p = Product.objects.create(
-            barcode='123',
             name='Test Product',
             category=self.cat,
             brand=self.brand,
@@ -31,6 +30,9 @@ class ProductModelTests(TestCase):
             minimum_stock=1,
         )
         self.assertTrue(p.reference.startswith('PRD-'))
+        self.assertTrue(p.barcode.startswith('BC-PRD-'))
+        self.assertIsNotNone(p.barcode_image)
+        self.assertTrue(default_storage.exists(p.barcode_image.name))
         self.assertIsNotNone(p.qr_code)
         self.assertTrue(default_storage.exists(p.qr_code.name))
 
@@ -38,7 +40,6 @@ class ProductModelTests(TestCase):
         self.client.login(username='tester', password='pass')
         url = reverse('product_create')
         data = {
-            'barcode': '321',
             'name': 'View Product',
             'brand_text': 'Brand1',
             'purchase_price': '5.00',
@@ -51,5 +52,41 @@ class ProductModelTests(TestCase):
         p = Product.objects.filter(name='View Product').first()
         self.assertIsNotNone(p)
         self.assertTrue(p.reference.startswith('PRD-'))
+        self.assertTrue(p.barcode.startswith('BC-PRD-'))
+        self.assertIsNotNone(p.barcode_image)
+        self.assertTrue(default_storage.exists(p.barcode_image.name))
         self.assertIsNotNone(p.qr_code)
         self.assertTrue(default_storage.exists(p.qr_code.name))
+
+    def test_product_detail_displays_barcode(self):
+        self.client.login(username='tester', password='pass')
+        product = Product.objects.create(
+            name='Barcode Product',
+            category=self.cat,
+            brand=self.brand,
+            unit=self.unit,
+            purchase_price='10.00',
+            sale_price='15.00',
+            quantity=5,
+            minimum_stock=1,
+        )
+        response = self.client.get(reverse('product_detail', args=[product.pk]))
+        self.assertContains(response, product.reference)
+        self.assertContains(response, product.barcode)
+        self.assertContains(response, 'Code-barres')
+
+    def test_barcode_download(self):
+        self.client.login(username='tester', password='pass')
+        product = Product.objects.create(
+            name='Download Barcode',
+            category=self.cat,
+            brand=self.brand,
+            unit=self.unit,
+            purchase_price='10.00',
+            sale_price='15.00',
+            quantity=5,
+            minimum_stock=1,
+        )
+        response = self.client.get(reverse('product_barcode_download', args=[product.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('attachment', response['Content-Disposition'])

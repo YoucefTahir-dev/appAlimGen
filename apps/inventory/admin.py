@@ -18,6 +18,7 @@ class ProductAdmin(admin.ModelAdmin):
     list_display = ('reference', 'barcode', 'name', 'category', 'brand', 'quantity', 'minimum_stock', 'sale_price')
     search_fields = ('reference', 'barcode', 'name')
     list_filter = ('category', 'brand')
+    readonly_fields = ('reference', 'barcode', 'qr_code', 'barcode_image')
 
 @admin.register(StockMovement)
 class StockMovementAdmin(admin.ModelAdmin):

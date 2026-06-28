@@ -3,6 +3,8 @@ from django.utils import timezone
 import io
 import qrcode
 from django.core.files.base import ContentFile
+from reportlab.graphics import renderSVG
+from reportlab.graphics.barcode import createBarcodeDrawing
 
 class Category(models.Model):
     name = models.CharField('Nom catégorie', max_length=120)
@@ -24,7 +26,7 @@ class Unit(models.Model):
 
 class Product(models.Model):
     reference = models.CharField('Référence', max_length=100, unique=True, editable=False)
-    barcode = models.CharField('Code-barres', max_length=100, blank=True)
+    barcode = models.CharField('Code-barres', max_length=100, unique=True, blank=True)
     name = models.CharField('Nom produit', max_length=255)
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, related_name='products')
     brand = models.ForeignKey(Brand, on_delete=models.SET_NULL, null=True, related_name='products')
@@ -36,6 +38,7 @@ class Product(models.Model):
     description = models.TextField('Description', blank=True)
     photo = models.ImageField('Photo', upload_to='products/', blank=True, null=True)
     qr_code = models.ImageField('QR Code', upload_to='qrcodes/', blank=True, null=True)
+    barcode_image = models.FileField('Image code-barres', upload_to='barcodes/', blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -62,6 +65,20 @@ class Product(models.Model):
         new_num = last_num + 1
         return f"{prefix}{new_num:06d}"
 
+    @classmethod
+    def _generate_barcode(cls, reference):
+        return f'BC-{reference}'
+
+    @staticmethod
+    def _build_barcode_svg(barcode_value):
+        drawing = createBarcodeDrawing(
+            'Code128',
+            value=barcode_value,
+            barHeight=44,
+            humanReadable=True,
+        )
+        return renderSVG.drawToString(drawing).encode('utf-8')
+
     def save(self, *args, **kwargs):
         # generate reference if missing
         if not self.reference:
@@ -71,6 +88,12 @@ class Product(models.Model):
                 if not Product.objects.filter(reference=candidate).exists():
                     self.reference = candidate
                     break
+        if not self.barcode and self.reference:
+            self.barcode = self._generate_barcode(self.reference)
+
+        if self.barcode and not self.barcode_image:
+            barcode_svg = self._build_barcode_svg(self.barcode)
+            self.barcode_image.save(f"{self.reference}_barcode.svg", ContentFile(barcode_svg), save=False)
         super().save(*args, **kwargs)
 
         # generate QR code if missing
