@@ -106,6 +106,32 @@ class Product(models.Model):
             self.qr_code.save(f"{self.reference}.png", ContentFile(buf.getvalue()), save=False)
             super().save(update_fields=['qr_code'])
 
+
+class ProductPackaging(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='packagings')
+    name = models.CharField('Conditionnement', max_length=120)
+    unit_quantity = models.PositiveIntegerField("Quantité d'unités de base", default=1)
+    default_sale_price = models.DecimalField('Prix de vente par défaut', max_digits=12, decimal_places=2)
+    barcode = models.CharField('Code-barres conditionnement', max_length=100, unique=True, blank=True, null=True)
+    is_active = models.BooleanField('Actif', default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Conditionnement produit'
+        verbose_name_plural = 'Conditionnements produit'
+        ordering = ['product__name', 'unit_quantity', 'name']
+        constraints = [
+            models.UniqueConstraint(fields=['product', 'name'], name='unique_packaging_name_per_product'),
+            models.CheckConstraint(check=models.Q(unit_quantity__gte=1), name='packaging_unit_quantity_gte_1'),
+        ]
+
+    def __str__(self):
+        return f'{self.product.name} - {self.name}'
+
+    @property
+    def purchase_cost(self):
+        return self.product.purchase_price * self.unit_quantity
+
 class StockMovement(models.Model):
     ENTRY = 'entry'
     EXIT = 'exit'

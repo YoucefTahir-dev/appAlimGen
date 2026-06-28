@@ -180,7 +180,7 @@ def stock_movement_delete(request, pk):
 
 @seller_required
 def product_detail(request, pk):
-    product = get_object_or_404(Product, pk=pk)
+    product = get_object_or_404(Product.objects.prefetch_related('packagings'), pk=pk)
     if not product.barcode or not product.barcode_image or not product.qr_code:
         product.save()
         product.refresh_from_db()

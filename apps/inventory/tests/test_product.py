@@ -5,7 +5,7 @@ from django.conf import settings
 import tempfile
 import shutil
 
-from ..models import Product, Category, Brand, Unit
+from ..models import Product, ProductPackaging, Category, Brand, Unit
 from django.contrib.auth import get_user_model
 
 
@@ -90,3 +90,45 @@ class ProductModelTests(TestCase):
         response = self.client.get(reverse('product_barcode_download', args=[product.pk]))
         self.assertEqual(response.status_code, 200)
         self.assertIn('attachment', response['Content-Disposition'])
+
+    def test_product_packaging_purchase_cost(self):
+        product = Product.objects.create(
+            name='Packaged Product',
+            category=self.cat,
+            brand=self.brand,
+            unit=self.unit,
+            purchase_price='10.00',
+            sale_price='15.00',
+            quantity=48,
+            minimum_stock=1,
+        )
+        packaging = ProductPackaging.objects.create(
+            product=product,
+            name='Carton',
+            unit_quantity=24,
+            default_sale_price='300.00',
+        )
+        self.assertEqual(packaging.purchase_cost, product.purchase_price * 24)
+
+    def test_product_detail_displays_packagings(self):
+        self.client.login(username='tester', password='pass')
+        product = Product.objects.create(
+            name='Packaging Detail',
+            category=self.cat,
+            brand=self.brand,
+            unit=self.unit,
+            purchase_price='10.00',
+            sale_price='15.00',
+            quantity=48,
+            minimum_stock=1,
+        )
+        ProductPackaging.objects.create(
+            product=product,
+            name='Carton',
+            unit_quantity=24,
+            default_sale_price='300.00',
+        )
+        response = self.client.get(reverse('product_detail', args=[product.pk]))
+        self.assertContains(response, 'Conditionnements')
+        self.assertContains(response, 'Carton')
+        self.assertContains(response, '24')
