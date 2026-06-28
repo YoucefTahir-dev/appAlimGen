@@ -6,7 +6,7 @@
 
 {% block content %}
 <div class="card card-dashboard p-4 bg-white">
-    <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="page-toolbar mb-3">
         <h5>Liste des fournisseurs</h5>
         {% if can_manage %}
             <a href="{% url 'supplier_create' %}" class="btn btn-success">Ajouter fournisseur</a>
@@ -21,6 +21,7 @@
                     <th>Wilaya</th>
                     <th>Email</th>
                     <th>RC</th>
+                    {% if can_manage %}<th>Actions</th>{% endif %}
                 </tr>
             </thead>
             <tbody>
@@ -33,13 +34,15 @@
                         <td>{{ supplier.rc_number }}</td>
                         {% if can_manage %}
                             <td>
-                                <a href="{% url 'supplier_update' supplier.pk %}" class="btn btn-sm btn-secondary">Modifier</a>
-                                <a href="{% url 'supplier_delete' supplier.pk %}" class="btn btn-sm btn-danger">Supprimer</a>
+                                <div class="table-actions">
+                                    <a href="{% url 'supplier_update' supplier.pk %}" class="btn btn-sm btn-secondary">Modifier</a>
+                                    <a href="{% url 'supplier_delete' supplier.pk %}" class="btn btn-sm btn-danger">Supprimer</a>
+                                </div>
                             </td>
                         {% endif %}
                     </tr>
                 {% empty %}
-                    <tr><td colspan="5" class="text-center">Aucun fournisseur enregistré.</td></tr>
+                    <tr><td colspan="{% if can_manage %}6{% else %}5{% endif %}" class="text-center">Aucun fournisseur enregistré.</td></tr>
                 {% endfor %}
             </tbody>
         </table>

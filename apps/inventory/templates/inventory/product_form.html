@@ -27,13 +27,15 @@
             <div class="col-md-4 text-center">
                 <label class="form-label">QR Code</label>
                 <div>
-                    <img src="{{ form.instance.qr_code.url }}" alt="QR" class="img-fluid" style="max-width:150px;" />
+                    <img src="{{ form.instance.qr_code.url }}" alt="QR" class="img-fluid qr-image-sm" />
                 </div>
             </div>
             {% endif %}
             <div class="col-12">{{ form.description.label_tag }}{{ form.description }}</div>
         </div>
-        <button class="btn btn-success mt-3">Enregistrer</button>
+        <div class="form-actions mt-3">
+            <button class="btn btn-success">Enregistrer</button>
+        </div>
     </form>
 </div>
 {% endblock %}

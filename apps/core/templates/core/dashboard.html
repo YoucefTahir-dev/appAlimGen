@@ -5,51 +5,51 @@
 {% block page_title %}Tableau de bord{% endblock %}
 
 {% block content %}
-<div class="row g-4">
-    <div class="col-md-4">
-        <div class="card card-dashboard p-4 bg-white">
+<div class="row g-3 g-xl-4 align-items-stretch">
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card card-dashboard dashboard-card p-4 bg-white">
             <h5>Produits</h5>
             <p class="display-6 mb-0">{{ total_products }}</p>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card card-dashboard p-4 bg-white">
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card card-dashboard dashboard-card p-4 bg-white">
             <h5>Valeur du stock</h5>
             <p class="display-6 mb-0">{{ stock_value|floatformat:2 }} DZD</p>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card card-dashboard p-4 bg-white">
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card card-dashboard dashboard-card p-4 bg-white">
             <h5>Clients</h5>
             <p class="display-6 mb-0">{{ total_clients }}</p>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card card-dashboard p-4 bg-white">
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card card-dashboard dashboard-card p-4 bg-white">
             <h5>Fournisseurs</h5>
             <p class="display-6 mb-0">{{ total_suppliers }}</p>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card card-dashboard p-4 bg-white">
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card card-dashboard dashboard-card p-4 bg-white">
             <h5>Ventes du jour</h5>
             <p class="display-6 mb-0">{{ sales_today|floatformat:2 }} DZD</p>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card card-dashboard p-4 bg-white">
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card card-dashboard dashboard-card p-4 bg-white">
             <h5>Achats du jour</h5>
             <p class="display-6 mb-0">{{ purchases_today|floatformat:2 }} DZD</p>
         </div>
     </div>
-    <div class="col-md-6">
-        <div class="card card-dashboard p-4 bg-white">
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card card-dashboard dashboard-card p-4 bg-white">
             <h5>Chiffre d'affaires mensuel</h5>
             <p class="display-6 mb-0">{{ monthly_revenue|floatformat:2 }} DZD</p>
         </div>
     </div>
-    <div class="col-md-6">
-        <div class="card card-dashboard p-4 bg-white">
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card card-dashboard dashboard-card p-4 bg-white">
             <h5>Produits en rupture</h5>
             <p class="display-6 mb-0">{{ out_of_stock }}</p>
         </div>

@@ -16,7 +16,7 @@
         <hr>
         {{ formset.management_form }}
         <div class="table-responsive">
-            <table class="table table-bordered align-middle">
+            <table class="table table-bordered align-middle formset-table">
                 <thead>
                     <tr>
                         <th>Produit</th>
@@ -37,7 +37,9 @@
                 </tbody>
             </table>
         </div>
-        <button class="btn btn-success">Enregistrer</button>
+        <div class="form-actions">
+            <button class="btn btn-success">Enregistrer</button>
+        </div>
     </form>
 </div>
 {% endblock %}

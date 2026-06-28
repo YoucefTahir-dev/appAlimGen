@@ -6,17 +6,17 @@
 
 {% block content %}
 <div class="card card-dashboard p-4 bg-white">
-    <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="page-toolbar mb-3">
         <h5>Liste des produits</h5>
         {% if can_manage %}
-            <div>
-                <a class="btn btn-outline-success me-2" href="{% url 'product_import' %}">Import Excel</a>
-                <a class="btn btn-outline-secondary me-2" href="{% url 'product_export' %}">Export Excel</a>
+            <div class="toolbar-actions">
+                <a class="btn btn-outline-success" href="{% url 'product_import' %}">Import Excel</a>
+                <a class="btn btn-outline-secondary" href="{% url 'product_export' %}">Export Excel</a>
                 <a class="btn btn-success" href="{% url 'product_create' %}">Ajouter produit</a>
             </div>
         {% endif %}
     </div>
-    <form method="get" class="mb-3 d-flex gap-2">
+    <form method="get" class="mb-3 search-form">
         <input type="search" name="q" class="form-control" placeholder="Rechercher..." value="{{ request.GET.q }}" />
         <button type="submit" class="btn btn-primary">Rechercher</button>
     </form>
@@ -31,6 +31,7 @@
                     <th>Prix vente</th>
                     <th>Stock</th>
                     <th>Seuil</th>
+                    {% if can_manage %}<th>Actions</th>{% endif %}
                 </tr>
             </thead>
             <tbody>
@@ -45,14 +46,16 @@
                         <td>{{ product.minimum_stock }}</td>
                         {% if can_manage %}
                             <td>
-                                <a class="btn btn-sm btn-outline-primary" href="{% url 'product_update' product.pk %}">Modifier</a>
-                                <a class="btn btn-sm btn-outline-danger" href="{% url 'product_delete' product.pk %}">Supprimer</a>
+                                <div class="table-actions">
+                                    <a class="btn btn-sm btn-outline-primary" href="{% url 'product_update' product.pk %}">Modifier</a>
+                                    <a class="btn btn-sm btn-outline-danger" href="{% url 'product_delete' product.pk %}">Supprimer</a>
+                                </div>
                             </td>
                         {% endif %}
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="7" class="text-center">Aucun produit trouvé.</td>
+                        <td colspan="{% if can_manage %}8{% else %}7{% endif %}" class="text-center">Aucun produit trouvé.</td>
                     </tr>
                 {% endfor %}
             </tbody>

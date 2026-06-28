@@ -6,25 +6,29 @@
 
 {% block content %}
 <div class="card card-dashboard p-4 bg-white">
-    <h3>{{ product.name }}</h3>
-    <p><strong>Référence:</strong> {{ product.reference }}</p>
-    <p><strong>Catégorie:</strong> {{ product.category }}</p>
-    <p><strong>Marque:</strong> {{ product.brand }}</p>
-    <p><strong>Prix de vente:</strong> {{ product.sale_price }} DA</p>
-    <p><strong>Quantité:</strong> {{ product.quantity }}</p>
+    <div class="row g-4 align-items-start">
+        <div class="col-12 col-lg-8">
+            <h3 class="h4">{{ product.name }}</h3>
+            <p><strong>Référence :</strong> {{ product.reference }}</p>
+            <p><strong>Catégorie :</strong> {{ product.category }}</p>
+            <p><strong>Marque :</strong> {{ product.brand }}</p>
+            <p><strong>Prix de vente :</strong> {{ product.sale_price }} DA</p>
+            <p><strong>Quantité :</strong> {{ product.quantity }}</p>
+        </div>
 
-    {% if product.qr_code %}
-    <div class="mt-3">
-        <img src="{{ product.qr_code.url }}" alt="QR code" style="max-width:200px;" />
+        {% if product.qr_code %}
+        <div class="col-12 col-lg-4 text-lg-center">
+            <img src="{{ product.qr_code.url }}" alt="QR code" class="img-fluid qr-image mb-3" />
+            <div class="form-actions justify-content-lg-center">
+                <a href="{% url 'product_qr_download' product.pk %}" class="btn btn-outline-primary">Télécharger QR</a>
+                <button class="btn btn-outline-secondary" onclick="window.open('{{ product.qr_code.url }}');">Ouvrir QR</button>
+                <button class="btn btn-outline-success" onclick="window.print();">Imprimer</button>
+            </div>
+        </div>
+        {% endif %}
     </div>
-    <div class="mt-2">
-        <a href="{% url 'product_qr_download' product.pk %}" class="btn btn-outline-primary">Télécharger QR</a>
-        <button class="btn btn-outline-secondary" onclick="window.open('{{ product.qr_code.url }}');">Ouvrir QR</button>
-        <button class="btn btn-outline-success" onclick="window.print();">Imprimer</button>
-    </div>
-    {% endif %}
 
-    <div class="mt-4">
+    <div class="form-actions mt-4">
         <a href="{% url 'product_update' product.pk %}" class="btn btn-primary">Modifier</a>
         <a href="{% url 'product_list' %}" class="btn btn-secondary">Retour</a>
     </div>
