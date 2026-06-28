@@ -1,7 +1,7 @@
 from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth import get_user_model
-from apps.inventory.models import Product, Category, Brand, Unit, Client, Supplier
+from apps.inventory.models import Product, ProductPackaging, Category, Brand, Unit, Client, Supplier
 from apps.commerce.models import Sale, Purchase, SaleLine, PurchaseLine
 
 
@@ -26,6 +26,12 @@ class CommerceTests(TestCase):
         )
         self.client_obj = Client.objects.create(name='Client1')
         self.supplier_obj = Supplier.objects.create(name='Supplier1')
+        self.carton = ProductPackaging.objects.create(
+            product=self.product,
+            name='Carton',
+            unit_quantity=24,
+            default_sale_price='300.00',
+        )
 
     def test_purchase_create_and_stock_update(self):
         url = reverse('purchase_create')
@@ -63,6 +69,53 @@ class CommerceTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.product.refresh_from_db()
         self.assertEqual(self.product.quantity, 7)
+
+    def test_sale_by_packaging_decrements_base_stock(self):
+        self.product.quantity = 100
+        self.product.save(update_fields=['quantity'])
+        url = reverse('sale_create')
+        response = self.client.post(url, {
+            'invoice_number': 'INV-CARTON-001',
+            'client': self.client_obj.pk,
+            'discount': '0.00',
+            'tax_rate': '0.00',
+            'lines-TOTAL_FORMS': '1',
+            'lines-INITIAL_FORMS': '0',
+            'lines-MIN_NUM_FORMS': '0',
+            'lines-MAX_NUM_FORMS': '1000',
+            'lines-0-product': str(self.product.pk),
+            'lines-0-packaging': str(self.carton.pk),
+            'lines-0-quantity': '2',
+            'lines-0-unit_price': '300.00',
+        })
+        self.assertEqual(response.status_code, 302)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.quantity, 52)
+        line = SaleLine.objects.get(sale__invoice_number='INV-CARTON-001')
+        self.assertEqual(line.stock_quantity, 48)
+
+    def test_sale_by_packaging_rejects_price_below_purchase_cost(self):
+        initial_quantity = self.product.quantity
+        url = reverse('sale_create')
+        response = self.client.post(url, {
+            'invoice_number': 'INV-LOSS-001',
+            'client': self.client_obj.pk,
+            'discount': '0.00',
+            'tax_rate': '0.00',
+            'lines-TOTAL_FORMS': '1',
+            'lines-INITIAL_FORMS': '0',
+            'lines-MIN_NUM_FORMS': '0',
+            'lines-MAX_NUM_FORMS': '1000',
+            'lines-0-product': str(self.product.pk),
+            'lines-0-packaging': str(self.carton.pk),
+            'lines-0-quantity': '1',
+            'lines-0-unit_price': '200.00',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Le prix de vente est inférieur au coût")
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.quantity, initial_quantity)
+        self.assertFalse(Sale.objects.filter(invoice_number='INV-LOSS-001').exists())
 
     def test_sale_create_rejects_insufficient_stock(self):
         initial_quantity = self.product.quantity
@@ -185,6 +238,26 @@ class CommerceTests(TestCase):
         self.product.refresh_from_db()
         self.assertEqual(self.product.quantity, initial_quantity)
         self.assertFalse(Sale.objects.filter(pk=sale.pk).exists())
+
+    def test_sale_delete_reverts_packaging_stock(self):
+        self.product.quantity = 100
+        self.product.save(update_fields=['quantity'])
+        initial_quantity = self.product.quantity
+        sale = Sale.objects.create(invoice_number='INV-CARTON-DEL', client=self.client_obj, total='0', discount='0', tax_rate='0')
+        SaleLine.objects.create(
+            sale=sale,
+            product=self.product,
+            packaging=self.carton,
+            quantity=2,
+            unit_price='300.00',
+        )
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.quantity, initial_quantity - 48)
+
+        response = self.client.post(reverse('sale_delete', args=[sale.pk]))
+        self.assertEqual(response.status_code, 302)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.quantity, initial_quantity)
 
     def test_purchase_delete_reverts_stock(self):
         initial_quantity = self.product.quantity

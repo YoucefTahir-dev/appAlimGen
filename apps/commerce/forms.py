@@ -1,7 +1,9 @@
 from django import forms
 from django.core.exceptions import ValidationError
 from django.forms import BaseInlineFormSet, inlineformset_factory
-from .models import Purchase, PurchaseLine, Sale, SaleLine, Payment
+
+from .models import Payment, Purchase, PurchaseLine, Sale, SaleLine
+
 
 class PurchaseForm(forms.ModelForm):
     class Meta:
@@ -12,6 +14,7 @@ class PurchaseForm(forms.ModelForm):
             'supplier': forms.Select(attrs={'class': 'form-select'}),
             'tax_rate': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
         }
+
 
 class SaleForm(forms.ModelForm):
     class Meta:
@@ -24,6 +27,7 @@ class SaleForm(forms.ModelForm):
             'tax_rate': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
         }
 
+
 class PaymentForm(forms.ModelForm):
     class Meta:
         model = Payment
@@ -35,6 +39,44 @@ class PaymentForm(forms.ModelForm):
             'amount': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'payment_type': forms.Select(attrs={'class': 'form-select'}),
         }
+
+
+class SaleLineForm(forms.ModelForm):
+    class Meta:
+        model = SaleLine
+        fields = ('product', 'packaging', 'quantity', 'unit_price')
+        widgets = {
+            'product': forms.Select(attrs={'class': 'form-select'}),
+            'packaging': forms.Select(attrs={'class': 'form-select'}),
+            'quantity': forms.NumberInput(attrs={'class': 'form-control'}),
+            'unit_price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+        }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        product = cleaned_data.get('product')
+        packaging = cleaned_data.get('packaging')
+        unit_price = cleaned_data.get('unit_price')
+
+        if product and not packaging:
+            packaging = product.packagings.filter(is_active=True, unit_quantity=1).order_by('pk').first()
+            if packaging:
+                cleaned_data['packaging'] = packaging
+                self.instance.packaging = packaging
+
+        if product and packaging:
+            if packaging.product_id != product.pk:
+                raise ValidationError('Le conditionnement sélectionné ne correspond pas au produit.')
+            if not packaging.is_active:
+                raise ValidationError('Le conditionnement sélectionné est inactif.')
+
+        if product and unit_price is not None:
+            minimum_price = product.purchase_price * (packaging.unit_quantity if packaging else 1)
+            if unit_price < minimum_price:
+                raise ValidationError("Le prix de vente est inférieur au coût d'achat. Vente refusée.")
+
+        return cleaned_data
+
 
 class BaseSaleLineFormSet(BaseInlineFormSet):
     def clean(self):
@@ -51,18 +93,22 @@ class BaseSaleLineFormSet(BaseInlineFormSet):
                 continue
 
             product = cleaned_data.get('product')
+            packaging = cleaned_data.get('packaging')
             quantity = cleaned_data.get('quantity') or 0
             if not product:
                 continue
 
-            required_by_product[product.pk] = required_by_product.get(product.pk, 0) + quantity
+            unit_quantity = packaging.unit_quantity if packaging else 1
+            required_quantity = quantity * unit_quantity
+
+            required_by_product[product.pk] = required_by_product.get(product.pk, 0) + required_quantity
             if product.pk not in available_by_product:
                 available_by_product[product.pk] = product.quantity
 
             if form.instance and form.instance.pk:
-                old_line = SaleLine.objects.select_related('product').get(pk=form.instance.pk)
+                old_line = SaleLine.objects.select_related('product', 'packaging').get(pk=form.instance.pk)
                 if old_line.product_id == product.pk:
-                    available_by_product[product.pk] += old_line.quantity
+                    available_by_product[product.pk] += old_line.stock_quantity
 
         errors = []
         for product_id, required_quantity in required_by_product.items():
@@ -76,14 +122,24 @@ class BaseSaleLineFormSet(BaseInlineFormSet):
             raise ValidationError(errors)
 
 
-PurchaseLineFormSet = inlineformset_factory(Purchase, PurchaseLine, fields=('product', 'quantity', 'purchase_price'), extra=1, can_delete=True, widgets={
-    'product': forms.Select(attrs={'class': 'form-select'}),
-    'quantity': forms.NumberInput(attrs={'class': 'form-control'}),
-    'purchase_price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-})
+PurchaseLineFormSet = inlineformset_factory(
+    Purchase,
+    PurchaseLine,
+    fields=('product', 'quantity', 'purchase_price'),
+    extra=1,
+    can_delete=True,
+    widgets={
+        'product': forms.Select(attrs={'class': 'form-select'}),
+        'quantity': forms.NumberInput(attrs={'class': 'form-control'}),
+        'purchase_price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+    },
+)
 
-SaleLineFormSet = inlineformset_factory(Sale, SaleLine, formset=BaseSaleLineFormSet, fields=('product', 'quantity', 'unit_price'), extra=1, can_delete=True, widgets={
-    'product': forms.Select(attrs={'class': 'form-select'}),
-    'quantity': forms.NumberInput(attrs={'class': 'form-control'}),
-    'unit_price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-})
+SaleLineFormSet = inlineformset_factory(
+    Sale,
+    SaleLine,
+    form=SaleLineForm,
+    formset=BaseSaleLineFormSet,
+    extra=1,
+    can_delete=True,
+)

@@ -17,7 +17,7 @@ class SaleAdmin(admin.ModelAdmin):
 
 @admin.register(SaleLine)
 class SaleLineAdmin(admin.ModelAdmin):
-    list_display = ('sale', 'product', 'quantity', 'unit_price')
+    list_display = ('sale', 'product', 'packaging', 'quantity', 'unit_price')
 
 @admin.register(Payment)
 class PaymentAdmin(admin.ModelAdmin):
