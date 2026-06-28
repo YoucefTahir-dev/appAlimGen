@@ -1,7 +1,7 @@
 import os
 from importlib.util import find_spec
 from pathlib import Path
-from urllib.parse import urlparse, unquote
+from urllib.parse import parse_qsl, urlparse, unquote
 from dotenv import load_dotenv
 from django.core.exceptions import ImproperlyConfigured
 
@@ -105,15 +105,20 @@ WSGI_APPLICATION = 'gestio_stock.wsgi.application'
 DATABASE_URL = os.getenv('DATABASE_URL', '').strip()
 if DATABASE_URL:
     parsed_database_url = urlparse(DATABASE_URL)
+    database_options = dict(parse_qsl(parsed_database_url.query, keep_blank_values=True))
+    database_config = {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': parsed_database_url.path.lstrip('/'),
+        'USER': unquote(parsed_database_url.username or ''),
+        'PASSWORD': unquote(parsed_database_url.password or ''),
+        'HOST': parsed_database_url.hostname or '',
+        'PORT': str(parsed_database_url.port or 5432),
+    }
+    if database_options:
+        database_config['OPTIONS'] = database_options
+
     DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': parsed_database_url.path.lstrip('/'),
-            'USER': unquote(parsed_database_url.username or ''),
-            'PASSWORD': unquote(parsed_database_url.password or ''),
-            'HOST': parsed_database_url.hostname or '',
-            'PORT': str(parsed_database_url.port or 5432),
-        }
+        'default': database_config
     }
 else:
     DATABASE_ENGINE = os.getenv('DATABASE_ENGINE', 'sqlite').lower()

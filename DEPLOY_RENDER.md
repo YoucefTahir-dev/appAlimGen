@@ -3,7 +3,7 @@
 ## Pré-requis
 
 - Un dépôt Git connecté à Render.
-- Une base PostgreSQL Render.
+- Une base PostgreSQL existante, par exemple Neon ou Render PostgreSQL.
 - Les variables d’environnement définies dans `render.yaml`.
 
 ## Déploiement Blueprint
@@ -39,8 +39,11 @@ Variables minimales :
 Exemple de variable `DATABASE_URL` :
 
 ```text
-postgresql://user:password@host/database
+postgresql://user:password@host/database?sslmode=require
 ```
+
+Avec Neon, copier l’URL complète fournie par Neon, y compris les paramètres de fin
+comme `sslmode=require` ou `channel_binding=require`.
 
 ## Vérification
 
