@@ -256,6 +256,19 @@ class CommerceTests(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['Content-Type'], 'application/pdf')
+        self.assertTrue(response.content.startswith(b'%PDF'))
+
+    def test_sale_invoice_preview(self):
+        self.product.quantity = 100
+        self.product.save(update_fields=['quantity'])
+        sale = Sale.objects.create(invoice_number='FAC-2026-000100', client=self.client_obj, total='0', discount='0', tax_rate='10')
+        SaleLine.objects.create(sale=sale, product=self.product, packaging=self.carton, quantity=1, unit_price='300.00')
+        response = self.client.get(reverse('sale_invoice_preview', args=[sale.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'FACTURE')
+        self.assertContains(response, sale.invoice_number)
+        self.assertContains(response, 'الأمين للمواد الغذائية و غير الغذائية')
+        self.assertContains(response, 'Télécharger PDF')
 
     def test_sale_delete_reverts_stock(self):
         initial_quantity = self.product.quantity

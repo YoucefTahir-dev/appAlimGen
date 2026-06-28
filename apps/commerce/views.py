@@ -8,7 +8,7 @@ from apps.accounts.permissions import manager_required, seller_required
 
 from .forms import PurchaseForm, PurchaseLineFormSet, SaleForm, SaleLineFormSet
 from .models import InvoiceSequence, Purchase, Sale
-from .utils import generate_invoice_pdf
+from .utils import build_invoice_context, generate_invoice_pdf
 
 
 def generate_invoice_number():
@@ -138,3 +138,11 @@ def sale_invoice_pdf(request, pk):
     response['Content-Disposition'] = f'attachment; filename=facture_{sale.invoice_number}.pdf'
     generate_invoice_pdf(response, sale)
     return response
+
+
+@seller_required
+def sale_invoice_preview(request, pk):
+    sale = get_object_or_404(Sale.objects.select_related('client').prefetch_related('lines__product', 'lines__packaging'), pk=pk)
+    context = build_invoice_context(sale)
+    context['auto_print'] = request.GET.get('print') == '1'
+    return render(request, 'commerce/sale_invoice_preview.html', context)
