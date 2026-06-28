@@ -29,19 +29,24 @@
                         <td>{{ sale.created_at|date:'d/m/Y' }}</td>
                         <td>{{ sale.total|floatformat:2 }} DZD</td>
                         <td>
-                            <div class="dropdown action-dropdown">
-                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                    Actions
-                                </button>
-                                <ul class="dropdown-menu dropdown-menu-end">
-                                    <li><a class="dropdown-item" href="{% url 'sale_invoice_pdf' sale.pk %}"><i class="bi bi-file-earmark-pdf me-2"></i>Télécharger PDF</a></li>
-                                    <li><a class="dropdown-item" href="{% url 'sale_invoice_pdf' sale.pk %}" target="_blank"><i class="bi bi-printer me-2"></i>Imprimer</a></li>
-                                    {% if can_manage %}
-                                        <li><hr class="dropdown-divider"></li>
-                                        <li><a class="dropdown-item" href="{% url 'sale_update' sale.pk %}"><i class="bi bi-pencil me-2"></i>Modifier</a></li>
-                                        <li><a class="dropdown-item text-danger" href="{% url 'sale_delete' sale.pk %}"><i class="bi bi-trash me-2"></i>Supprimer</a></li>
-                                    {% endif %}
-                                </ul>
+                            <div class="table-actions">
+                                <a class="btn btn-sm btn-outline-primary" href="{% url 'sale_invoice_pdf' sale.pk %}" target="_blank">
+                                    <i class="bi bi-eye"></i> Visualiser
+                                </a>
+                                <a class="btn btn-sm btn-outline-danger" href="{% url 'sale_invoice_pdf' sale.pk %}">
+                                    <i class="bi bi-file-earmark-pdf"></i> PDF
+                                </a>
+                                <a class="btn btn-sm btn-outline-secondary" href="{% url 'sale_invoice_pdf' sale.pk %}" target="_blank" onclick="setTimeout(() => window.print(), 600);">
+                                    <i class="bi bi-printer"></i> Imprimer
+                                </a>
+                                {% if can_manage %}
+                                    <a class="btn btn-sm btn-outline-success" href="{% url 'sale_update' sale.pk %}">
+                                        <i class="bi bi-pencil"></i> Modifier
+                                    </a>
+                                    <a class="btn btn-sm btn-outline-danger" href="{% url 'sale_delete' sale.pk %}">
+                                        <i class="bi bi-trash"></i> Supprimer
+                                    </a>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>

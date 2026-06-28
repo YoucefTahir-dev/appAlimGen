@@ -88,6 +88,19 @@ class Sale(models.Model):
         super().delete(*args, **kwargs)
 
 
+class InvoiceSequence(models.Model):
+    year = models.PositiveIntegerField(unique=True)
+    last_number = models.PositiveIntegerField(default=0)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Séquence facture'
+        verbose_name_plural = 'Séquences factures'
+
+    def __str__(self):
+        return f'{self.year} - {self.last_number}'
+
+
 class SaleLine(models.Model):
     sale = models.ForeignKey(Sale, on_delete=models.CASCADE, related_name='lines')
     product = models.ForeignKey(Product, on_delete=models.PROTECT)

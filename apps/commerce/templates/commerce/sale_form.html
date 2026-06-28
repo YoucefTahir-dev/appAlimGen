@@ -9,7 +9,12 @@
     <form method="post">
         {% csrf_token %}
         <div class="row g-3">
-            <div class="col-md-6">{{ form.invoice_number.label_tag }}{{ form.invoice_number }}</div>
+            {% if form.instance.pk %}
+                <div class="col-md-6">
+                    <label class="form-label">Numéro facture</label>
+                    <input type="text" class="form-control" value="{{ form.instance.invoice_number }}" readonly>
+                </div>
+            {% endif %}
             <div class="col-md-6">{{ form.client.label_tag }}{{ form.client }}</div>
             <div class="col-md-6">{{ form.discount.label_tag }}{{ form.discount }}</div>
             <div class="col-md-6">{{ form.tax_rate.label_tag }}{{ form.tax_rate }}</div>

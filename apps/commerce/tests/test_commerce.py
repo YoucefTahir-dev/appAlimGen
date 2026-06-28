@@ -2,7 +2,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 from apps.inventory.models import Product, ProductPackaging, Category, Brand, Unit, Client, Supplier
-from apps.commerce.models import Sale, Purchase, SaleLine, PurchaseLine
+from apps.commerce.models import InvoiceSequence, Sale, Purchase, SaleLine, PurchaseLine
 
 
 class CommerceTests(TestCase):
@@ -67,6 +67,8 @@ class CommerceTests(TestCase):
             'lines-0-unit_price': '15.00',
         })
         self.assertEqual(response.status_code, 302)
+        sale = Sale.objects.latest('pk')
+        self.assertRegex(sale.invoice_number, r'^FAC-\d{4}-000001$')
         self.product.refresh_from_db()
         self.assertEqual(self.product.quantity, 7)
 
@@ -91,8 +93,39 @@ class CommerceTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.product.refresh_from_db()
         self.assertEqual(self.product.quantity, 52)
-        line = SaleLine.objects.get(sale__invoice_number='INV-CARTON-001')
+        line = SaleLine.objects.latest('pk')
         self.assertEqual(line.stock_quantity, 48)
+
+    def test_invoice_number_is_sequential_and_not_reused_after_delete(self):
+        url = reverse('sale_create')
+        payload = {
+            'client': self.client_obj.pk,
+            'discount': '0.00',
+            'tax_rate': '0.00',
+            'lines-TOTAL_FORMS': '1',
+            'lines-INITIAL_FORMS': '0',
+            'lines-MIN_NUM_FORMS': '0',
+            'lines-MAX_NUM_FORMS': '1000',
+            'lines-0-product': str(self.product.pk),
+            'lines-0-quantity': '1',
+            'lines-0-unit_price': '15.00',
+        }
+
+        first_response = self.client.post(url, payload)
+        self.assertEqual(first_response.status_code, 302)
+        first_sale = Sale.objects.latest('pk')
+        first_number = first_sale.invoice_number
+
+        self.client.post(reverse('sale_delete', args=[first_sale.pk]))
+
+        second_response = self.client.post(url, payload)
+        self.assertEqual(second_response.status_code, 302)
+        second_sale = Sale.objects.latest('pk')
+
+        self.assertRegex(first_number, r'^FAC-\d{4}-000001$')
+        self.assertRegex(second_sale.invoice_number, r'^FAC-\d{4}-000002$')
+        self.assertNotEqual(first_number, second_sale.invoice_number)
+        self.assertEqual(InvoiceSequence.objects.get(year=second_sale.created_at.year).last_number, 2)
 
     def test_sale_by_packaging_rejects_price_below_purchase_cost(self):
         initial_quantity = self.product.quantity
