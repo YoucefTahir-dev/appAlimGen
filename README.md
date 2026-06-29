@@ -1,95 +1,167 @@
-# El Amine ERP - Gestion Commerciale & Stock
+# El Amine ERP — Gestion commerciale & stock
 
-Application web ERP pour la gestion commerciale, achats, ventes et stock.
+Application web ERP Django pour la gestion commerciale, les ventes, les achats, les clients, les fournisseurs, les factures PDF et le stock de l’entreprise **El Amine**.
 
-## Technologie
-- Backend: Django
-- Base de données: SQLite pour le mode local / PostgreSQL pour production
-- Frontend: Bootstrap 5, HTML, CSS, JavaScript
-- Génération PDF: ReportLab
+## Stack technique
 
-## Installation rapide
+- Backend : Django 5
+- Base de données locale : SQLite
+- Base de données production : PostgreSQL compatible Render / Neon
+- Frontend : Bootstrap 5, HTML, CSS, JavaScript
+- PDF : ReportLab
+- Static files : WhiteNoise
+- CI : GitHub Actions
+- Déploiement : Render
 
-1. Copier `.env.example` vers `.env`.
-2. Démarrer les services Docker:
+## Architecture
 
-   ```bash
-   docker compose up -d --build
-   ```
+```text
+apps/
+  accounts/   Authentification, rôles, permissions, récupération admin
+  core/       Dashboard, paramètres société, logs d’audit, sécurité
+  inventory/  Produits, stock, clients, fournisseurs, imports/exports
+  commerce/   Achats, ventes, factures PDF
+gestio_stock/ Configuration Django
+static/       CSS, logo et assets
+templates/    Templates globaux
+scripts/      Scripts d’exploitation locale
+```
 
-3. Exécuter les migrations et créer un utilisateur administrateur:
+## Installation locale
 
-   ```bash
-   docker compose exec web python manage.py migrate
-   docker compose exec web python manage.py createsuperuser
-   ```
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+Copy-Item .env.example .env
+.\.venv\Scripts\python.exe manage.py migrate
+.\.venv\Scripts\python.exe manage.py createsuperuser
+.\.venv\Scripts\python.exe manage.py runserver
+```
 
-4. Charger les données de démonstration:
+Application locale :
 
-   ```bash
-   docker compose exec web python scripts/seed_demo.py
-   ```
+```text
+http://127.0.0.1:8000
+```
 
-5. Accéder à l'application : http://localhost:8000
+Pour un démarrage local simple, utiliser dans `.env` :
 
-## Installation Windows (service)
+```env
+DJANGO_DEBUG=True
+DATABASE_ENGINE=sqlite
+DATABASE_URL=
+```
 
-Si vous ne souhaitez pas utiliser Docker et que vous êtes sur Windows, vous pouvez installer l'application comme un service Windows en mode production avec Waitress.
+## Tests et validation
 
-1. Ouvrir PowerShell en tant qu'administrateur.
-2. Créer l'environnement virtuel et installer les dépendances :
+Commandes recommandées avant chaque merge :
 
-   ```cmd
-   .\scripts\ensure_venv.bat
-   ```
+```powershell
+.\.venv\Scripts\python.exe manage.py check
+.\.venv\Scripts\python.exe manage.py makemigrations --check --dry-run
+.\.venv\Scripts\python.exe manage.py test
+.\.venv\Scripts\python.exe -m pip_audit -r requirements.txt
+```
 
-3. Exécuter les migrations :
+Pour vérifier les paramètres production :
 
-   ```cmd
-   .\.venv\Scripts\python.exe manage.py migrate
-   ```
+```powershell
+.\.venv\Scripts\python.exe manage.py check --deploy
+```
 
-4. Installer et démarrer le service Windows :
+## Déploiement Render
 
-   ```cmd
-   .\scripts\manage_windows_service.bat install
-   ```
+Le dépôt contient :
 
-5. Gérer le service :
+- `render.yaml`
+- `build.sh`
+- `start.sh`
+- `runtime.txt`
+- `Procfile`
 
-   ```cmd
-   .\scripts\manage_windows_service.bat status
-   .\scripts\manage_windows_service.bat stop
-   .\scripts\manage_windows_service.bat start
-   .\scripts\manage_windows_service.bat restart
-   .\scripts\manage_windows_service.bat uninstall
-   ```
+Variables Render minimales :
 
-Le service écoute par défaut sur le port `8000` et enregistre les logs dans le dossier `logs/`.
+```env
+DJANGO_DEBUG=False
+SECRET_KEY=<clé longue et aléatoire>
+ALLOWED_HOSTS=.onrender.com
+CSRF_TRUSTED_ORIGINS=https://*.onrender.com
+DATABASE_URL=<URL PostgreSQL Render ou Neon>
+SECURE_SSL_REDIRECT=True
+SESSION_COOKIE_SECURE=True
+CSRF_COOKIE_SECURE=True
+SECURE_HSTS_SECONDS=31536000
+SESSION_IDLE_TIMEOUT_SECONDS=1800
+```
 
-> Assurez-vous d'abord que `.env` est configuré et que `DJANGO_DEBUG=False` en production.
+Voir aussi [DEPLOY_RENDER.md](DEPLOY_RENDER.md).
 
-## Fonctionnalités
-- Authentification sécurisée
-- Gestion des produits et stocks
-- Achats, ventes, facturation PDF
-- Gestion clients et fournisseurs
-- Rapports PDF et Excel
-- Administration des utilisateurs
-- Paramètres société
+## Workflow Git
 
-## Structure
-- `apps/accounts`: gestion des utilisateurs et rôles
-- `apps/core`: tableau de bord, paramètres société et audit
-- `apps/inventory`: produits, stock, fournisseurs, clients
-- `apps/commerce`: achats, ventes, factures, paiements
+`main` représente uniquement la version stable de production.
 
-## GitHub CI
-Ce dépôt utilise GitHub Actions pour exécuter les tests automatiquement sur chaque push ou pull request vers `main`.
+Ne pas développer directement sur `main`.
 
-## Logo
-Placez le logo de l'entreprise dans `static/img/logo.png`.
+Branches recommandées :
 
-## Notes
-- Utilisez le mode production `DJANGO_DEBUG=False`
-- Protégez la base de données et effectuez des sauvegardes régulières.
+```text
+feature/nom-fonctionnalite
+fix/nom-correction
+security/nom-durcissement
+refactor/nom-refactor
+docs/nom-documentation
+chore/nom-maintenance
+```
+
+Process :
+
+1. Créer une branche depuis `main`.
+2. Faire des commits petits et explicites.
+3. Exécuter les validations.
+4. Fusionner vers `main` uniquement si tout passe.
+5. Taguer les versions stables.
+
+Messages de commit recommandés :
+
+```text
+feat(products): ajout ...
+fix(stock): correction ...
+security(csrf): protection ...
+refactor(views): simplification ...
+docs(render): mise à jour ...
+test(stock): ajout tests ...
+chore(git): nettoyage ...
+```
+
+## Versions
+
+Les versions stables sont taguées :
+
+```text
+v1.0.0
+v1.1.0
+v2.0.0
+```
+
+Le détail est documenté dans [CHANGELOG.md](CHANGELOG.md).
+
+## Sécurité
+
+Le projet active notamment :
+
+- validation `SECRET_KEY` forte en production ;
+- cookies sécurisés en production ;
+- CSRF Django ;
+- `X-Frame-Options=DENY` ;
+- CSP ;
+- HSTS configurable ;
+- expiration d’inactivité ;
+- journalisation sécurité ;
+- validation des uploads ;
+- audit dépendances via `pip-audit`.
+
+## Récupération admin
+
+Voir [PASSWORD_RECOVERY.md](PASSWORD_RECOVERY.md).

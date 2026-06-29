@@ -45,12 +45,20 @@ jobs:
       - name: Configure environment
         run: |
           cp .env.example .env
-          echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/test_db" >> .env
-          echo "DJANGO_DEBUG=False" >> .env
-          echo "SECRET_KEY=ci_secret_key" >> .env
+          sed -i 's|^DATABASE_URL=.*|DATABASE_URL=postgresql://postgres:postgres@localhost:5432/test_db|' .env
+          sed -i 's|^DJANGO_DEBUG=.*|DJANGO_DEBUG=False|' .env
+          sed -i 's|^SECRET_KEY=.*|SECRET_KEY=ci-secret-key-for-tests-only-abcdefghijklmnopqrstuvwxyz-1234567890|' .env
+
+      - name: Check pending migrations
+        run: python manage.py makemigrations --check --dry-run
 
       - name: Run migrations
         run: python manage.py migrate --noinput
 
       - name: Run tests
         run: python manage.py test --verbosity=2
+
+      - name: Audit dependencies
+        run: |
+          pip install pip-audit
+          python -m pip_audit -r requirements.txt
