@@ -1,5 +1,9 @@
-from django.core.management.base import BaseCommand
+from getpass import getpass
+
 from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
+from django.core.management.base import BaseCommand
+
 
 class Command(BaseCommand):
     help = 'Créer un superutilisateur de secours'
@@ -7,17 +11,18 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         User = get_user_model()
 
-        username = input('Nom d\'utilisateur : ').strip()
+        username = input("Nom d'utilisateur : ").strip()
         email = input('Email : ').strip()
         while True:
-            password = input('Mot de passe : ')
-            password_confirm = input('Confirmation du mot de passe : ')
+            password = getpass('Mot de passe : ')
+            password_confirm = getpass('Confirmation du mot de passe : ')
             if password != password_confirm:
                 self.stdout.write(self.style.ERROR('Les mots de passe ne correspondent pas.'))
                 continue
             if not password:
                 self.stdout.write(self.style.ERROR('Le mot de passe ne peut pas être vide.'))
                 continue
+            validate_password(password)
             break
 
         if User.objects.filter(username=username).exists():

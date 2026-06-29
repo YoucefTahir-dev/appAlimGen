@@ -20,13 +20,25 @@ from .forms import (
     StyledSetPasswordForm,
 )
 from .models import User
+from apps.core.security import log_security_event
 
 class UserLoginView(LoginView):
     template_name = 'accounts/login.html'
     authentication_form = LoginForm
 
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        log_security_event(self.request, 'Connexion réussie', user=form.get_user())
+        return response
+
+    def form_invalid(self, form):
+        username = self.request.POST.get('username', '')[:80]
+        log_security_event(self.request, f'Tentative de connexion échouée pour {username}', level='warning', status_code=401)
+        return super().form_invalid(form)
+
 @login_required
 def user_logout(request):
+    log_security_event(request, 'Déconnexion')
     logout(request)
     return redirect('login')
 
@@ -45,6 +57,7 @@ class UserProfileView(LoginRequiredMixin, View):
             if password_form.is_valid():
                 user = password_form.save()
                 update_session_auth_hash(request, user)
+                log_security_event(request, 'Changement de mot de passe')
                 return redirect('password_change_done')
         elif 'update_profile' in request.POST:
             if profile_form.is_valid():

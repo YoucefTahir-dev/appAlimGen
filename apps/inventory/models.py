@@ -7,6 +7,8 @@ from django.utils import timezone
 from reportlab.graphics import renderSVG
 from reportlab.graphics.barcode import createBarcodeDrawing
 
+from apps.core.security import product_photo_upload_to, validate_image_upload
+
 
 class Category(models.Model):
     name = models.CharField('Nom catégorie', max_length=120)
@@ -41,7 +43,7 @@ class Product(models.Model):
     quantity = models.PositiveIntegerField('Quantité en stock', default=0)
     minimum_stock = models.PositiveIntegerField('Stock minimum', default=0)
     description = models.TextField('Description', blank=True)
-    photo = models.ImageField('Photo', upload_to='products/', blank=True, null=True)
+    photo = models.ImageField('Photo', upload_to=product_photo_upload_to, validators=[validate_image_upload], blank=True, null=True)
     qr_code = models.ImageField('QR Code', upload_to='qrcodes/', blank=True, null=True)
     barcode_image = models.FileField('Image code-barres', upload_to='barcodes/', blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)

@@ -1,4 +1,5 @@
 from django import forms
+from apps.core.security import validate_excel_upload
 from .models import Product, Client, Supplier, StockMovement, Brand
 
 class ProductForm(forms.ModelForm):
@@ -83,4 +84,8 @@ class StockMovementForm(forms.ModelForm):
         }
 
 class ImportExcelForm(forms.Form):
-    file = forms.FileField(label='Fichier Excel', widget=forms.FileInput(attrs={'class': 'form-control'}))
+    file = forms.FileField(
+        label='Fichier Excel',
+        validators=[validate_excel_upload],
+        widget=forms.FileInput(attrs={'class': 'form-control'}),
+    )

@@ -59,7 +59,10 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'apps.core.security.SessionIdleTimeoutMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    'apps.core.security.SecurityAuditMiddleware',
+    'apps.core.security.SecurityHeadersMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
@@ -80,6 +83,29 @@ CSRF_COOKIE_SECURE = env_bool('CSRF_COOKIE_SECURE', not DEBUG)
 CSRF_COOKIE_SAMESITE = os.getenv('CSRF_COOKIE_SAMESITE', 'Lax')
 CSRF_TRUSTED_ORIGINS = os.getenv('CSRF_TRUSTED_ORIGINS', '').split()
 X_FRAME_OPTIONS = os.getenv('X_FRAME_OPTIONS', 'DENY')
+SESSION_COOKIE_AGE = env_int('SESSION_COOKIE_AGE', 60 * 60 * 8)
+SESSION_SAVE_EVERY_REQUEST = env_bool('SESSION_SAVE_EVERY_REQUEST', True)
+SESSION_IDLE_TIMEOUT_SECONDS = env_int('SESSION_IDLE_TIMEOUT_SECONDS', 60 * 30)
+MAX_IMAGE_UPLOAD_SIZE = env_int('MAX_IMAGE_UPLOAD_SIZE', 5 * 1024 * 1024)
+MAX_EXCEL_UPLOAD_SIZE = env_int('MAX_EXCEL_UPLOAD_SIZE', 10 * 1024 * 1024)
+
+SECURITY_RESPONSE_HEADERS = {
+    'Content-Security-Policy': os.getenv(
+        'CONTENT_SECURITY_POLICY',
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "font-src 'self' https://cdn.jsdelivr.net data:; "
+        "img-src 'self' data:; "
+        "object-src 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self'; "
+        "frame-ancestors 'none';"
+    ),
+    'Permissions-Policy': os.getenv('PERMISSIONS_POLICY', 'camera=(), microphone=(), geolocation=(), payment=()'),
+    'Cross-Origin-Opener-Policy': os.getenv('CROSS_ORIGIN_OPENER_POLICY', 'same-origin'),
+    'Cross-Origin-Resource-Policy': os.getenv('CROSS_ORIGIN_RESOURCE_POLICY', 'same-origin'),
+}
 
 ROOT_URLCONF = 'gestio_stock.urls'
 
@@ -187,3 +213,27 @@ EMAIL_PORT = int(os.getenv('EMAIL_PORT', '25'))
 EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'False') == 'True'
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'standard': {
+            'format': '[{asctime}] {levelname} {name}: {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'standard',
+        },
+    },
+    'loggers': {
+        'security': {
+            'handlers': ['console'],
+            'level': os.getenv('SECURITY_LOG_LEVEL', 'INFO'),
+            'propagate': False,
+        },
+    },
+}

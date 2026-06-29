@@ -32,6 +32,8 @@ services:
         value: "False"
       - key: USE_X_FORWARDED_PROTO
         value: "True"
+      - key: SESSION_IDLE_TIMEOUT_SECONDS
+        value: "1800"
       - key: WEB_CONCURRENCY
         value: "2"
       - key: WEB_TIMEOUT
