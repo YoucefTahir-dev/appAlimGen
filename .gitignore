@@ -2,6 +2,10 @@ __pycache__/
 *.pyc
 *.pyo
 *.env
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
 staticfiles/
 media/
 logs/
@@ -9,3 +13,4 @@ scripts/nssm/
 .DS_Store
 .vscode/
 *.sqlite3
+test_run_output.txt
