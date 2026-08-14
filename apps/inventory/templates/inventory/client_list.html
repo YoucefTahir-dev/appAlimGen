@@ -1,27 +1,28 @@
 {% extends 'base/base.html' %}
+{% load i18n %}
 
-{% block title %}Clients - El Amine ERP{% endblock %}
+{% block title %}{% trans "Client" %}s - El Amine ERP{% endblock %}
 
-{% block page_title %}Clients{% endblock %}
+{% block page_title %}{% trans "Client" %}s{% endblock %}
 
 {% block content %}
 <div class="card card-dashboard p-4 bg-white">
     <div class="page-toolbar mb-3">
-        <h5>Liste des clients</h5>
+        <h5>{% trans "Liste des clients" %}</h5>
         {% if can_sell %}
-            <a href="{% url 'client_create' %}" class="btn btn-success">Ajouter client</a>
+            <a href="{% url 'client_create' %}" class="btn btn-success">{% trans "Ajouter client" %}</a>
         {% endif %}
     </div>
     <div class="table-responsive">
         <table class="table table-hover align-middle">
             <thead>
                 <tr>
-                    <th>Nom</th>
+                    <th>{% trans "Nom" %}</th>
                     <th>Téléphone</th>
-                    <th>Wilaya</th>
-                    <th>Email</th>
-                    <th>Solde</th>
-                    {% if can_manage %}<th>Actions</th>{% endif %}
+                    <th>{% trans "Wilaya" %}</th>
+                    <th>{% trans "Email" %}</th>
+                    <th>{% trans "Solde" %}</th>
+                    {% if can_manage %}<th>{% trans "Actions" %}</th>{% endif %}
                 </tr>
             </thead>
             <tbody>
@@ -35,8 +36,8 @@
                         {% if can_manage %}
                             <td>
                                 <div class="table-actions">
-                                    <a href="{% url 'client_update' client.pk %}" class="btn btn-sm btn-secondary">Modifier</a>
-                                    <a href="{% url 'client_delete' client.pk %}" class="btn btn-sm btn-danger">Supprimer</a>
+                                    <a href="{% url 'client_update' client.pk %}" class="btn btn-sm btn-secondary">{% trans "Modifier" %}</a>
+                                    <a href="{% url 'client_delete' client.pk %}" class="btn btn-sm btn-danger">{% trans "Supprimer" %}</a>
                                 </div>
                             </td>
                         {% endif %}

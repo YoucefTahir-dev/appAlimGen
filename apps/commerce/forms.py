@@ -1,6 +1,7 @@
 from django import forms
 from django.core.exceptions import ValidationError
 from django.forms import BaseInlineFormSet, inlineformset_factory
+from django.utils.translation import gettext_lazy as _
 
 from .models import Payment, Purchase, PurchaseLine, Sale, SaleLine
 
@@ -57,7 +58,7 @@ class SaleLineForm(forms.ModelForm):
         unit_price = cleaned_data.get('unit_price')
 
         if product and unit_price is not None and unit_price < product.purchase_price:
-            raise ValidationError("Le prix de vente est inférieur au coût d'achat. Vente refusée.")
+            raise ValidationError(_("Le prix de vente est inférieur au coût d'achat. Vente refusée."))
 
         return cleaned_data
 
@@ -95,7 +96,10 @@ class BaseSaleLineFormSet(BaseInlineFormSet):
             available_quantity = available_by_product.get(product_id, 0)
             if required_quantity > available_quantity:
                 errors.append(
-                    f'Stock insuffisant pour ce produit : demandé {required_quantity}, disponible {available_quantity}.'
+                    _('Stock insuffisant pour ce produit : demandé %(required)s, disponible %(available)s.') % {
+                        'required': required_quantity,
+                        'available': available_quantity,
+                    }
                 )
 
         if errors:

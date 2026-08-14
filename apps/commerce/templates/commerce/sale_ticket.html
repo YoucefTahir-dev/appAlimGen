@@ -1,10 +1,11 @@
+{% load i18n %}
 {% load static %}
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Ticket {{ sale.ticket_number }}</title>
+    <title>{% trans "Ticket" %} {{ sale.ticket_number }}</title>
     <style>
         @page {
             size: {{ ticket_width }}mm auto;
@@ -152,10 +153,10 @@
 </head>
 <body>
 <div class="ticket-actions">
-    <a href="{% url 'sale_list' %}">Retour</a>
-    <a href="{% url 'sale_ticket_preview' sale.pk 80 %}">Format 80 mm</a>
-    <a href="{% url 'sale_ticket_preview' sale.pk 58 %}">Format 58 mm</a>
-    <button onclick="window.print()">Imprimer</button>
+    <a href="{% url 'sale_list' %}">{% trans "Retour" %}</a>
+    <a href="{% url 'sale_ticket_preview' sale.pk 80 %}">{% trans "Format 80 mm" %}</a>
+    <a href="{% url 'sale_ticket_preview' sale.pk 58 %}">{% trans "Format 58 mm" %}</a>
+    <button onclick="window.print()">{% trans "Imprimer" %}</button>
 </div>
 
 <main class="ticket">
@@ -169,19 +170,19 @@
         <div class="company-ar">الأمين للمواد الغذائية و غير الغذائية</div>
         <div class="muted">{{ company.address|default:"" }}</div>
         <div>Tél : {{ company.phone|default:"" }}</div>
-        <div>RC : {{ company.rc_number|default:"-" }} | NIF : {{ company.tax_number|default:"-" }}</div>
+        <div>{% trans "RC" %} : {{ company.rc_number|default:"-" }} | NIF : {{ company.tax_number|default:"-" }}</div>
     </header>
 
     <div class="separator"></div>
 
     <section>
-        <div class="row"><span>Ticket</span><span>{{ sale.ticket_number }}</span></div>
-        <div class="row"><span>Facture</span><span>{{ sale.invoice_number }}</span></div>
-        <div class="row"><span>Date</span><span>{{ sale.created_at|date:"d/m/Y" }}</span></div>
-        <div class="row"><span>Heure</span><span>{{ sale.created_at|date:"H:i" }}</span></div>
-        <div class="row"><span>Caissier</span><span>{{ cashier_name }}</span></div>
+        <div class="row"><span>{% trans "Ticket" %}</span><span>{{ sale.ticket_number }}</span></div>
+        <div class="row"><span>{% trans "Facture" %}</span><span>{{ sale.invoice_number }}</span></div>
+        <div class="row"><span>{% trans "Date" %}</span><span>{{ sale.created_at|date:"d/m/Y" }}</span></div>
+        <div class="row"><span>{% trans "Heure" %}</span><span>{{ sale.created_at|date:"H:i" }}</span></div>
+        <div class="row"><span>{% trans "Caissier" %}</span><span>{{ cashier_name }}</span></div>
         {% if sale.client %}
-            <div class="row"><span>Client</span><span>{{ sale.client.name }}</span></div>
+            <div class="row"><span>{% trans "Client" %}</span><span>{{ sale.client.name }}</span></div>
         {% endif %}
     </section>
 
@@ -190,10 +191,10 @@
     <table>
         <thead>
             <tr>
-                <th>Article</th>
+                <th>{% trans "Article" %}</th>
                 <th class="num">Qté</th>
-                <th class="num">PU</th>
-                <th class="num">Total</th>
+                <th class="num">{% trans "PU" %}</th>
+                <th class="num">{% trans "Total" %}</th>
             </tr>
         </thead>
         <tbody>
@@ -201,7 +202,7 @@
                 <tr>
                     <td>
                         <div class="product-name">{{ line.product.name }}</div>
-                        <div class="small muted">Conditionnement : Unité</div>
+                        <div class="small muted">{% trans "Conditionnement" %} : Unité</div>
                     </td>
                     <td class="num">{{ line.quantity }}</td>
                     <td class="num">{{ line.unit_price|floatformat:2 }}</td>
@@ -214,18 +215,18 @@
     <div class="separator"></div>
 
     <section>
-        <div class="row"><span>Total HT</span><span>{{ total_ht|floatformat:2 }} DZD</span></div>
-        <div class="row"><span>TVA</span><span>{{ tax_amount|floatformat:2 }} DZD</span></div>
-        <div class="row"><span>Remise</span><span>{{ discount|floatformat:2 }} DZD</span></div>
-        <div class="row total"><span>Total TTC</span><span>{{ total_ttc|floatformat:2 }} DZD</span></div>
-        <div class="row"><span>Paiement</span><span>{{ sale.get_payment_type_display }}</span></div>
+        <div class="row"><span>{% trans "Total" %} HT</span><span>{{ total_ht|floatformat:2 }} DZD</span></div>
+        <div class="row"><span>{% trans "TVA" %}</span><span>{{ tax_amount|floatformat:2 }} DZD</span></div>
+        <div class="row"><span>{% trans "Remise" %}</span><span>{{ discount|floatformat:2 }} DZD</span></div>
+        <div class="row total"><span>{% trans "Total" %} TTC</span><span>{{ total_ttc|floatformat:2 }} DZD</span></div>
+        <div class="row"><span>{% trans "Paiement" %}</span><span>{{ sale.get_payment_type_display }}</span></div>
     </section>
 
     <div class="separator"></div>
 
     <footer class="center">
-        <img src="{{ qr_code_data_uri }}" class="qr" alt="QR Code facture">
-        <div>Merci pour votre visite</div>
+        <img src="{{ qr_code_data_uri }}" class="qr" alt="{% trans "QR Code" %} facture">
+        <div>{% trans "Merci pour votre visite" %}</div>
         <div>À bientôt.</div>
     </footer>
 </main>

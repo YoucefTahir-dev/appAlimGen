@@ -1,4 +1,5 @@
 {% extends 'base/base.html' %}
+{% load i18n %}
 
 {% block title %}Nouvelle catégorie - El Amine ERP{% endblock %}
 
@@ -15,8 +16,8 @@
             </div>
         </div>
         <div class="form-actions mt-3">
-            <button class="btn btn-success">Enregistrer</button>
-            <a class="btn btn-secondary" href="{% url 'expense_list' %}">Retour</a>
+            <button class="btn btn-success">{% trans "Enregistrer" %}</button>
+            <a class="btn btn-secondary" href="{% url 'expense_list' %}">{% trans "Retour" %}</a>
         </div>
     </form>
 </div>

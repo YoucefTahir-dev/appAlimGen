@@ -1,15 +1,16 @@
 {% extends 'base/base.html' %}
+{% load i18n %}
 
-{% block title %}Import Excel produits - El Amine ERP{% endblock %}
+{% block title %}{% trans "Import Excel produits" %} - El Amine ERP{% endblock %}
 
-{% block page_title %}Import Excel produits{% endblock %}
+{% block page_title %}{% trans "Import Excel produits" %}{% endblock %}
 
 {% block content %}
 <div class="card card-dashboard p-4 bg-white">
     <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
         <div class="mb-3">{{ form.file.label_tag }}{{ form.file }}</div>
-        <button class="btn btn-success">Importer</button>
+        <button class="btn btn-success">{% trans "Importer" %}</button>
     </form>
 </div>
 {% endblock %}

@@ -4,6 +4,7 @@ from django.db.models import Sum
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.utils.translation import gettext as _
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
@@ -53,7 +54,7 @@ def expense_create(request):
         expense.save()
         messages.success(request, 'Charge enregistrée avec succès.')
         return redirect('expense_list')
-    return render(request, 'expenses/expense_form.html', {'form': form, 'title': 'Nouvelle charge'})
+    return render(request, 'expenses/expense_form.html', {'form': form, 'title': _('Nouvelle charge')})
 
 
 @manager_required

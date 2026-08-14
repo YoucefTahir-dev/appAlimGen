@@ -6,6 +6,7 @@ from apps.accounts.permissions import manager_required, seller_required
 from .forms import ProductForm, ClientForm, SupplierForm, StockMovementForm, ImportExcelForm
 from .models import Product, Client, Supplier, StockMovement
 from django.http import FileResponse
+from django.utils.translation import gettext as _
 
 @seller_required
 def product_list(request):
@@ -22,7 +23,7 @@ def product_create(request):
         form.save()
         messages.success(request, 'Produit ajouté avec succès.')
         return redirect('product_list')
-    return render(request, 'inventory/product_form.html', {'form': form, 'title': 'Ajouter un produit'})
+    return render(request, 'inventory/product_form.html', {'form': form, 'title': _('Ajouter un produit')})
 
 @manager_required
 def product_update(request, pk):
@@ -32,7 +33,7 @@ def product_update(request, pk):
         form.save()
         messages.success(request, 'Produit mis à jour.')
         return redirect('product_list')
-    return render(request, 'inventory/product_form.html', {'form': form, 'title': 'Modifier le produit'})
+    return render(request, 'inventory/product_form.html', {'form': form, 'title': _('Modifier le produit')})
 
 @manager_required
 def product_delete(request, pk):
@@ -191,7 +192,7 @@ def product_detail(request, pk):
 def product_qr_download(request, pk):
     product = get_object_or_404(Product, pk=pk)
     if not product.qr_code:
-        messages.error(request, 'Aucun QR code disponible pour ce produit.')
+        messages.error(request, _('Aucun QR code disponible pour ce produit.'))
         return redirect('product_detail', pk=pk)
     return FileResponse(product.qr_code.open('rb'), as_attachment=True, filename=f"{product.reference}_qr.png")
 
@@ -203,6 +204,6 @@ def product_barcode_download(request, pk):
         product.save()
         product.refresh_from_db()
     if not product.barcode_image:
-        messages.error(request, 'Aucun code-barres disponible pour ce produit.')
+        messages.error(request, _('Aucun code-barres disponible pour ce produit.'))
         return redirect('product_detail', pk=pk)
     return FileResponse(product.barcode_image.open('rb'), as_attachment=True, filename=f"{product.reference}_barcode.svg")

@@ -1,4 +1,5 @@
 {% extends 'base/base.html' %}
+{% load i18n %}
 
 {% block title %}{{ title }} - El Amine ERP{% endblock %}
 
@@ -19,10 +20,10 @@
             <table class="table table-bordered align-middle formset-table">
                 <thead>
                     <tr>
-                        <th>Produit</th>
+                        <th>{% trans "Produit" %}</th>
                         <th>Quantité</th>
-                        <th>Prix d\'achat</th>
-                        <th>Supprimer</th>
+                        <th>{% trans "Prix d'achat" %}</th>
+                        <th>{% trans "Supprimer" %}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -38,7 +39,7 @@
             </table>
         </div>
         <div class="form-actions">
-            <button class="btn btn-success">Enregistrer</button>
+            <button class="btn btn-success">{% trans "Enregistrer" %}</button>
         </div>
     </form>
 </div>

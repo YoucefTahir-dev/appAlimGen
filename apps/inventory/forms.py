@@ -1,16 +1,17 @@
 from django import forms
+from django.utils.translation import gettext_lazy as _
 from apps.core.security import validate_excel_upload
 from .models import Product, Client, Supplier, StockMovement, Brand
 
 class ProductForm(forms.ModelForm):
     barcode_display = forms.CharField(
-        label='Code-barres',
+        label=_('Code-barres'),
         required=False,
         disabled=True,
         widget=forms.TextInput(attrs={'class': 'form-control', 'readonly': 'readonly'})
     )
     brand_text = forms.CharField(
-        label='Marque',
+        label=_('Marque'),
         required=False,
         widget=forms.TextInput(attrs={'class': 'form-control'})
     )
@@ -29,7 +30,7 @@ class ProductForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['barcode_display'].initial = self.instance.barcode if self.instance and self.instance.pk else 'Généré automatiquement'
+        self.fields['barcode_display'].initial = self.instance.barcode if self.instance and self.instance.pk else _('Généré automatiquement')
         if self.instance and self.instance.pk and self.instance.brand:
             self.fields['brand_text'].initial = self.instance.brand.name
 
@@ -85,7 +86,7 @@ class StockMovementForm(forms.ModelForm):
 
 class ImportExcelForm(forms.Form):
     file = forms.FileField(
-        label='Fichier Excel',
+        label=_('Fichier Excel'),
         validators=[validate_excel_upload],
         widget=forms.FileInput(attrs={'class': 'form-control'}),
     )
