@@ -692,3 +692,147 @@ msgstr "هل تريد فعلًا حذف المنتج"
 
 msgid "Voulez-vous vraiment supprimer le mouvement de stock pour"
 msgstr "هل تريد فعلًا حذف حركة المخزون الخاصة بـ"
+
+msgid "Tableau de bord décisionnel"
+msgstr "لوحة القيادة التحليلية"
+
+msgid "Période"
+msgstr "الفترة"
+
+msgid "Hier"
+msgstr "أمس"
+
+msgid "Cette semaine"
+msgstr "هذا الأسبوع"
+
+msgid "Ce mois"
+msgstr "هذا الشهر"
+
+msgid "Cette année"
+msgstr "هذه السنة"
+
+msgid "Période personnalisée"
+msgstr "فترة مخصصة"
+
+msgid "Date de début"
+msgstr "تاريخ البداية"
+
+msgid "Date de fin"
+msgstr "تاريخ النهاية"
+
+msgid "Appliquer"
+msgstr "تطبيق"
+
+msgid "Période analysée"
+msgstr "الفترة المحللة"
+
+msgid "notifications"
+msgstr "إشعارات"
+
+msgid "Chiffre d'affaires du jour"
+msgstr "رقم أعمال اليوم"
+
+msgid "Chiffre d'affaires de la période"
+msgstr "رقم أعمال الفترة"
+
+msgid "Nombre de ventes"
+msgstr "عدد المبيعات"
+
+msgid "Panier moyen"
+msgstr "متوسط السلة"
+
+msgid "Gain brut (avant charges)"
+msgstr "الربح الإجمالي قبل المصاريف"
+
+msgid "Total des charges"
+msgstr "إجمالي المصاريف"
+
+msgid "Gain net (après charges)"
+msgstr "الربح الصافي بعد المصاريف"
+
+msgid "Nombre de produits"
+msgstr "عدد المنتجات"
+
+msgid "Nombre de clients"
+msgstr "عدد الزبائن"
+
+msgid "Nombre de fournisseurs"
+msgstr "عدد الموردين"
+
+msgid "Achats de la période"
+msgstr "مشتريات الفترة"
+
+msgid "Ventes de la période"
+msgstr "مبيعات الفترة"
+
+msgid "Produits vendus"
+msgstr "المنتجات المباعة"
+
+msgid "Produits achetés"
+msgstr "المنتجات المشتراة"
+
+msgid "Alertes"
+msgstr "تنبيهات"
+
+msgid "Produits bientôt en rupture"
+msgstr "منتجات قريبة من النفاد"
+
+msgid "Factures impayées"
+msgstr "فواتير غير مدفوعة"
+
+msgid "Paiements fournisseurs en attente"
+msgstr "مدفوعات الموردين المعلقة"
+
+msgid "Charges importantes"
+msgstr "مصاريف كبيرة"
+
+msgid "Évolution financière"
+msgstr "التطور المالي"
+
+msgid "Répartition des ventes par catégorie"
+msgstr "توزيع المبيعات حسب الفئة"
+
+msgid "Répartition des charges par catégorie"
+msgstr "توزيع المصاريف حسب الفئة"
+
+msgid "Top 10 produits les plus vendus"
+msgstr "أفضل 10 منتجات مبيعا"
+
+msgid "Top 10 clients"
+msgstr "أفضل 10 زبائن"
+
+msgid "Top 10 fournisseurs"
+msgstr "أفضل 10 موردين"
+
+msgid "Top 10 produits les plus rentables"
+msgstr "أفضل 10 منتجات ربحية"
+
+msgid "Top 10 produits les moins vendus"
+msgstr "أقل 10 منتجات مبيعا"
+
+msgid "Quantité vendue"
+msgstr "الكمية المباعة"
+
+msgid "Aucune donnée disponible."
+msgstr "لا توجد بيانات متاحة."
+
+msgid "Sans catégorie"
+msgstr "بدون فئة"
+
+msgid "Indicateur"
+msgstr "المؤشر"
+
+msgid "Valeur"
+msgstr "القيمة"
+
+msgid "Séries des graphiques"
+msgstr "سلاسل الرسوم البيانية"
+
+msgid "CA"
+msgstr "رقم الأعمال"
+
+msgid "Gain brut"
+msgstr "الربح الإجمالي"
+
+msgid "Gain net"
+msgstr "الربح الصافي"

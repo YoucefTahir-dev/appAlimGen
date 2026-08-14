@@ -1,0 +1,26 @@
+{% load i18n dashboard_extras %}
+<div class="card card-dashboard p-4 bg-white h-100">
+    <h5>{{ title }}</h5>
+    <div class="table-responsive">
+        <table class="table table-sm align-middle">
+            <thead>
+                <tr>
+                    <th>{% trans "Nom" %}</th>
+                    <th class="text-end">{{ value_label }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                    <tr>
+                        <td>{{ row|get_item:name_key|default:"-" }}</td>
+                        <td class="text-end">
+                            {% if money %}{{ row|get_item:value_key|floatformat:2 }} {% trans "DZD" %}{% else %}{{ row|get_item:value_key }}{% endif %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="2" class="text-center">{% trans "Aucune donnée disponible." %}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>

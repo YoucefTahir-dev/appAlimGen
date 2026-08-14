@@ -1,59 +1,120 @@
-from django.db.models import DecimalField, ExpressionWrapper, F, Sum
+import io
+
+import openpyxl
+from django.http import HttpResponse
 from django.shortcuts import render
-from django.utils import timezone
+from django.utils.translation import gettext as _
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
 from apps.accounts.permissions import seller_required
-from apps.inventory.models import Product, Client, Supplier
-from apps.commerce.models import Sale, Purchase
-from apps.expenses.models import Expense
+from .dashboard import dashboard_context
+
+
+def money(value):
+    return f"{value:,.2f} DZD".replace(",", " ")
+
 
 @seller_required
 def dashboard(request):
-    today = timezone.localtime(timezone.now()).date()
-    total_products = Product.objects.count()
-    stock_value = Product.objects.aggregate(total_value=Sum(F('purchase_price') * F('quantity')))['total_value'] or 0
-    total_clients = Client.objects.count()
-    total_suppliers = Supplier.objects.count()
+    return render(request, 'core/dashboard.html', dashboard_context(request))
 
-    sales_today = Sale.objects.filter(created_at__date=today).aggregate(total=Sum('total'))['total'] or 0
-    purchases_today = Purchase.objects.filter(created_at__date=today).aggregate(total=Sum('total'))['total'] or 0
-    monthly_revenue = Sale.objects.filter(created_at__month=today.month, created_at__year=today.year).aggregate(total=Sum('total'))['total'] or 0
-    yearly_revenue = Sale.objects.filter(created_at__year=today.year).aggregate(total=Sum('total'))['total'] or 0
 
-    expenses_today = Expense.objects.filter(date=today).aggregate(total=Sum('amount'))['total'] or 0
-    monthly_expenses = Expense.objects.filter(date__month=today.month, date__year=today.year).aggregate(total=Sum('amount'))['total'] or 0
-    yearly_expenses = Expense.objects.filter(date__year=today.year).aggregate(total=Sum('amount'))['total'] or 0
-    cost_expression = ExpressionWrapper(
-        F('lines__quantity') * F('lines__product__purchase_price'),
-        output_field=DecimalField(max_digits=14, decimal_places=2),
-    )
-    monthly_cogs = Sale.objects.filter(
-        created_at__month=today.month,
-        created_at__year=today.year,
-    ).aggregate(total=Sum(cost_expression))['total'] or 0
-    gross_profit = monthly_revenue - monthly_cogs
-    net_profit = gross_profit - monthly_expenses
-    expense_categories = Expense.objects.filter(
-        date__month=today.month,
-        date__year=today.year,
-    ).values('category__name').annotate(total=Sum('amount')).order_by('-total')[:8]
+@seller_required
+def dashboard_export_excel(request):
+    context = dashboard_context(request)
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.title = "Dashboard"
+    sheet.append([_("Période"), context["start_date"].isoformat(), context["end_date"].isoformat()])
+    sheet.append([])
+    sheet.append([_("Indicateur"), _("Valeur")])
+    for label, value in [
+        (_("Chiffre d'affaires du jour"), context["sales_today"]),
+        (_("Chiffre d'affaires de la période"), context["period_revenue"]),
+        (_("Nombre de ventes"), context["sales_count"]),
+        (_("Panier moyen"), context["average_basket"]),
+        (_("Gain brut (avant charges)"), context["gross_profit"]),
+        (_("Total des charges"), context["expenses_total"]),
+        (_("Gain net (après charges)"), context["net_profit"]),
+        (_("Valeur du stock"), context["stock_value"]),
+        (_("Achats de la période"), context["purchases_total"]),
+        (_("Produits vendus"), context["products_sold"]),
+        (_("Produits achetés"), context["products_purchased"]),
+        (_("Notifications"), context["notification_count"]),
+    ]:
+        sheet.append([label, value])
 
-    out_of_stock = Product.objects.filter(quantity__lte=F('minimum_stock')).count()
+    sheet.append([])
+    sheet.append([_("Évolution"), _("CA"), _("Achats"), _("Charges"), _("Gain brut"), _("Gain net")])
+    trend = context["chart_data"]["trend"]
+    for index, label in enumerate(trend["labels"]):
+        sheet.append([
+            label,
+            trend["revenue"][index],
+            trend["purchases"][index],
+            trend["expenses"][index],
+            trend["gross_profit"][index],
+            trend["net_profit"][index],
+        ])
 
-    context = {
-        'total_products': total_products,
-        'stock_value': stock_value,
-        'total_clients': total_clients,
-        'total_suppliers': total_suppliers,
-        'sales_today': sales_today,
-        'purchases_today': purchases_today,
-        'monthly_revenue': monthly_revenue,
-        'yearly_revenue': yearly_revenue,
-        'expenses_today': expenses_today,
-        'monthly_expenses': monthly_expenses,
-        'yearly_expenses': yearly_expenses,
-        'gross_profit': gross_profit,
-        'net_profit': net_profit,
-        'expense_categories': expense_categories,
-        'out_of_stock': out_of_stock,
-    }
-    return render(request, 'core/dashboard.html', context)
+    output = io.BytesIO()
+    workbook.save(output)
+    output.seek(0)
+    response = HttpResponse(output.read(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    response["Content-Disposition"] = "attachment; filename=dashboard.xlsx"
+    return response
+
+
+@seller_required
+def dashboard_export_pdf(request):
+    context = dashboard_context(request)
+    response = HttpResponse(content_type="application/pdf")
+    response["Content-Disposition"] = "attachment; filename=dashboard.pdf"
+    doc = SimpleDocTemplate(response, pagesize=A4, title="Dashboard")
+    styles = getSampleStyleSheet()
+    story = [
+        Paragraph(_("Tableau de bord décisionnel"), styles["Title"]),
+        Paragraph(f"{context['start_date']:%d/%m/%Y} - {context['end_date']:%d/%m/%Y}", styles["Normal"]),
+        Spacer(1, 12),
+    ]
+    indicators = [
+        [_("Chiffre d'affaires de la période"), money(context["period_revenue"])],
+        [_("Nombre de ventes"), context["sales_count"]],
+        [_("Panier moyen"), money(context["average_basket"])],
+        [_("Gain brut (avant charges)"), money(context["gross_profit"])],
+        [_("Total des charges"), money(context["expenses_total"])],
+        [_("Gain net (après charges)"), money(context["net_profit"])],
+        [_("Valeur du stock"), money(context["stock_value"])],
+        [_("Notifications"), context["notification_count"]],
+    ]
+    table = Table([[_("Indicateur"), _("Valeur")], *indicators], colWidths=[260, 180])
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e3a2a")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("GRID", (0, 0), (-1, -1), 0.3, colors.grey),
+        ("PADDING", (0, 0), (-1, -1), 6),
+    ]))
+    story.extend([table, Spacer(1, 12), Paragraph(_("Séries des graphiques"), styles["Heading2"])])
+    trend = context["chart_data"]["trend"]
+    chart_rows = [[_("Date"), _("CA"), _("Achats"), _("Charges"), _("Gain brut"), _("Gain net")]]
+    for index, label in enumerate(trend["labels"][:25]):
+        chart_rows.append([
+            label,
+            trend["revenue"][index],
+            trend["purchases"][index],
+            trend["expenses"][index],
+            trend["gross_profit"][index],
+            trend["net_profit"][index],
+        ])
+    chart_table = Table(chart_rows, repeatRows=1)
+    chart_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e9ecef")),
+        ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+    ]))
+    story.append(chart_table)
+    doc.build(story)
+    return response

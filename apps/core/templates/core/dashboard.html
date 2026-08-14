@@ -3,108 +3,223 @@
 
 {% block title %}{% trans "Tableau de bord" %} - El Amine ERP{% endblock %}
 
-{% block page_title %}{% trans "Tableau de bord" %}{% endblock %}
+{% block page_title %}{% trans "Tableau de bord décisionnel" %}{% endblock %}
 
 {% block content %}
+<form method="get" class="card card-dashboard p-3 p-lg-4 bg-white mb-4">
+    <div class="row g-3 align-items-end">
+        <div class="col-12 col-md-4 col-xl-3">
+            <label class="form-label">{% trans "Période" %}</label>
+            <select name="period" class="form-select" id="dashboardPeriod">
+                {% for value, label in period_options %}
+                    <option value="{{ value }}" {% if period == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-12 col-md-4 col-xl-3 custom-period-field">
+            <label class="form-label">{% trans "Date de début" %}</label>
+            <input type="date" name="start_date" class="form-control" value="{{ start_date|date:'Y-m-d' }}">
+        </div>
+        <div class="col-12 col-md-4 col-xl-3 custom-period-field">
+            <label class="form-label">{% trans "Date de fin" %}</label>
+            <input type="date" name="end_date" class="form-control" value="{{ end_date|date:'Y-m-d' }}">
+        </div>
+        <div class="col-12 col-xl-3">
+            <div class="toolbar-actions justify-content-xl-end">
+                <button class="btn btn-primary" type="submit"><i class="bi bi-funnel me-2"></i>{% trans "Appliquer" %}</button>
+                <a class="btn btn-outline-danger" href="{% url 'dashboard_export_pdf' %}?{{ request.GET.urlencode }}"><i class="bi bi-file-earmark-pdf me-2"></i>{% trans "Export PDF" %}</a>
+                <a class="btn btn-outline-success" href="{% url 'dashboard_export_excel' %}?{{ request.GET.urlencode }}"><i class="bi bi-file-earmark-excel me-2"></i>{% trans "Export Excel" %}</a>
+            </div>
+        </div>
+    </div>
+</form>
+
+<div class="alert alert-info d-flex flex-wrap align-items-center justify-content-between gap-2">
+    <div>
+        <i class="bi bi-calendar-range me-2"></i>
+        {% trans "Période analysée" %} :
+        <strong>{{ start_date|date:"d/m/Y" }} - {{ end_date|date:"d/m/Y" }}</strong>
+    </div>
+    <span class="badge text-bg-danger fs-6">
+        <i class="bi bi-bell me-1"></i>{{ notification_count }} {% trans "notifications" %}
+    </span>
+</div>
+
 <div class="row g-3 g-xl-4 align-items-stretch">
     <div class="col-12 col-sm-6 col-xl-3">
         <div class="card card-dashboard dashboard-card p-4 bg-white">
-            <h5>{% trans "Produits" %}</h5>
-            <p class="display-6 mb-0">{{ total_products }}</p>
+            <h5>{% trans "Chiffre d'affaires du jour" %}</h5>
+            <p class="display-6 mb-1">{{ sales_today|floatformat:2 }} {% trans "DZD" %}</p>
         </div>
     </div>
     <div class="col-12 col-sm-6 col-xl-3">
         <div class="card card-dashboard dashboard-card p-4 bg-white">
-            <h5>{% trans "Valeur du stock" %}</h5>
-            <p class="display-6 mb-0">{{ stock_value|floatformat:2 }} {% trans "DZD" %}</p>
+            <h5>{% trans "Chiffre d'affaires de la période" %}</h5>
+            <p class="display-6 mb-1">{{ period_revenue|floatformat:2 }} {% trans "DZD" %}</p>
+            <span class="badge {% if comparisons.revenue.direction == 'down' %}text-bg-danger{% elif comparisons.revenue.direction == 'up' %}text-bg-success{% else %}text-bg-secondary{% endif %}">
+                {{ comparisons.revenue.percent|floatformat:2 }}%
+            </span>
         </div>
     </div>
     <div class="col-12 col-sm-6 col-xl-3">
         <div class="card card-dashboard dashboard-card p-4 bg-white">
-            <h5>{% trans "Clients" %}</h5>
-            <p class="display-6 mb-0">{{ total_clients }}</p>
+            <h5>{% trans "Nombre de ventes" %}</h5>
+            <p class="display-6 mb-0">{{ sales_count }}</p>
         </div>
     </div>
     <div class="col-12 col-sm-6 col-xl-3">
         <div class="card card-dashboard dashboard-card p-4 bg-white">
-            <h5>{% trans "Fournisseurs" %}</h5>
-            <p class="display-6 mb-0">{{ total_suppliers }}</p>
+            <h5>{% trans "Panier moyen" %}</h5>
+            <p class="display-6 mb-0">{{ average_basket|floatformat:2 }} {% trans "DZD" %}</p>
         </div>
     </div>
-    <div class="col-12 col-sm-6 col-xl-3">
+
+    <div class="col-12 col-md-4">
         <div class="card card-dashboard dashboard-card p-4 bg-white">
-            <h5>{% trans "Ventes du jour" %}</h5>
-            <p class="display-6 mb-0">{{ sales_today|floatformat:2 }} {% trans "DZD" %}</p>
+            <h5>{% trans "Gain brut (avant charges)" %}</h5>
+            <p class="display-6 mb-1">{{ gross_profit|floatformat:2 }} {% trans "DZD" %}</p>
+            <span class="badge {% if comparisons.gross_profit.direction == 'down' %}text-bg-danger{% elif comparisons.gross_profit.direction == 'up' %}text-bg-success{% else %}text-bg-secondary{% endif %}">
+                {{ comparisons.gross_profit.percent|floatformat:2 }}%
+            </span>
         </div>
     </div>
-    <div class="col-12 col-sm-6 col-xl-3">
+    <div class="col-12 col-md-4">
         <div class="card card-dashboard dashboard-card p-4 bg-white">
-            <h5>{% trans "Achats du jour" %}</h5>
-            <p class="display-6 mb-0">{{ purchases_today|floatformat:2 }} {% trans "DZD" %}</p>
+            <h5>{% trans "Total des charges" %}</h5>
+            <p class="display-6 mb-1">{{ expenses_total|floatformat:2 }} {% trans "DZD" %}</p>
+            <span class="badge {% if comparisons.expenses.direction == 'up' %}text-bg-danger{% elif comparisons.expenses.direction == 'down' %}text-bg-success{% else %}text-bg-secondary{% endif %}">
+                {{ comparisons.expenses.percent|floatformat:2 }}%
+            </span>
         </div>
     </div>
-    <div class="col-12 col-sm-6 col-xl-3">
-        <div class="card card-dashboard dashboard-card p-4 bg-white">
-            <h5>{% trans "Chiffre d'affaires mensuel" %}</h5>
-            <p class="display-6 mb-0">{{ monthly_revenue|floatformat:2 }} {% trans "DZD" %}</p>
+    <div class="col-12 col-md-4">
+        <div class="card card-dashboard dashboard-card p-4 text-white net-profit-card">
+            <h5>{% trans "Gain net (après charges)" %}</h5>
+            <p class="display-6 mb-1">{{ net_profit|floatformat:2 }} {% trans "DZD" %}</p>
+            <span class="badge {% if comparisons.net_profit.direction == 'down' %}text-bg-danger{% elif comparisons.net_profit.direction == 'up' %}text-bg-light text-success{% else %}text-bg-secondary{% endif %}">
+                {{ comparisons.net_profit.percent|floatformat:2 }}%
+            </span>
         </div>
     </div>
-    <div class="col-12 col-sm-6 col-xl-3">
-        <div class="card card-dashboard dashboard-card p-4 bg-white">
-            <h5>{% trans "Produits en rupture" %}</h5>
-            <p class="display-6 mb-0">{{ out_of_stock }}</p>
+
+    <div class="col-12 col-sm-6 col-xl-3"><div class="card card-dashboard dashboard-card p-4 bg-white"><h5>{% trans "Valeur du stock" %}</h5><p class="display-6 mb-0">{{ stock_value|floatformat:2 }} {% trans "DZD" %}</p></div></div>
+    <div class="col-12 col-sm-6 col-xl-3"><div class="card card-dashboard dashboard-card p-4 bg-white"><h5>{% trans "Nombre de produits" %}</h5><p class="display-6 mb-0">{{ total_products }}</p></div></div>
+    <div class="col-12 col-sm-6 col-xl-3"><div class="card card-dashboard dashboard-card p-4 bg-white"><h5>{% trans "Nombre de clients" %}</h5><p class="display-6 mb-0">{{ total_clients }}</p></div></div>
+    <div class="col-12 col-sm-6 col-xl-3"><div class="card card-dashboard dashboard-card p-4 bg-white"><h5>{% trans "Nombre de fournisseurs" %}</h5><p class="display-6 mb-0">{{ total_suppliers }}</p></div></div>
+    <div class="col-12 col-sm-6 col-xl-3"><div class="card card-dashboard dashboard-card p-4 bg-white"><h5>{% trans "Achats de la période" %}</h5><p class="display-6 mb-0">{{ purchases_total|floatformat:2 }} {% trans "DZD" %}</p></div></div>
+    <div class="col-12 col-sm-6 col-xl-3"><div class="card card-dashboard dashboard-card p-4 bg-white"><h5>{% trans "Ventes de la période" %}</h5><p class="display-6 mb-0">{{ period_sales|floatformat:2 }} {% trans "DZD" %}</p></div></div>
+    <div class="col-12 col-sm-6 col-xl-3"><div class="card card-dashboard dashboard-card p-4 bg-white"><h5>{% trans "Produits vendus" %}</h5><p class="display-6 mb-0">{{ products_sold }}</p></div></div>
+    <div class="col-12 col-sm-6 col-xl-3"><div class="card card-dashboard dashboard-card p-4 bg-white"><h5>{% trans "Produits achetés" %}</h5><p class="display-6 mb-0">{{ products_purchased }}</p></div></div>
+</div>
+
+<div class="row g-4 mt-1">
+    <div class="col-12 col-xl-4">
+        <div class="card card-dashboard p-4 bg-white h-100">
+            <h5 class="mb-3"><i class="bi bi-exclamation-triangle text-warning me-2"></i>{% trans "Alertes" %}</h5>
+            <div class="list-group list-group-flush">
+                <div class="list-group-item d-flex justify-content-between">{% trans "Produits en rupture" %}<strong>{{ out_of_stock }}</strong></div>
+                <div class="list-group-item d-flex justify-content-between">{% trans "Produits à faible stock" %}<strong>{{ low_stock }}</strong></div>
+                <div class="list-group-item d-flex justify-content-between">{% trans "Produits bientôt en rupture" %}<strong>{{ near_stockout }}</strong></div>
+                <div class="list-group-item d-flex justify-content-between">{% trans "Factures impayées" %}<strong>{{ unpaid_invoices }}</strong></div>
+                <div class="list-group-item d-flex justify-content-between">{% trans "Paiements fournisseurs en attente" %}<strong>{{ pending_supplier_payments }}</strong></div>
+                <div class="list-group-item d-flex justify-content-between">{% trans "Charges importantes" %}<strong>{{ important_expenses }}</strong></div>
+            </div>
         </div>
     </div>
-    <div class="col-12 col-sm-6 col-xl-3">
-        <div class="card card-dashboard dashboard-card p-4 bg-white">
-            <h5>{% trans "Charges du jour" %}</h5>
-            <p class="display-6 mb-0">{{ expenses_today|floatformat:2 }} {% trans "DZD" %}</p>
-        </div>
-    </div>
-    <div class="col-12 col-sm-6 col-xl-3">
-        <div class="card card-dashboard dashboard-card p-4 bg-white">
-            <h5>{% trans "Charges du mois" %}</h5>
-            <p class="display-6 mb-0">{{ monthly_expenses|floatformat:2 }} {% trans "DZD" %}</p>
-        </div>
-    </div>
-    <div class="col-12 col-sm-6 col-xl-3">
-        <div class="card card-dashboard dashboard-card p-4 bg-white">
-            <h5>{% trans "Bénéfice brut mensuel" %}</h5>
-            <p class="display-6 mb-0">{{ gross_profit|floatformat:2 }} {% trans "DZD" %}</p>
-        </div>
-    </div>
-    <div class="col-12 col-sm-6 col-xl-3">
-        <div class="card card-dashboard dashboard-card p-4 bg-white">
-            <h5>{% trans "Bénéfice net mensuel" %}</h5>
-            <p class="display-6 mb-0">{{ net_profit|floatformat:2 }} {% trans "DZD" %}</p>
+    <div class="col-12 col-xl-8">
+        <div class="card card-dashboard p-4 bg-white h-100">
+            <h5>{% trans "Évolution financière" %}</h5>
+            <canvas id="financialTrendChart" height="120"></canvas>
         </div>
     </div>
 </div>
 
-<div class="card card-dashboard p-4 bg-white mt-4">
-    <div class="page-toolbar mb-3">
-        <h5>{% trans "Répartition des charges du mois" %}</h5>
-        <a class="btn btn-outline-primary" href="{% url 'expense_list' %}">{% trans "Voir les charges" %}</a>
-    </div>
-    <div class="table-responsive">
-        <table class="table table-sm align-middle">
-            <thead>
-                <tr>
-                    <th>{% trans "Catégorie" %}</th>
-                    <th class="text-end">{% trans "Montant" %}</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in expense_categories %}
-                    <tr>
-                        <td>{{ item.category__name }}</td>
-                        <td class="text-end">{{ item.total|floatformat:2 }} {% trans "DZD" %}</td>
-                    </tr>
-                {% empty %}
-                    <tr><td colspan="2" class="text-center">{% trans "Aucune charge ce mois." %}</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
+<div class="row g-4 mt-1">
+    <div class="col-12 col-xl-6"><div class="card card-dashboard p-4 bg-white"><h5>{% trans "Répartition des ventes par catégorie" %}</h5><canvas id="salesCategoryChart" height="160"></canvas></div></div>
+    <div class="col-12 col-xl-6"><div class="card card-dashboard p-4 bg-white"><h5>{% trans "Répartition des charges par catégorie" %}</h5><canvas id="expenseCategoryChart" height="160"></canvas></div></div>
+</div>
+
+<div class="row g-4 mt-1">
+    {% trans "Top 10 produits les plus vendus" as top_products_title %}
+    {% trans "Quantité" as quantity_label %}
+    {% trans "Top 10 clients" as top_clients_title %}
+    {% trans "Total" as total_label %}
+    {% trans "Top 10 fournisseurs" as top_suppliers_title %}
+    {% trans "Top 10 produits les plus rentables" as profitable_products_title %}
+    {% trans "Gain" as gain_label %}
+    <div class="col-12 col-xl-6">{% include 'core/partials/top_table.html' with title=top_products_title rows=top_products name_key="product__name" value_key="quantity" value_label=quantity_label %}</div>
+    <div class="col-12 col-xl-6">{% include 'core/partials/top_table.html' with title=top_clients_title rows=top_clients name_key="client__name" value_key="total" value_label=total_label money=True %}</div>
+    <div class="col-12 col-xl-6">{% include 'core/partials/top_table.html' with title=top_suppliers_title rows=top_suppliers name_key="supplier__name" value_key="total" value_label=total_label money=True %}</div>
+    <div class="col-12 col-xl-6">{% include 'core/partials/top_table.html' with title=profitable_products_title rows=profitable_products name_key="product__name" value_key="profit" value_label=gain_label money=True %}</div>
+    <div class="col-12">
+        <div class="card card-dashboard p-4 bg-white">
+            <h5>{% trans "Top 10 produits les moins vendus" %}</h5>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead><tr><th>{% trans "Produit" %}</th><th class="text-end">{% trans "Quantité vendue" %}</th></tr></thead>
+                    <tbody>
+                        {% for product in least_sold_products %}
+                            <tr><td>{{ product.name }}</td><td class="text-end">{{ product.sold_quantity }}</td></tr>
+                        {% empty %}
+                            <tr><td colspan="2" class="text-center">{% trans "Aucune donnée disponible." %}</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 </div>
+
+{{ chart_data|json_script:"dashboard-data" }}
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const periodSelect = document.getElementById('dashboardPeriod');
+    const customFields = document.querySelectorAll('.custom-period-field');
+    const updateCustomFields = () => {
+        const isCustom = periodSelect && periodSelect.value === 'custom';
+        customFields.forEach((field) => field.classList.toggle('d-none', !isCustom));
+    };
+    updateCustomFields();
+    if (periodSelect) {
+        periodSelect.addEventListener('change', updateCustomFields);
+    }
+
+    const data = JSON.parse(document.getElementById('dashboard-data').textContent);
+    const moneyTicks = (value) => `${Number(value).toLocaleString()} DZD`;
+    const chartOptions = {
+        responsive: true,
+        interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { position: 'bottom' } },
+        scales: { y: { ticks: { callback: moneyTicks } } }
+    };
+    new Chart(document.getElementById('financialTrendChart'), {
+        type: 'line',
+        data: {
+            labels: data.trend.labels,
+            datasets: [
+                { label: "{% trans "Chiffre d'affaires" %}", data: data.trend.revenue, borderColor: '#198754', backgroundColor: 'rgba(25,135,84,.12)', tension: .35 },
+                { label: "{% trans "Achats" %}", data: data.trend.purchases, borderColor: '#0d6efd', backgroundColor: 'rgba(13,110,253,.12)', tension: .35 },
+                { label: "{% trans "Charges" %}", data: data.trend.expenses, borderColor: '#dc3545', backgroundColor: 'rgba(220,53,69,.12)', tension: .35 },
+                { label: "{% trans "Gain brut" %}", data: data.trend.gross_profit, borderColor: '#ffc107', backgroundColor: 'rgba(255,193,7,.12)', tension: .35 },
+                { label: "{% trans "Gain net" %}", data: data.trend.net_profit, borderColor: '#6f42c1', backgroundColor: 'rgba(111,66,193,.12)', tension: .35 },
+            ]
+        },
+        options: chartOptions
+    });
+    new Chart(document.getElementById('salesCategoryChart'), {
+        type: 'doughnut',
+        data: { labels: data.sales_categories.labels, datasets: [{ data: data.sales_categories.values }] },
+        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+    });
+    new Chart(document.getElementById('expenseCategoryChart'), {
+        type: 'doughnut',
+        data: { labels: data.expense_categories.labels, datasets: [{ data: data.expense_categories.values }] },
+        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+    });
+});
+</script>
 {% endblock %}

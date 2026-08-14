@@ -159,6 +159,10 @@ img {
     word-break: break-word;
 }
 
+.net-profit-card {
+    background: linear-gradient(135deg, #155e3b, #0f766e);
+}
+
 .table thead {
     background: #f8f9fa;
 }

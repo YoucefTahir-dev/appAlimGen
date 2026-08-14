@@ -98,6 +98,6 @@ class ExpenseTests(TestCase):
 
         response = self.client.get(reverse('dashboard'))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Charges du mois')
-        self.assertContains(response, 'Bénéfice brut mensuel')
-        self.assertContains(response, 'Bénéfice net mensuel')
+        self.assertContains(response, 'Total des charges')
+        self.assertContains(response, 'Gain brut (avant charges)')
+        self.assertContains(response, 'Gain net (après charges)')
