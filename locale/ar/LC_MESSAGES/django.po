@@ -1,0 +1,169 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: gestio_stock 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-14 18:30+0100\n"
+"PO-Revision-Date: 2026-08-14 18:30+0100\n"
+"Last-Translator: Codex\n"
+"Language-Team: Arabic\n"
+"Language: ar\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=6; plural=n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 && n%100<=99 ? 4 : 5;\n"
+
+msgid "Français"
+msgstr "الفرنسية"
+
+msgid "Choisir la langue"
+msgstr "اختيار اللغة"
+
+msgid "ERP El Amine"
+msgstr "نظام الأمين"
+
+msgid "Navigation principale"
+msgstr "التنقل الرئيسي"
+
+msgid "Logo"
+msgstr "الشعار"
+
+msgid "Tableau de bord"
+msgstr "لوحة التحكم"
+
+msgid "Mon profil"
+msgstr "ملفي الشخصي"
+
+msgid "Produits"
+msgstr "المنتجات"
+
+msgid "Clients"
+msgstr "الزبائن"
+
+msgid "Fournisseurs"
+msgstr "الموردون"
+
+msgid "Nouveau client"
+msgstr "زبون جديد"
+
+msgid "Ventes"
+msgstr "المبيعات"
+
+msgid "Achats"
+msgstr "المشتريات"
+
+msgid "Charges"
+msgstr "المصاريف"
+
+msgid "Ouvrir le menu"
+msgstr "فتح القائمة"
+
+msgid "ERP"
+msgstr "النظام"
+
+msgid "Se déconnecter"
+msgstr "تسجيل الخروج"
+
+msgid "Connexion"
+msgstr "تسجيل الدخول"
+
+msgid "Entrez vos identifiants pour accéder au système"
+msgstr "أدخل بيانات الدخول للوصول إلى النظام"
+
+msgid "Se connecter"
+msgstr "تسجيل الدخول"
+
+msgid "Mot de passe oublié ?"
+msgstr "هل نسيت كلمة المرور؟"
+
+msgid "Informations du compte"
+msgstr "معلومات الحساب"
+
+msgid "Langue de l'interface"
+msgstr "لغة الواجهة"
+
+msgid "Mettre à jour"
+msgstr "تحديث"
+
+msgid "Changer mon mot de passe"
+msgstr "تغيير كلمة المرور"
+
+msgid "Enregistrer"
+msgstr "حفظ"
+
+msgid "Nom d'utilisateur"
+msgstr "اسم المستخدم"
+
+msgid "Mot de passe"
+msgstr "كلمة المرور"
+
+msgid "Prénom"
+msgstr "الاسم الشخصي"
+
+msgid "Nom"
+msgstr "اللقب"
+
+msgid "Mot de passe actuel"
+msgstr "كلمة المرور الحالية"
+
+msgid "Nouveau mot de passe"
+msgstr "كلمة المرور الجديدة"
+
+msgid "Confirmation du nouveau mot de passe"
+msgstr "تأكيد كلمة المرور الجديدة"
+
+msgid "Confirmation du mot de passe"
+msgstr "تأكيد كلمة المرور"
+
+msgid "Adresse email"
+msgstr "البريد الإلكتروني"
+
+msgid "Forcer l'utilisateur à changer son mot de passe à la prochaine connexion"
+msgstr "إجبار المستخدم على تغيير كلمة المرور عند تسجيل الدخول القادم"
+
+msgid "Les deux mots de passe ne correspondent pas."
+msgstr "كلمتا المرور غير متطابقتين."
+
+msgid "Valeur du stock"
+msgstr "قيمة المخزون"
+
+msgid "DZD"
+msgstr "دج"
+
+msgid "Ventes du jour"
+msgstr "مبيعات اليوم"
+
+msgid "Achats du jour"
+msgstr "مشتريات اليوم"
+
+msgid "Chiffre d'affaires mensuel"
+msgstr "رقم الأعمال الشهري"
+
+msgid "Produits en rupture"
+msgstr "منتجات نافدة"
+
+msgid "Charges du jour"
+msgstr "مصاريف اليوم"
+
+msgid "Charges du mois"
+msgstr "مصاريف الشهر"
+
+msgid "Bénéfice brut mensuel"
+msgstr "الربح الإجمالي الشهري"
+
+msgid "Bénéfice net mensuel"
+msgstr "الربح الصافي الشهري"
+
+msgid "Répartition des charges du mois"
+msgstr "توزيع مصاريف الشهر"
+
+msgid "Voir les charges"
+msgstr "عرض المصاريف"
+
+msgid "Catégorie"
+msgstr "الفئة"
+
+msgid "Montant"
+msgstr "المبلغ"
+
+msgid "Aucune charge ce mois."
+msgstr "لا توجد مصاريف هذا الشهر."
