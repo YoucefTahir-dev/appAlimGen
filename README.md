@@ -21,6 +21,7 @@ apps/
   core/       Dashboard, paramètres société, logs d’audit, sécurité
   inventory/  Produits, stock, clients, fournisseurs, imports/exports
   commerce/   Achats, ventes, factures PDF
+  expenses/   Charges, catégories de dépenses, exports et rapports
 gestio_stock/ Configuration Django
 static/       CSS, logo et assets
 templates/    Templates globaux

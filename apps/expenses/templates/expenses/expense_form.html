@@ -1,0 +1,28 @@
+{% extends 'base/base.html' %}
+
+{% block title %}{{ title }} - El Amine ERP{% endblock %}
+
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="card card-dashboard p-4 bg-white">
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        <div class="row g-3">
+            <div class="col-md-4">{{ form.date.label_tag }}{{ form.date }}{{ form.date.errors }}</div>
+            <div class="col-md-4">{{ form.category.label_tag }}{{ form.category }}{{ form.category.errors }}</div>
+            <div class="col-md-4">{{ form.amount.label_tag }}{{ form.amount }}{{ form.amount.errors }}</div>
+            <div class="col-md-6">{{ form.description.label_tag }}{{ form.description }}{{ form.description.errors }}</div>
+            <div class="col-md-3">{{ form.payment_method.label_tag }}{{ form.payment_method }}{{ form.payment_method.errors }}</div>
+            <div class="col-md-3">{{ form.supplier.label_tag }}{{ form.supplier }}{{ form.supplier.errors }}</div>
+            <div class="col-md-6">{{ form.receipt.label_tag }}{{ form.receipt }}{{ form.receipt.errors }}</div>
+            <div class="col-12">{{ form.observation.label_tag }}{{ form.observation }}{{ form.observation.errors }}</div>
+        </div>
+        <div class="form-actions mt-3">
+            <button class="btn btn-success">Enregistrer</button>
+            <a class="btn btn-secondary" href="{% url 'expense_list' %}">Retour</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

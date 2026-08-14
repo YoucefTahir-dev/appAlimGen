@@ -25,11 +25,13 @@ BLOCKED_UPLOAD_EXTENSIONS = {
 }
 ALLOWED_IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp'}
 ALLOWED_EXCEL_EXTENSIONS = {'.xlsx'}
+ALLOWED_RECEIPT_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.pdf'}
 ALLOWED_IMAGE_MIME_TYPES = {'image/jpeg', 'image/png', 'image/gif', 'image/webp'}
 ALLOWED_EXCEL_MIME_TYPES = {
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     'application/octet-stream',
 }
+ALLOWED_RECEIPT_MIME_TYPES = ALLOWED_IMAGE_MIME_TYPES | {'application/pdf'}
 
 
 def get_client_ip(request):
@@ -75,6 +77,10 @@ def company_logo_upload_to(instance, filename):
     return _secure_upload_name('logos', filename)
 
 
+def expense_receipt_upload_to(instance, filename):
+    return _secure_upload_name('expense-receipts', filename)
+
+
 def _validate_upload(uploaded_file, allowed_extensions, allowed_mime_types, max_size):
     suffix = Path(uploaded_file.name).suffix.lower()
     if suffix in BLOCKED_UPLOAD_EXTENSIONS or suffix not in allowed_extensions:
@@ -104,6 +110,15 @@ def validate_excel_upload(uploaded_file):
         allowed_extensions=ALLOWED_EXCEL_EXTENSIONS,
         allowed_mime_types=ALLOWED_EXCEL_MIME_TYPES,
         max_size=getattr(settings, 'MAX_EXCEL_UPLOAD_SIZE', 10 * 1024 * 1024),
+    )
+
+
+def validate_receipt_upload(uploaded_file):
+    _validate_upload(
+        uploaded_file,
+        allowed_extensions=ALLOWED_RECEIPT_EXTENSIONS,
+        allowed_mime_types=ALLOWED_RECEIPT_MIME_TYPES,
+        max_size=getattr(settings, 'MAX_RECEIPT_UPLOAD_SIZE', 10 * 1024 * 1024),
     )
 
 

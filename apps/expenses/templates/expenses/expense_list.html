@@ -1,0 +1,73 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Charges - El Amine ERP{% endblock %}
+
+{% block page_title %}Charges{% endblock %}
+
+{% block content %}
+<div class="card card-dashboard p-4 bg-white">
+    <div class="page-toolbar mb-3">
+        <h5>Liste des charges</h5>
+        <div class="toolbar-actions">
+            <a class="btn btn-outline-primary" href="{% url 'expense_category_create' %}">Nouvelle catégorie</a>
+            <a class="btn btn-outline-success" href="{% url 'expense_export_excel' %}?{{ request.GET.urlencode }}">Export Excel</a>
+            <a class="btn btn-outline-danger" href="{% url 'expense_export_pdf' %}?{{ request.GET.urlencode }}">Export PDF</a>
+            <a class="btn btn-outline-secondary" href="{% url 'expense_print' %}?{{ request.GET.urlencode }}" target="_blank">Imprimer</a>
+            <a class="btn btn-success" href="{% url 'expense_create' %}">Nouvelle charge</a>
+        </div>
+    </div>
+
+    <form method="get" class="mb-3 search-form">
+        <input type="search" name="q" class="form-control" placeholder="Rechercher numéro ou description..." value="{{ request.GET.q }}">
+        <select name="period" class="form-select">
+            <option value="">Toutes les périodes</option>
+            <option value="day" {% if request.GET.period == 'day' %}selected{% endif %}>Aujourd'hui</option>
+            <option value="month" {% if request.GET.period == 'month' %}selected{% endif %}>Ce mois</option>
+            <option value="year" {% if request.GET.period == 'year' %}selected{% endif %}>Cette année</option>
+        </select>
+        <button class="btn btn-primary">Filtrer</button>
+    </form>
+
+    <div class="alert alert-info">Total affiché : <strong>{{ total_amount|floatformat:2 }} DZD</strong></div>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>Numéro</th>
+                    <th>Date</th>
+                    <th>Catégorie</th>
+                    <th>Description</th>
+                    <th>Montant</th>
+                    <th>Paiement</th>
+                    <th>Fournisseur</th>
+                    <th>Justif.</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for expense in expenses %}
+                    <tr>
+                        <td>{{ expense.number }}</td>
+                        <td>{{ expense.date|date:'d/m/Y' }}</td>
+                        <td>{{ expense.category.name }}</td>
+                        <td>{{ expense.description }}</td>
+                        <td>{{ expense.amount|floatformat:2 }} DZD</td>
+                        <td>{{ expense.get_payment_method_display }}</td>
+                        <td>{{ expense.supplier.name|default:'-' }}</td>
+                        <td>{% if expense.receipt %}<a href="{{ expense.receipt.url }}" target="_blank">Voir</a>{% else %}<span class="badge text-bg-warning">Absent</span>{% endif %}</td>
+                        <td>
+                            <div class="table-actions">
+                                <a class="btn btn-sm btn-outline-success" href="{% url 'expense_update' expense.pk %}">Modifier</a>
+                                <a class="btn btn-sm btn-outline-danger" href="{% url 'expense_delete' expense.pk %}">Supprimer</a>
+                            </div>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="9" class="text-center">Aucune charge enregistrée.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
