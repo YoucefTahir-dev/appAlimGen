@@ -68,11 +68,22 @@ class PurchaseLine(models.Model):
 
 
 class Sale(models.Model):
+    CASH = 'cash'
+    CHEQUE = 'cheque'
+    TRANSFER = 'transfer'
+    PAYMENT_CHOICES = [
+        (CASH, 'Espèces'),
+        (CHEQUE, 'Chèque'),
+        (TRANSFER, 'Virement'),
+    ]
+
     invoice_number = models.CharField('Numéro facture', max_length=100, unique=True)
+    ticket_number = models.CharField('Numéro ticket', max_length=100, unique=True, blank=True, null=True)
     client = models.ForeignKey(Client, on_delete=models.PROTECT, related_name='sales')
     total = models.DecimalField('Total TTC', max_digits=14, decimal_places=2)
     discount = models.DecimalField('Remise', max_digits=12, decimal_places=2, default=0)
     tax_rate = models.DecimalField('TVA (%)', max_digits=5, decimal_places=2, default=0)
+    payment_type = models.CharField('Mode de paiement', max_length=20, choices=PAYMENT_CHOICES, default=CASH, blank=True)
     created_at = models.DateTimeField('Date', default=timezone.now)
 
     class Meta:
@@ -96,6 +107,19 @@ class InvoiceSequence(models.Model):
     class Meta:
         verbose_name = 'Séquence facture'
         verbose_name_plural = 'Séquences factures'
+
+    def __str__(self):
+        return f'{self.year} - {self.last_number}'
+
+
+class TicketSequence(models.Model):
+    year = models.PositiveIntegerField(unique=True)
+    last_number = models.PositiveIntegerField(default=0)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Séquence ticket'
+        verbose_name_plural = 'Séquences tickets'
 
     def __str__(self):
         return f'{self.year} - {self.last_number}'

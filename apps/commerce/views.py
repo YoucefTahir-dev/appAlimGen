@@ -7,8 +7,8 @@ from django.utils import timezone
 from apps.accounts.permissions import manager_required, seller_required
 
 from .forms import PurchaseForm, PurchaseLineFormSet, SaleForm, SaleLineFormSet
-from .models import InvoiceSequence, Purchase, Sale
-from .utils import build_invoice_context, generate_invoice_pdf
+from .models import InvoiceSequence, Purchase, Sale, TicketSequence
+from .utils import build_invoice_context, generate_invoice_pdf, qr_code_data_uri
 
 
 def generate_invoice_number():
@@ -17,6 +17,25 @@ def generate_invoice_number():
     sequence.last_number += 1
     sequence.save(update_fields=['last_number'])
     return f'FAC-{year}-{sequence.last_number:06d}'
+
+
+def generate_ticket_number():
+    year = timezone.now().year
+    sequence, _ = TicketSequence.objects.select_for_update().get_or_create(year=year)
+    sequence.last_number += 1
+    sequence.save(update_fields=['last_number'])
+    return f'TCK-{year}-{sequence.last_number:06d}'
+
+
+def ensure_ticket_number(sale):
+    if sale.ticket_number:
+        return
+    with transaction.atomic():
+        locked_sale = Sale.objects.select_for_update().get(pk=sale.pk)
+        if not locked_sale.ticket_number:
+            locked_sale.ticket_number = generate_ticket_number()
+            locked_sale.save(update_fields=['ticket_number'])
+        sale.ticket_number = locked_sale.ticket_number
 
 
 def calculate_sale_total(sale, formset):
@@ -57,6 +76,7 @@ def sale_create(request):
         with transaction.atomic():
             sale = form.save(commit=False)
             sale.invoice_number = generate_invoice_number()
+            sale.ticket_number = generate_ticket_number()
             sale.total = calculate_sale_total(sale, formset)
             sale.save()
             formset.instance = sale
@@ -146,3 +166,18 @@ def sale_invoice_preview(request, pk):
     context = build_invoice_context(sale)
     context['auto_print'] = request.GET.get('print') == '1'
     return render(request, 'commerce/sale_invoice_preview.html', context)
+
+
+@seller_required
+def sale_ticket_preview(request, pk, width):
+    sale = get_object_or_404(Sale.objects.select_related('client').prefetch_related('lines__product'), pk=pk)
+    ensure_ticket_number(sale)
+    ticket_width = '58' if str(width) == '58' else '80'
+    context = build_invoice_context(sale)
+    context.update({
+        'ticket_width': ticket_width,
+        'auto_print': request.GET.get('print') == '1',
+        'cashier_name': request.user.get_full_name() or request.user.get_username(),
+        'qr_code_data_uri': qr_code_data_uri(sale, context['total_ttc']),
+    })
+    return render(request, 'commerce/sale_ticket.html', context)

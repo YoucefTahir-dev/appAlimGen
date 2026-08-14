@@ -1,0 +1,239 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Ticket {{ sale.ticket_number }}</title>
+    <style>
+        @page {
+            size: {{ ticket_width }}mm auto;
+            margin: 2mm;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: #f4f5f7;
+            color: #111;
+            font-family: Arial, "Tahoma", sans-serif;
+            font-size: {% if ticket_width == '58' %}10px{% else %}12px{% endif %};
+            line-height: 1.25;
+        }
+
+        .ticket-actions {
+            max-width: 720px;
+            margin: 12px auto;
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .ticket-actions a,
+        .ticket-actions button {
+            border: 1px solid #222;
+            background: #fff;
+            color: #111;
+            border-radius: 6px;
+            padding: 8px 10px;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .ticket {
+            width: {{ ticket_width }}mm;
+            margin: 0 auto 20px;
+            padding: 2mm;
+            background: #fff;
+        }
+
+        .center {
+            text-align: center;
+        }
+
+        .logo {
+            max-width: {% if ticket_width == '58' %}28mm{% else %}36mm{% endif %};
+            max-height: {% if ticket_width == '58' %}18mm{% else %}24mm{% endif %};
+            object-fit: contain;
+            margin-bottom: 2mm;
+        }
+
+        .company-name {
+            font-weight: 700;
+            font-size: {% if ticket_width == '58' %}11px{% else %}13px{% endif %};
+            text-transform: uppercase;
+        }
+
+        .company-ar {
+            direction: rtl;
+            font-size: {% if ticket_width == '58' %}11px{% else %}13px{% endif %};
+            margin-top: 1mm;
+        }
+
+        .muted {
+            color: #333;
+        }
+
+        .separator {
+            border-top: 1px dashed #111;
+            margin: 2mm 0;
+        }
+
+        .row {
+            display: flex;
+            justify-content: space-between;
+            gap: 2mm;
+        }
+
+        .row span:last-child {
+            text-align: right;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            padding: 1mm 0;
+            vertical-align: top;
+        }
+
+        th {
+            border-bottom: 1px dashed #111;
+            font-weight: 700;
+            text-align: left;
+        }
+
+        .num {
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        .product-name {
+            font-weight: 600;
+        }
+
+        .small {
+            font-size: {% if ticket_width == '58' %}9px{% else %}10px{% endif %};
+        }
+
+        .total {
+            font-weight: 700;
+            font-size: {% if ticket_width == '58' %}12px{% else %}14px{% endif %};
+        }
+
+        .qr {
+            width: {% if ticket_width == '58' %}22mm{% else %}28mm{% endif %};
+            height: {% if ticket_width == '58' %}22mm{% else %}28mm{% endif %};
+            margin-top: 2mm;
+        }
+
+        @media print {
+            body {
+                background: #fff;
+            }
+
+            .ticket-actions {
+                display: none;
+            }
+
+            .ticket {
+                margin: 0;
+                box-shadow: none;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="ticket-actions">
+    <a href="{% url 'sale_list' %}">Retour</a>
+    <a href="{% url 'sale_ticket_preview' sale.pk 80 %}">Format 80 mm</a>
+    <a href="{% url 'sale_ticket_preview' sale.pk 58 %}">Format 58 mm</a>
+    <button onclick="window.print()">Imprimer</button>
+</div>
+
+<main class="ticket">
+    <header class="center">
+        {% if company and company.logo %}
+            <img src="{{ company.logo.url }}" class="logo" alt="Logo">
+        {% else %}
+            <img src="{% static 'img/logo.png' %}" class="logo" alt="Logo">
+        {% endif %}
+        <div class="company-name">{{ company_name_fr }}</div>
+        <div class="company-ar">الأمين للمواد الغذائية و غير الغذائية</div>
+        <div class="muted">{{ company.address|default:"" }}</div>
+        <div>Tél : {{ company.phone|default:"" }}</div>
+        <div>RC : {{ company.rc_number|default:"-" }} | NIF : {{ company.tax_number|default:"-" }}</div>
+    </header>
+
+    <div class="separator"></div>
+
+    <section>
+        <div class="row"><span>Ticket</span><span>{{ sale.ticket_number }}</span></div>
+        <div class="row"><span>Facture</span><span>{{ sale.invoice_number }}</span></div>
+        <div class="row"><span>Date</span><span>{{ sale.created_at|date:"d/m/Y" }}</span></div>
+        <div class="row"><span>Heure</span><span>{{ sale.created_at|date:"H:i" }}</span></div>
+        <div class="row"><span>Caissier</span><span>{{ cashier_name }}</span></div>
+        {% if sale.client %}
+            <div class="row"><span>Client</span><span>{{ sale.client.name }}</span></div>
+        {% endif %}
+    </section>
+
+    <div class="separator"></div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Article</th>
+                <th class="num">Qté</th>
+                <th class="num">PU</th>
+                <th class="num">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for line in lines %}
+                <tr>
+                    <td>
+                        <div class="product-name">{{ line.product.name }}</div>
+                        <div class="small muted">Conditionnement : Unité</div>
+                    </td>
+                    <td class="num">{{ line.quantity }}</td>
+                    <td class="num">{{ line.unit_price|floatformat:2 }}</td>
+                    <td class="num">{{ line.line_total|floatformat:2 }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="separator"></div>
+
+    <section>
+        <div class="row"><span>Total HT</span><span>{{ total_ht|floatformat:2 }} DZD</span></div>
+        <div class="row"><span>TVA</span><span>{{ tax_amount|floatformat:2 }} DZD</span></div>
+        <div class="row"><span>Remise</span><span>{{ discount|floatformat:2 }} DZD</span></div>
+        <div class="row total"><span>Total TTC</span><span>{{ total_ttc|floatformat:2 }} DZD</span></div>
+        <div class="row"><span>Paiement</span><span>{{ sale.get_payment_type_display }}</span></div>
+    </section>
+
+    <div class="separator"></div>
+
+    <footer class="center">
+        <img src="{{ qr_code_data_uri }}" class="qr" alt="QR Code facture">
+        <div>Merci pour votre visite</div>
+        <div>À bientôt.</div>
+    </footer>
+</main>
+
+{% if auto_print %}
+<script>
+window.addEventListener('load', () => window.print());
+</script>
+{% endif %}
+</body>
+</html>

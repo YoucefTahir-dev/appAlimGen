@@ -1,4 +1,5 @@
 import io
+import base64
 from decimal import Decimal
 from pathlib import Path
 
@@ -153,6 +154,12 @@ def qr_code_image_reader(sale, total_ttc):
     img.save(buffer, format='PNG')
     buffer.seek(0)
     return buffer
+
+
+def qr_code_data_uri(sale, total_ttc):
+    buffer = qr_code_image_reader(sale, total_ttc)
+    encoded = base64.b64encode(buffer.getvalue()).decode('ascii')
+    return f'data:image/png;base64,{encoded}'
 
 
 def generate_invoice_pdf(response, sale):

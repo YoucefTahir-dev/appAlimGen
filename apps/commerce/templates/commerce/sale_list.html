@@ -39,6 +39,12 @@
                                 <a class="btn btn-sm btn-outline-secondary" href="{% url 'sale_invoice_preview' sale.pk %}?print=1" target="_blank">
                                     <i class="bi bi-printer"></i> Imprimer
                                 </a>
+                                <a class="btn btn-sm btn-outline-dark" href="{% url 'sale_ticket_preview' sale.pk 80 %}" target="_blank">
+                                    <i class="bi bi-receipt"></i> Ticket 80
+                                </a>
+                                <a class="btn btn-sm btn-outline-dark" href="{% url 'sale_ticket_preview' sale.pk 58 %}" target="_blank">
+                                    <i class="bi bi-receipt-cutoff"></i> Ticket 58
+                                </a>
                                 {% if can_manage %}
                                     <a class="btn btn-sm btn-outline-success" href="{% url 'sale_update' sale.pk %}">
                                         <i class="bi bi-pencil"></i> Modifier
