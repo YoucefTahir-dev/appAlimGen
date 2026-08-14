@@ -1,4 +1,5 @@
 {% extends 'base/base.html' %}
+{% load i18n %}
 
 {% block title %}Mouvements stock - El Amine ERP{% endblock %}
 
@@ -7,21 +8,21 @@
 {% block content %}
 <div class="card card-dashboard p-4 bg-white">
     <div class="page-toolbar mb-3">
-        <h5>Liste des mouvements</h5>
+        <h5>{% trans "Liste des mouvements" %}</h5>
         {% if can_manage %}
-            <a href="{% url 'stock_movement_create' %}" class="btn btn-success">Ajouter mouvement</a>
+            <a href="{% url 'stock_movement_create' %}" class="btn btn-success">{% trans "Ajouter mouvement" %}</a>
         {% endif %}
     </div>
     <div class="table-responsive">
         <table class="table table-hover align-middle">
             <thead>
                 <tr>
-                    <th>Produit</th>
-                    <th>Type</th>
+                    <th>{% trans "Produit" %}</th>
+                    <th>{% trans "Type" %}</th>
                     <th>Quantité</th>
-                    <th>Motif</th>
-                    <th>Date</th>
-                    {% if can_manage %}<th>Actions</th>{% endif %}
+                    <th>{% trans "Motif" %}</th>
+                    <th>{% trans "Date" %}</th>
+                    {% if can_manage %}<th>{% trans "Actions" %}</th>{% endif %}
                 </tr>
             </thead>
             <tbody>
@@ -35,7 +36,7 @@
                         {% if can_manage %}
                             <td>
                                 <div class="table-actions">
-                                    <a href="{% url 'stock_movement_delete' movement.pk %}" class="btn btn-sm btn-danger">Supprimer</a>
+                                    <a href="{% url 'stock_movement_delete' movement.pk %}" class="btn btn-sm btn-danger">{% trans "Supprimer" %}</a>
                                 </div>
                             </td>
                         {% endif %}

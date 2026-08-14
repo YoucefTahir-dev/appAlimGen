@@ -3,6 +3,7 @@ from django.db import transaction
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.utils.translation import gettext as _
 
 from apps.accounts.permissions import manager_required, seller_required
 
@@ -83,7 +84,7 @@ def sale_create(request):
             formset.save()
         messages.success(request, 'Facture enregistrée avec succès.')
         return redirect('sale_list')
-    return render(request, 'commerce/sale_form.html', {'form': form, 'formset': formset, 'title': 'Nouvelle facture'})
+    return render(request, 'commerce/sale_form.html', {'form': form, 'formset': formset, 'title': _('Nouvelle facture')})
 
 
 @manager_required
@@ -113,7 +114,7 @@ def sale_update(request, pk):
         formset.save()
         messages.success(request, 'Facture mise à jour avec succès.')
         return redirect('sale_list')
-    return render(request, 'commerce/sale_form.html', {'form': form, 'formset': formset, 'title': 'Modifier la facture'})
+    return render(request, 'commerce/sale_form.html', {'form': form, 'formset': formset, 'title': _('Modifier la facture')})
 
 
 @manager_required

@@ -1,10 +1,11 @@
+{% load i18n %}
 {% load static %}
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Facture {{ sale.invoice_number }}</title>
+    <title>{% trans "Facture" %} {{ sale.invoice_number }}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body { background: #eef2f4; color: #1f2933; }
@@ -29,11 +30,11 @@
 <body>
 <div class="print-actions py-3">
     <div class="container d-flex flex-wrap gap-2 justify-content-end">
-        <a href="{% url 'sale_list' %}" class="btn btn-outline-secondary">Retour</a>
+        <a href="{% url 'sale_list' %}" class="btn btn-outline-secondary">{% trans "Retour" %}</a>
         <a href="{% url 'sale_invoice_pdf' sale.pk %}" class="btn btn-danger">Télécharger PDF</a>
-        <button onclick="window.print()" class="btn btn-success">Imprimer</button>
-        <a href="{% url 'sale_ticket_preview' sale.pk 80 %}" class="btn btn-dark">Ticket 80 mm</a>
-        <a href="{% url 'sale_ticket_preview' sale.pk 58 %}" class="btn btn-dark">Ticket 58 mm</a>
+        <button onclick="window.print()" class="btn btn-success">{% trans "Imprimer" %}</button>
+        <a href="{% url 'sale_ticket_preview' sale.pk 80 %}" class="btn btn-dark">{% trans "Ticket" %} 80 mm</a>
+        <a href="{% url 'sale_ticket_preview' sale.pk 58 %}" class="btn btn-dark">{% trans "Ticket" %} 58 mm</a>
     </div>
 </div>
 
@@ -50,27 +51,27 @@
             <h1 class="h4 brand mb-1">{{ company_name_fr }}</h1>
             <div class="h5 brand text-end" dir="rtl">{{ company_name_ar }}</div>
             <div class="small text-muted mt-2">
-                Adresse : {{ company.address|default:"" }}<br>
-                Téléphone : {{ company.phone|default:"" }} | Email : {{ company.email|default:"" }}<br>
-                RC : {{ company.rc_number|default:"" }} | NIF : {{ company.tax_number|default:"" }}
+                {% trans "Adresse" %} : {{ company.address|default:"" }}<br>
+                Téléphone : {{ company.phone|default:"" }} | {% trans "Email" %} : {{ company.email|default:"" }}<br>
+                {% trans "RC" %} : {{ company.rc_number|default:"" }} | NIF : {{ company.tax_number|default:"" }}
             </div>
         </div>
         <div class="col-md-4">
             <div class="invoice-title">
-                <div class="h3 mb-2">FACTURE</div>
+                <div class="h3 mb-2">{% trans "FACTURE" %}</div>
                 <div>N° : <strong>{{ sale.invoice_number }}</strong></div>
-                <div>Date : {{ sale.created_at|date:"d/m/Y" }}</div>
-                <div>Statut : Validée</div>
+                <div>{% trans "Date" %} : {{ sale.created_at|date:"d/m/Y" }}</div>
+                <div>{% trans "Statut" %} : Validée</div>
             </div>
         </div>
     </header>
 
     <section class="border rounded-3 p-3 mb-4 bg-light">
-        <h2 class="h6 brand">Client</h2>
+        <h2 class="h6 brand">{% trans "Client" %}</h2>
         <div class="row">
             <div class="col-md-6"><strong>{{ sale.client.name }}</strong></div>
             <div class="col-md-6">Téléphone : {{ sale.client.phone }}</div>
-            <div class="col-md-6">Adresse : {{ sale.client.address }}</div>
+            <div class="col-md-6">{% trans "Adresse" %} : {{ sale.client.address }}</div>
             <div class="col-md-6">NIF : {{ sale.client.tax_number }}</div>
         </div>
     </section>
@@ -80,11 +81,11 @@
             <thead>
                 <tr>
                     <th>N°</th>
-                    <th>Produit</th>
+                    <th>{% trans "Produit" %}</th>
                     <th class="text-end">Qté</th>
-                    <th class="text-end">PU</th>
-                    <th class="text-end">TVA</th>
-                    <th class="text-end">Montant HT</th>
+                    <th class="text-end">{% trans "PU" %}</th>
+                    <th class="text-end">{% trans "TVA" %}</th>
+                    <th class="text-end">{% trans "Montant HT" %}</th>
                 </tr>
             </thead>
             <tbody>
@@ -105,9 +106,9 @@
     <section class="row justify-content-end mb-4">
         <div class="col-md-5">
             <div class="totals-card">
-                <div class="d-flex justify-content-between p-2 border-bottom"><span>Total HT</span><strong>{{ total_ht|floatformat:2 }} DZD</strong></div>
-                <div class="d-flex justify-content-between p-2 border-bottom"><span>TVA</span><strong>{{ tax_amount|floatformat:2 }} DZD</strong></div>
-                <div class="d-flex justify-content-between p-2 border-bottom"><span>Remise</span><strong>{{ sale.discount|floatformat:2 }} DZD</strong></div>
+                <div class="d-flex justify-content-between p-2 border-bottom"><span>{% trans "Total" %} HT</span><strong>{{ total_ht|floatformat:2 }} DZD</strong></div>
+                <div class="d-flex justify-content-between p-2 border-bottom"><span>{% trans "TVA" %}</span><strong>{{ tax_amount|floatformat:2 }} DZD</strong></div>
+                <div class="d-flex justify-content-between p-2 border-bottom"><span>{% trans "Remise" %}</span><strong>{{ sale.discount|floatformat:2 }} DZD</strong></div>
                 <div class="d-flex justify-content-between p-3 total-final"><span>Net à payer</span><strong>{{ total_ttc|floatformat:2 }} DZD</strong></div>
             </div>
         </div>
@@ -119,8 +120,8 @@
     </section>
 
     <footer class="row mt-5 pt-4 border-top">
-        <div class="col-md-4">Signature et cachet<br><br>______________________</div>
-        <div class="col-md-4 text-center fw-semibold gold">Merci pour votre confiance.</div>
+        <div class="col-md-4">{% trans "Signature et cachet" %}<br><br>______________________</div>
+        <div class="col-md-4 text-center fw-semibold gold">{% trans "Merci pour votre confiance." %}</div>
         <div class="col-md-4 small text-end">
             {{ company.phone|default:"" }}<br>
             {{ company.email|default:"" }}

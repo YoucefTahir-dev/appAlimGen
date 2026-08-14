@@ -1,16 +1,17 @@
 {% extends 'base/base.html' %}
+{% load i18n %}
 
-{% block title %}Supprimer facture - El Amine ERP{% endblock %}
+{% block title %}{% trans "Supprimer facture" %} - El Amine ERP{% endblock %}
 
-{% block page_title %}Supprimer facture{% endblock %}
+{% block page_title %}{% trans "Supprimer facture" %}{% endblock %}
 
 {% block content %}
 <div class="card card-dashboard p-4 bg-white">
-    <p>Voulez-vous vraiment supprimer la facture <strong>{{ sale.invoice_number }}</strong> ?</p>
+    <p>{% trans "Voulez-vous vraiment supprimer la facture" %} <strong>{{ sale.invoice_number }}</strong> </p>
     <form method="post">
         {% csrf_token %}
-        <button type="submit" class="btn btn-danger">Supprimer</button>
-        <a href="{% url 'sale_list' %}" class="btn btn-secondary">Annuler</a>
+        <button type="submit" class="btn btn-danger">{% trans "Supprimer" %}</button>
+        <a href="{% url 'sale_list' %}" class="btn btn-secondary">{% trans "Annuler" %}</a>
     </form>
 </div>
 {% endblock %}

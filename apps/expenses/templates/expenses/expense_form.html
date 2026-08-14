@@ -1,4 +1,5 @@
 {% extends 'base/base.html' %}
+{% load i18n %}
 
 {% block title %}{{ title }} - El Amine ERP{% endblock %}
 
@@ -20,8 +21,8 @@
             <div class="col-12">{{ form.observation.label_tag }}{{ form.observation }}{{ form.observation.errors }}</div>
         </div>
         <div class="form-actions mt-3">
-            <button class="btn btn-success">Enregistrer</button>
-            <a class="btn btn-secondary" href="{% url 'expense_list' %}">Retour</a>
+            <button class="btn btn-success">{% trans "Enregistrer" %}</button>
+            <a class="btn btn-secondary" href="{% url 'expense_list' %}">{% trans "Retour" %}</a>
         </div>
     </form>
 </div>

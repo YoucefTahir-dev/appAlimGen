@@ -1,4 +1,5 @@
 {% extends 'base/base.html' %}
+{% load i18n %}
 
 {% block title %}{{ title }} - El Amine ERP{% endblock %}
 
@@ -25,7 +26,7 @@
             <div class="col-md-8">{{ form.photo.label_tag }}{{ form.photo }}</div>
             {% if form.instance.pk and form.instance.qr_code %}
             <div class="col-md-4 text-center">
-                <label class="form-label">QR Code</label>
+                <label class="form-label">{% trans "QR Code" %}</label>
                 <div>
                     <img src="{{ form.instance.qr_code.url }}" alt="QR" class="img-fluid qr-image-sm" />
                 </div>
@@ -34,7 +35,7 @@
             <div class="col-12">{{ form.description.label_tag }}{{ form.description }}</div>
         </div>
         <div class="form-actions mt-3">
-            <button class="btn btn-success">Enregistrer</button>
+            <button class="btn btn-success">{% trans "Enregistrer" %}</button>
         </div>
     </form>
 </div>

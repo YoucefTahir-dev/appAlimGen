@@ -1,16 +1,17 @@
 {% extends 'base/base.html' %}
+{% load i18n %}
 
-{% block title %}Supprimer charge - El Amine ERP{% endblock %}
+{% block title %}{% trans "Supprimer charge" %} - El Amine ERP{% endblock %}
 
-{% block page_title %}Supprimer charge{% endblock %}
+{% block page_title %}{% trans "Supprimer charge" %}{% endblock %}
 
 {% block content %}
 <div class="card card-dashboard p-4 bg-white">
-    <p>Supprimer la charge <strong>{{ expense.number }}</strong> ?</p>
+    <p>{% trans "Supprimer la charge" %} <strong>{{ expense.number }}</strong> </p>
     <form method="post">
         {% csrf_token %}
-        <button class="btn btn-danger">Supprimer</button>
-        <a href="{% url 'expense_list' %}" class="btn btn-secondary">Annuler</a>
+        <button class="btn btn-danger">{% trans "Supprimer" %}</button>
+        <a href="{% url 'expense_list' %}" class="btn btn-secondary">{% trans "Annuler" %}</a>
     </form>
 </div>
 {% endblock %}

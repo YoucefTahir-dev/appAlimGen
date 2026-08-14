@@ -1,0 +1,691 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: gestio_stock 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-14 18:30+0100\n"
+"PO-Revision-Date: 2026-08-14 18:30+0100\n"
+"Last-Translator: Codex\n"
+"Language-Team: Arabic\n"
+"Language: ar\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=6; plural=n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 && n%100<=99 ? 4 : 5;\n"
+
+msgid "Français"
+msgstr "الفرنسية"
+
+msgid "العربية"
+msgstr "العربية"
+
+msgid "Choisir la langue"
+msgstr "اختيار اللغة"
+
+msgid "ERP El Amine"
+msgstr "نظام الأمين"
+
+msgid "Navigation principale"
+msgstr "التنقل الرئيسي"
+
+msgid "Logo"
+msgstr "الشعار"
+
+msgid "ERP"
+msgstr "النظام"
+
+msgid "Ouvrir le menu"
+msgstr "فتح القائمة"
+
+msgid "Se déconnecter"
+msgstr "تسجيل الخروج"
+
+msgid "Tableau de bord"
+msgstr "لوحة التحكم"
+
+msgid "Produits"
+msgstr "المنتجات"
+
+msgid "Produit"
+msgstr "المنتج"
+
+msgid "Clients"
+msgstr "الزبائن"
+
+msgid "Client"
+msgstr "الزبون"
+
+msgid "Fournisseurs"
+msgstr "الموردون"
+
+msgid "Fournisseur"
+msgstr "المورد"
+
+msgid "Achats"
+msgstr "المشتريات"
+
+msgid "Ventes"
+msgstr "المبيعات"
+
+msgid "Charges"
+msgstr "المصاريف"
+
+msgid "Mon profil"
+msgstr "ملفي الشخصي"
+
+msgid "Nouveau client"
+msgstr "زبون جديد"
+
+msgid "Connexion"
+msgstr "تسجيل الدخول"
+
+msgid "Entrez vos identifiants pour accéder au système"
+msgstr "أدخل بيانات الدخول للوصول إلى النظام"
+
+msgid "Se connecter"
+msgstr "تسجيل الدخول"
+
+msgid "Mot de passe oublié ?"
+msgstr "هل نسيت كلمة المرور؟"
+
+msgid "Mot de passe oublié"
+msgstr "نسيت كلمة المرور"
+
+msgid "Nom d'utilisateur"
+msgstr "اسم المستخدم"
+
+msgid "Mot de passe"
+msgstr "كلمة المرور"
+
+msgid "Informations du compte"
+msgstr "معلومات الحساب"
+
+msgid "Langue de l'interface"
+msgstr "لغة الواجهة"
+
+msgid "Mettre à jour"
+msgstr "تحديث"
+
+msgid "Changer mon mot de passe"
+msgstr "تغيير كلمة المرور"
+
+msgid "Enregistrer"
+msgstr "حفظ"
+
+msgid "Prénom"
+msgstr "الاسم الشخصي"
+
+msgid "Nom"
+msgstr "الاسم"
+
+msgid "Mot de passe actuel"
+msgstr "كلمة المرور الحالية"
+
+msgid "Nouveau mot de passe"
+msgstr "كلمة المرور الجديدة"
+
+msgid "Confirmation du nouveau mot de passe"
+msgstr "تأكيد كلمة المرور الجديدة"
+
+msgid "Confirmation du mot de passe"
+msgstr "تأكيد كلمة المرور"
+
+msgid "Adresse email"
+msgstr "البريد الإلكتروني"
+
+msgid "Forcer l'utilisateur à changer son mot de passe à la prochaine connexion"
+msgstr "إجبار المستخدم على تغيير كلمة المرور عند تسجيل الدخول القادم"
+
+msgid "Les deux mots de passe ne correspondent pas."
+msgstr "كلمتا المرور غير متطابقتين."
+
+msgid "Valeur du stock"
+msgstr "قيمة المخزون"
+
+msgid "DZD"
+msgstr "دج"
+
+msgid "Ventes du jour"
+msgstr "مبيعات اليوم"
+
+msgid "Achats du jour"
+msgstr "مشتريات اليوم"
+
+msgid "Chiffre d'affaires mensuel"
+msgstr "رقم الأعمال الشهري"
+
+msgid "Produits en rupture"
+msgstr "منتجات نافدة"
+
+msgid "Charges du jour"
+msgstr "مصاريف اليوم"
+
+msgid "Charges du mois"
+msgstr "مصاريف الشهر"
+
+msgid "Bénéfice brut mensuel"
+msgstr "الربح الإجمالي الشهري"
+
+msgid "Bénéfice net mensuel"
+msgstr "الربح الصافي الشهري"
+
+msgid "Répartition des charges du mois"
+msgstr "توزيع مصاريف الشهر"
+
+msgid "Voir les charges"
+msgstr "عرض المصاريف"
+
+msgid "Catégorie"
+msgstr "الفئة"
+
+msgid "Montant"
+msgstr "المبلغ"
+
+msgid "Aucune charge ce mois."
+msgstr "لا توجد مصاريف هذا الشهر."
+
+msgid "Liste des produits"
+msgstr "قائمة المنتجات"
+
+msgid "Liste des clients"
+msgstr "قائمة الزبائن"
+
+msgid "Liste des fournisseurs"
+msgstr "قائمة الموردين"
+
+msgid "Liste des ventes"
+msgstr "قائمة المبيعات"
+
+msgid "Liste des achats"
+msgstr "قائمة المشتريات"
+
+msgid "Liste des charges"
+msgstr "قائمة المصاريف"
+
+msgid "Liste des mouvements"
+msgstr "قائمة الحركات"
+
+msgid "Ajouter produit"
+msgstr "إضافة منتج"
+
+msgid "Ajouter un produit"
+msgstr "إضافة منتج"
+
+msgid "Ajouter client"
+msgstr "إضافة زبون"
+
+msgid "Ajouter fournisseur"
+msgstr "إضافة مورد"
+
+msgid "Ajouter mouvement"
+msgstr "إضافة حركة"
+
+msgid "Nouvelle facture"
+msgstr "فاتورة جديدة"
+
+msgid "Nouveau bon d'achat"
+msgstr "وصل شراء جديد"
+
+msgid "Nouvelle charge"
+msgstr "مصروف جديد"
+
+msgid "Nouvelle catégorie"
+msgstr "فئة جديدة"
+
+msgid "Nouvelle catégorie de charge"
+msgstr "فئة مصروف جديدة"
+
+msgid "Import Excel"
+msgstr "استيراد Excel"
+
+msgid "Export Excel"
+msgstr "تصدير Excel"
+
+msgid "Export PDF"
+msgstr "تصدير PDF"
+
+msgid "Importer"
+msgstr "استيراد"
+
+msgid "Imprimer"
+msgstr "طباعة"
+
+msgid "Télécharger"
+msgstr "تحميل"
+
+msgid "Télécharger PDF"
+msgstr "تحميل PDF"
+
+msgid "Télécharger QR"
+msgstr "تحميل QR"
+
+msgid "Ouvrir QR"
+msgstr "فتح QR"
+
+msgid "Retour"
+msgstr "رجوع"
+
+msgid "Annuler"
+msgstr "إلغاء"
+
+msgid "Supprimer"
+msgstr "حذف"
+
+msgid "Modifier"
+msgstr "تعديل"
+
+msgid "Visualiser"
+msgstr "عرض"
+
+msgid "Voir"
+msgstr "عرض"
+
+msgid "Filtrer"
+msgstr "تصفية"
+
+msgid "Rechercher"
+msgstr "بحث"
+
+msgid "Rechercher..."
+msgstr "بحث..."
+
+msgid "Rechercher numéro ou description..."
+msgstr "البحث بالرقم أو الوصف..."
+
+msgid "Toutes les périodes"
+msgstr "كل الفترات"
+
+msgid "Aujourd'hui"
+msgstr "اليوم"
+
+msgid "Ce mois"
+msgstr "هذا الشهر"
+
+msgid "Cette année"
+msgstr "هذه السنة"
+
+msgid "Total affiché"
+msgstr "المجموع المعروض"
+
+msgid "Total"
+msgstr "المجموع"
+
+msgid "Référence"
+msgstr "المرجع"
+
+msgid "Réf"
+msgstr "المرجع"
+
+msgid "Code-barres"
+msgstr "كود بار"
+
+msgid "QR Code"
+msgstr "رمز QR"
+
+msgid "Marque"
+msgstr "العلامة"
+
+msgid "Prix vente"
+msgstr "سعر البيع"
+
+msgid "Prix de vente"
+msgstr "سعر البيع"
+
+msgid "Prix d'achat"
+msgstr "سعر الشراء"
+
+msgid "Prix unitaire"
+msgstr "سعر الوحدة"
+
+msgid "Stock"
+msgstr "المخزون"
+
+msgid "Seuil"
+msgstr "الحد الأدنى"
+
+msgid "Quantité"
+msgstr "الكمية"
+
+msgid "Description"
+msgstr "الوصف"
+
+msgid "Téléphone"
+msgstr "الهاتف"
+
+msgid "Wilaya"
+msgstr "الولاية"
+
+msgid "Email"
+msgstr "البريد الإلكتروني"
+
+msgid "Adresse"
+msgstr "العنوان"
+
+msgid "Solde"
+msgstr "الرصيد"
+
+msgid "RC"
+msgstr "السجل التجاري"
+
+msgid "NIF"
+msgstr "الرقم الجبائي"
+
+msgid "Date"
+msgstr "التاريخ"
+
+msgid "Actions"
+msgstr "إجراءات"
+
+msgid "Facture"
+msgstr "فاتورة"
+
+msgid "Ticket"
+msgstr "تذكرة"
+
+msgid "Format 80 mm"
+msgstr "صيغة 80 مم"
+
+msgid "Format 58 mm"
+msgstr "صيغة 58 مم"
+
+msgid "Numéro"
+msgstr "الرقم"
+
+msgid "Numéro facture"
+msgstr "رقم الفاتورة"
+
+msgid "Type"
+msgstr "النوع"
+
+msgid "Motif"
+msgstr "السبب"
+
+msgid "Paiement"
+msgstr "الدفع"
+
+msgid "Justif."
+msgstr "المرفق"
+
+msgid "Absent"
+msgstr "غائب"
+
+msgid "Aucun produit trouvé."
+msgstr "لم يتم العثور على أي منتج."
+
+msgid "Aucun client enregistré."
+msgstr "لا يوجد زبائن مسجلون."
+
+msgid "Aucun fournisseur enregistré."
+msgstr "لا يوجد موردون مسجلون."
+
+msgid "Aucune vente enregistrée."
+msgstr "لا توجد مبيعات مسجلة."
+
+msgid "Aucun achat enregistré."
+msgstr "لا توجد مشتريات مسجلة."
+
+msgid "Aucune charge enregistrée."
+msgstr "لا توجد مصاريف مسجلة."
+
+msgid "Aucun mouvement de stock enregistré."
+msgstr "لا توجد حركات مخزون مسجلة."
+
+msgid "Fiche produit"
+msgstr "بطاقة المنتج"
+
+msgid "Import Excel produits"
+msgstr "استيراد منتجات Excel"
+
+msgid "Généré automatiquement"
+msgstr "يتم إنشاؤه تلقائيًا"
+
+msgid "Fichier Excel"
+msgstr "ملف Excel"
+
+msgid "FACTURE"
+msgstr "فاتورة"
+
+msgid "Statut"
+msgstr "الحالة"
+
+msgid "Validée"
+msgstr "مؤكدة"
+
+msgid "Qté"
+msgstr "الكمية"
+
+msgid "PU"
+msgstr "سعر الوحدة"
+
+msgid "TVA"
+msgstr "ضريبة القيمة المضافة"
+
+msgid "Montant HT"
+msgstr "المبلغ دون ضريبة"
+
+msgid "Total HT"
+msgstr "المجموع دون ضريبة"
+
+msgid "Total TTC"
+msgstr "المجموع شامل الضريبة"
+
+msgid "Remise"
+msgstr "الخصم"
+
+msgid "Net à payer"
+msgstr "الصافي للدفع"
+
+msgid "Arrêtée la présente facture à la somme de"
+msgstr "أوقفت هذه الفاتورة على مبلغ"
+
+msgid "Signature et cachet"
+msgstr "التوقيع والختم"
+
+msgid "Merci pour votre confiance."
+msgstr "شكرًا لثقتكم."
+
+msgid "Heure"
+msgstr "الوقت"
+
+msgid "Caissier"
+msgstr "أمين الصندوق"
+
+msgid "Article"
+msgstr "الصنف"
+
+msgid "Conditionnement"
+msgstr "التغليف"
+
+msgid "Unité"
+msgstr "وحدة"
+
+msgid "Merci pour votre visite"
+msgstr "شكرًا لزيارتكم"
+
+msgid "À bientôt."
+msgstr "إلى اللقاء."
+
+msgid "Rapport charges"
+msgstr "تقرير المصاريف"
+
+msgid "Rapport des charges"
+msgstr "تقرير المصاريف"
+
+msgid "Mot de passe modifié"
+msgstr "تم تغيير كلمة المرور"
+
+msgid "Votre mot de passe a été modifié avec succès."
+msgstr "تم تغيير كلمة المرور بنجاح."
+
+msgid "Retour au tableau de bord"
+msgstr "الرجوع إلى لوحة التحكم"
+
+msgid "Entrez votre adresse email pour recevoir un lien de réinitialisation."
+msgstr "أدخل بريدك الإلكتروني لاستلام رابط إعادة التعيين."
+
+msgid "Envoyer le lien"
+msgstr "إرسال الرابط"
+
+msgid "Retour à la connexion"
+msgstr "الرجوع إلى تسجيل الدخول"
+
+msgid "Réinitialiser le mot de passe"
+msgstr "إعادة تعيين كلمة المرور"
+
+msgid "Changer le mot de passe"
+msgstr "تغيير كلمة المرور"
+
+msgid "Mot de passe réinitialisé"
+msgstr "تمت إعادة تعيين كلمة المرور"
+
+msgid "Votre nouveau mot de passe a bien été enregistré."
+msgstr "تم حفظ كلمة المرور الجديدة بنجاح."
+
+msgid "Email envoyé"
+msgstr "تم إرسال البريد الإلكتروني"
+
+msgid "E-mail envoyé"
+msgstr "تم إرسال البريد الإلكتروني"
+
+msgid "Si une adresse correspond à un compte, un lien de réinitialisation a été envoyé."
+msgstr "إذا كان البريد مرتبطًا بحساب، فقد تم إرسال رابط إعادة التعيين."
+
+msgid "Le prix de vente est inférieur au coût d'achat. Vente refusée."
+msgstr "سعر البيع أقل من تكلفة الشراء. تم رفض البيع."
+
+msgid "Stock insuffisant pour ce produit : demandé %(required)s, disponible %(available)s."
+msgstr "المخزون غير كافٍ لهذا المنتج: المطلوب %(required)s، المتوفر %(available)s."
+
+msgid "Produit ajouté avec succès."
+msgstr "تمت إضافة المنتج بنجاح."
+
+msgid "Produit mis à jour."
+msgstr "تم تحديث المنتج."
+
+msgid "Produit supprimé."
+msgstr "تم حذف المنتج."
+
+msgid "Importation Excel terminée."
+msgstr "اكتمل استيراد Excel."
+
+msgid "Client ajouté avec succès."
+msgstr "تمت إضافة الزبون بنجاح."
+
+msgid "Client mis à jour."
+msgstr "تم تحديث الزبون."
+
+msgid "Client supprimé."
+msgstr "تم حذف الزبون."
+
+msgid "Fournisseur ajouté avec succès."
+msgstr "تمت إضافة المورد بنجاح."
+
+msgid "Fournisseur mis à jour."
+msgstr "تم تحديث المورد."
+
+msgid "Fournisseur supprimé."
+msgstr "تم حذف المورد."
+
+msgid "Mouvement de stock enregistré."
+msgstr "تم تسجيل حركة المخزون."
+
+msgid "Mouvement de stock supprimé."
+msgstr "تم حذف حركة المخزون."
+
+msgid "Aucun QR code disponible pour ce produit."
+msgstr "لا يوجد رمز QR متاح لهذا المنتج."
+
+msgid "Aucun code-barres disponible pour ce produit."
+msgstr "لا توجد صورة كود بار متاحة لهذا المنتج."
+
+msgid "Facture enregistrée avec succès."
+msgstr "تم تسجيل الفاتورة بنجاح."
+
+msgid "Bon d'achat enregistré avec succès."
+msgstr "تم تسجيل وصل الشراء بنجاح."
+
+msgid "Facture mise à jour avec succès."
+msgstr "تم تحديث الفاتورة بنجاح."
+
+msgid "Facture supprimée."
+msgstr "تم حذف الفاتورة."
+
+msgid "Bon d'achat mis à jour avec succès."
+msgstr "تم تحديث وصل الشراء بنجاح."
+
+msgid "Bon d'achat supprimé."
+msgstr "تم حذف وصل الشراء."
+
+msgid "Charge enregistrée avec succès."
+msgstr "تم تسجيل المصروف بنجاح."
+
+msgid "Charge mise à jour."
+msgstr "تم تحديث المصروف."
+
+msgid "Charge supprimée."
+msgstr "تم حذف المصروف."
+
+msgid "Catégorie ajoutée."
+msgstr "تمت إضافة الفئة."
+
+msgid "Modifier le produit"
+msgstr "تعديل المنتج"
+
+msgid "Modifier la facture"
+msgstr "تعديل الفاتورة"
+
+msgid "Modifier charge"
+msgstr "تعديل المصروف"
+
+msgid "Modifier client"
+msgstr "تعديل الزبون"
+
+msgid "Modifier fournisseur"
+msgstr "تعديل المورد"
+
+msgid "Modifier le bon d'achat"
+msgstr "تعديل وصل الشراء"
+
+msgid "Supprimer achat"
+msgstr "حذف شراء"
+
+msgid "Supprimer facture"
+msgstr "حذف فاتورة"
+
+msgid "Supprimer client"
+msgstr "حذف زبون"
+
+msgid "Supprimer fournisseur"
+msgstr "حذف مورد"
+
+msgid "Supprimer produit"
+msgstr "حذف منتج"
+
+msgid "Supprimer mouvement"
+msgstr "حذف حركة"
+
+msgid "Supprimer mouvement de stock"
+msgstr "حذف حركة مخزون"
+
+msgid "Supprimer charge"
+msgstr "حذف مصروف"
+
+msgid "Supprimer la charge"
+msgstr "حذف المصروف"
+
+msgid "Voulez-vous vraiment supprimer l'achat"
+msgstr "هل تريد فعلًا حذف عملية الشراء"
+
+msgid "Voulez-vous vraiment supprimer la facture"
+msgstr "هل تريد فعلًا حذف الفاتورة"
+
+msgid "Voulez-vous vraiment supprimer le client"
+msgstr "هل تريد فعلًا حذف الزبون"
+
+msgid "Voulez-vous vraiment supprimer le fournisseur"
+msgstr "هل تريد فعلًا حذف المورد"
+
+msgid "Voulez-vous vraiment supprimer le produit"
+msgstr "هل تريد فعلًا حذف المنتج"
+
+msgid "Voulez-vous vraiment supprimer le mouvement de stock pour"
+msgstr "هل تريد فعلًا حذف حركة المخزون الخاصة بـ"

@@ -34,3 +34,13 @@ class DashboardTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Tableau de bord')
         self.assertContains(response, 'Valeur du stock')
+
+    def test_dashboard_loads_in_arabic_rtl(self):
+        self.client.cookies['django_language'] = 'ar'
+
+        response = self.client.get(reverse('dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'dir="rtl"')
+        self.assertContains(response, 'لوحة التحكم')
+        self.assertContains(response, 'قيمة المخزون')

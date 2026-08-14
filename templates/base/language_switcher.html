@@ -1,0 +1,23 @@
+{% load i18n %}
+{% get_current_language as CURRENT_LANGUAGE %}
+{% get_available_languages as AVAILABLE_LANGUAGES %}
+
+<form action="{% url 'set_language' %}" method="post" class="language-switcher {{ switcher_class|default:'' }}">
+    {% csrf_token %}
+    <input name="next" type="hidden" value="{{ request.get_full_path }}">
+    <div class="btn-group btn-group-sm" role="group" aria-label="{% trans 'Choisir la langue' %}">
+        {% for code, name in AVAILABLE_LANGUAGES %}
+            <button
+                type="submit"
+                name="language"
+                value="{{ code }}"
+                class="btn {% if code == CURRENT_LANGUAGE %}btn-success{% else %}btn-outline-secondary{% endif %}"
+                lang="{{ code }}"
+                {% if code == CURRENT_LANGUAGE %}aria-current="true"{% endif %}
+            >
+                {% if code == 'fr' %}🇫🇷{% elif code == 'ar' %}🇩🇿{% endif %}
+                <span>{{ name }}</span>
+            </button>
+        {% endfor %}
+    </div>
+</form>
