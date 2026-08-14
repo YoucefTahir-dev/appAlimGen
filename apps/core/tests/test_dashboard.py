@@ -44,3 +44,15 @@ class DashboardTests(TestCase):
         self.assertContains(response, 'dir="rtl"')
         self.assertContains(response, 'لوحة التحكم')
         self.assertContains(response, 'قيمة المخزون')
+
+    def test_mobile_sidebar_uses_bootstrap_offcanvas(self):
+        response = self.client.get(reverse('dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'bootstrap.bundle.min.js')
+        self.assertContains(response, 'id="appSidebar"')
+        self.assertContains(response, 'offcanvas-lg offcanvas-start')
+        self.assertContains(response, 'data-bs-toggle="offcanvas"')
+        self.assertContains(response, 'data-bs-target="#appSidebar"')
+        self.assertContains(response, 'data-bs-dismiss="offcanvas"')
+        self.assertNotContains(response, 'sidebar-open')

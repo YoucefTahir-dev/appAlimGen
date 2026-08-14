@@ -36,6 +36,9 @@ msgstr "النظام"
 msgid "Ouvrir le menu"
 msgstr "فتح القائمة"
 
+msgid "Fermer le menu"
+msgstr "إغلاق القائمة"
+
 msgid "Se déconnecter"
 msgstr "تسجيل الخروج"
 
