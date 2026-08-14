@@ -1,0 +1,23 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Nouvelle catégorie - El Amine ERP{% endblock %}
+
+{% block page_title %}Nouvelle catégorie de charge{% endblock %}
+
+{% block content %}
+<div class="card card-dashboard p-4 bg-white">
+    <form method="post">
+        {% csrf_token %}
+        <div class="row g-3">
+            <div class="col-md-8">{{ form.name.label_tag }}{{ form.name }}{{ form.name.errors }}</div>
+            <div class="col-md-4 d-flex align-items-end">
+                <div class="form-check">{{ form.is_active }} {{ form.is_active.label_tag }}</div>
+            </div>
+        </div>
+        <div class="form-actions mt-3">
+            <button class="btn btn-success">Enregistrer</button>
+            <a class="btn btn-secondary" href="{% url 'expense_list' %}">Retour</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

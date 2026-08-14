@@ -10,6 +10,7 @@ from .views import (
     purchase_delete,
     sale_invoice_pdf,
     sale_invoice_preview,
+    sale_ticket_preview,
 )
 
 urlpatterns = [
@@ -19,6 +20,7 @@ urlpatterns = [
     path('sales/<int:pk>/delete/', sale_delete, name='sale_delete'),
     path('sales/<int:pk>/preview/', sale_invoice_preview, name='sale_invoice_preview'),
     path('sales/<int:pk>/invoice/', sale_invoice_pdf, name='sale_invoice_pdf'),
+    path('sales/<int:pk>/ticket/<str:width>/', sale_ticket_preview, name='sale_ticket_preview'),
     path('purchases/', purchase_list, name='purchase_list'),
     path('purchases/new/', purchase_create, name='purchase_create'),
     path('purchases/<int:pk>/edit/', purchase_update, name='purchase_update'),

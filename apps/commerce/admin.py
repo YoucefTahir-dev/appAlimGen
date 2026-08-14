@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import InvoiceSequence, Purchase, PurchaseLine, Sale, SaleLine, Payment
+from .models import InvoiceSequence, Purchase, PurchaseLine, Sale, SaleLine, Payment, TicketSequence
 
 @admin.register(Purchase)
 class PurchaseAdmin(admin.ModelAdmin):
@@ -12,12 +12,18 @@ class PurchaseLineAdmin(admin.ModelAdmin):
 
 @admin.register(Sale)
 class SaleAdmin(admin.ModelAdmin):
-    list_display = ('invoice_number', 'client', 'created_at', 'total')
-    search_fields = ('invoice_number',)
-    readonly_fields = ('invoice_number',)
+    list_display = ('invoice_number', 'ticket_number', 'client', 'payment_type', 'created_at', 'total')
+    search_fields = ('invoice_number', 'ticket_number', 'client__name')
+    list_filter = ('payment_type',)
+    readonly_fields = ('invoice_number', 'ticket_number')
 
 @admin.register(InvoiceSequence)
 class InvoiceSequenceAdmin(admin.ModelAdmin):
+    list_display = ('year', 'last_number', 'updated_at')
+    readonly_fields = ('updated_at',)
+
+@admin.register(TicketSequence)
+class TicketSequenceAdmin(admin.ModelAdmin):
     list_display = ('year', 'last_number', 'updated_at')
     readonly_fields = ('updated_at',)
 

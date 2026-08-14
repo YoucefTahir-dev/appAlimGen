@@ -2,7 +2,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 from apps.inventory.models import Product, Category, Brand, Unit, Client, Supplier
-from apps.commerce.models import InvoiceSequence, Sale, Purchase, SaleLine, PurchaseLine
+from apps.commerce.models import InvoiceSequence, Sale, Purchase, SaleLine, PurchaseLine, TicketSequence
 
 
 class CommerceTests(TestCase):
@@ -62,15 +62,18 @@ class CommerceTests(TestCase):
         self.assertEqual(response.status_code, 302)
         sale = Sale.objects.latest('pk')
         self.assertRegex(sale.invoice_number, r'^FAC-\d{4}-000001$')
+        self.assertRegex(sale.ticket_number, r'^TCK-\d{4}-000001$')
+        self.assertEqual(sale.payment_type, Sale.CASH)
         self.product.refresh_from_db()
         self.assertEqual(self.product.quantity, 7)
 
-    def test_invoice_number_is_sequential_and_not_reused_after_delete(self):
+    def test_invoice_and_ticket_numbers_are_independent_and_not_reused_after_delete(self):
         url = reverse('sale_create')
         payload = {
             'client': self.client_obj.pk,
             'discount': '0.00',
             'tax_rate': '0.00',
+            'payment_type': Sale.CASH,
             'lines-TOTAL_FORMS': '1',
             'lines-INITIAL_FORMS': '0',
             'lines-MIN_NUM_FORMS': '0',
@@ -84,6 +87,7 @@ class CommerceTests(TestCase):
         self.assertEqual(first_response.status_code, 302)
         first_sale = Sale.objects.latest('pk')
         first_number = first_sale.invoice_number
+        first_ticket = first_sale.ticket_number
 
         self.client.post(reverse('sale_delete', args=[first_sale.pk]))
 
@@ -93,8 +97,12 @@ class CommerceTests(TestCase):
 
         self.assertRegex(first_number, r'^FAC-\d{4}-000001$')
         self.assertRegex(second_sale.invoice_number, r'^FAC-\d{4}-000002$')
+        self.assertRegex(first_ticket, r'^TCK-\d{4}-000001$')
+        self.assertRegex(second_sale.ticket_number, r'^TCK-\d{4}-000002$')
         self.assertNotEqual(first_number, second_sale.invoice_number)
+        self.assertNotEqual(first_ticket, second_sale.ticket_number)
         self.assertEqual(InvoiceSequence.objects.get(year=second_sale.created_at.year).last_number, 2)
+        self.assertEqual(TicketSequence.objects.get(year=second_sale.created_at.year).last_number, 2)
 
     def test_sale_rejects_price_below_purchase_price(self):
         initial_quantity = self.product.quantity
@@ -235,6 +243,23 @@ class CommerceTests(TestCase):
         self.assertContains(response, sale.invoice_number)
         self.assertContains(response, 'الأمين للمواد الغذائية و غير الغذائية')
         self.assertContains(response, 'Télécharger PDF')
+
+    def test_sale_ticket_preview_generates_missing_ticket_number_and_supports_thermal_widths(self):
+        sale = Sale.objects.create(invoice_number='FAC-2026-000101', client=self.client_obj, total='0', discount='0', tax_rate='10')
+        SaleLine.objects.create(sale=sale, product=self.product, quantity=1, unit_price='15.00')
+
+        response_80 = self.client.get(reverse('sale_ticket_preview', args=[sale.pk, 80]))
+        self.assertEqual(response_80.status_code, 200)
+        sale.refresh_from_db()
+        self.assertRegex(sale.ticket_number, r'^TCK-\d{4}-000001$')
+        self.assertContains(response_80, sale.ticket_number)
+        self.assertContains(response_80, 'size: 80mm auto')
+        self.assertContains(response_80, 'Conditionnement : Unité')
+        self.assertContains(response_80, 'data:image/png;base64')
+
+        response_58 = self.client.get(reverse('sale_ticket_preview', args=[sale.pk, 58]))
+        self.assertEqual(response_58.status_code, 200)
+        self.assertContains(response_58, 'size: 58mm auto')
 
     def test_sale_delete_reverts_stock(self):
         initial_quantity = self.product.quantity

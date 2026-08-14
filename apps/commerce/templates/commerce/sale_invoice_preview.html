@@ -32,6 +32,8 @@
         <a href="{% url 'sale_list' %}" class="btn btn-outline-secondary">Retour</a>
         <a href="{% url 'sale_invoice_pdf' sale.pk %}" class="btn btn-danger">Télécharger PDF</a>
         <button onclick="window.print()" class="btn btn-success">Imprimer</button>
+        <a href="{% url 'sale_ticket_preview' sale.pk 80 %}" class="btn btn-dark">Ticket 80 mm</a>
+        <a href="{% url 'sale_ticket_preview' sale.pk 58 %}" class="btn btn-dark">Ticket 58 mm</a>
     </div>
 </div>
 

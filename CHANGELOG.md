@@ -2,6 +2,15 @@
 
 Toutes les modifications notables de ce projet seront documentées ici.
 
+## [Non publié]
+
+### Ajouté
+
+- Ticket de caisse thermique 58 mm et 80 mm.
+- Numérotation indépendante des tickets au format `TCK-AAAA-000001`.
+- Module Charges avec catégories, CRUD, recherche, impression, export PDF et export Excel.
+- Indicateurs dashboard pour charges du jour, du mois, de l'année, bénéfice brut et bénéfice net.
+
 ## [v1.0.0] - 2026-06-29
 
 ### Ajouté

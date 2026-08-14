@@ -19,11 +19,12 @@ class PurchaseForm(forms.ModelForm):
 class SaleForm(forms.ModelForm):
     class Meta:
         model = Sale
-        fields = ['client', 'discount', 'tax_rate']
+        fields = ['client', 'discount', 'tax_rate', 'payment_type']
         widgets = {
             'client': forms.Select(attrs={'class': 'form-select'}),
             'discount': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'tax_rate': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'payment_type': forms.Select(attrs={'class': 'form-select'}),
         }
 
 

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Rapport charges</title>
+    <style>
+        body { font-family: Arial, sans-serif; color: #111; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #ccc; padding: 6px; font-size: 12px; }
+        th { background: #163b2f; color: #fff; }
+        .text-end { text-align: right; }
+        @media print { .no-print { display: none; } }
+    </style>
+</head>
+<body>
+<button class="no-print" onclick="window.print()">Imprimer</button>
+<h1>Rapport des charges</h1>
+<p>Total : <strong>{{ total_amount|floatformat:2 }} DZD</strong></p>
+<table>
+    <thead>
+        <tr><th>Numéro</th><th>Date</th><th>Catégorie</th><th>Description</th><th>Montant</th></tr>
+    </thead>
+    <tbody>
+        {% for expense in expenses %}
+            <tr>
+                <td>{{ expense.number }}</td>
+                <td>{{ expense.date|date:'d/m/Y' }}</td>
+                <td>{{ expense.category.name }}</td>
+                <td>{{ expense.description }}</td>
+                <td class="text-end">{{ expense.amount|floatformat:2 }} DZD</td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</body>
+</html>
