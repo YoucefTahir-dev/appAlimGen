@@ -15,7 +15,7 @@
                 lang="{{ code }}"
                 {% if code == CURRENT_LANGUAGE %}aria-current="true"{% endif %}
             >
-                {% if code == 'fr' %}🇫🇷{% elif code == 'ar' %}🇩🇿{% endif %}
+                {% if code == 'fr' %}🇫🇷{% elif code == 'ar' %}🇩🇿{% elif code == 'en' %}🇬🇧{% endif %}
                 <span>{{ name }}</span>
             </button>
         {% endfor %}

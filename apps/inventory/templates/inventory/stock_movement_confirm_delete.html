@@ -1,17 +1,18 @@
 {% extends 'base/base.html' %}
 {% load i18n %}
 
-{% block title %}{% trans "Supprimer mouvement" %} - El Amine ERP{% endblock %}
+{% block title %}{% trans "Annuler le mouvement" %} - El Amine ERP{% endblock %}
 
-{% block page_title %}{% trans "Supprimer mouvement de stock" %}{% endblock %}
+{% block page_title %}{% trans "Annuler un mouvement de stock" %}{% endblock %}
 
 {% block content %}
 <div class="card card-dashboard p-4 bg-white">
-    <p>{% trans "Voulez-vous vraiment supprimer le mouvement de stock pour" %} <strong>{{ movement.product.name }}</strong> </p>
+    <p>{% trans "Le mouvement original sera conservé. Une contrepassation traçable sera ajoutée pour" %} <strong>{{ movement.product.name }}</strong>.</p>
+    <p class="text-muted">{% trans "Cette opération est refusée si elle devait rendre le stock négatif." %}</p>
     <form method="post">
         {% csrf_token %}
-        <button type="submit" class="btn btn-danger">{% trans "Supprimer" %}</button>
-        <a href="{% url 'stock_movement_list' %}" class="btn btn-secondary">{% trans "Annuler" %}</a>
+        <button type="submit" class="btn btn-warning">{% trans "Confirmer l'annulation" %}</button>
+        <a href="{% url 'stock_movement_list' %}" class="btn btn-secondary">{% trans "Retour" %}</a>
     </form>
 </div>
 {% endblock %}

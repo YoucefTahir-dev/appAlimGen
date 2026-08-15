@@ -34,7 +34,7 @@ scripts/      Scripts d’exploitation locale
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-pip install -r requirements.txt
+pip install --require-hashes -r requirements.lock
 Copy-Item .env.example .env
 .\.venv\Scripts\python.exe manage.py migrate
 .\.venv\Scripts\python.exe manage.py createsuperuser
@@ -63,8 +63,12 @@ Commandes recommandées avant chaque merge :
 .\.venv\Scripts\python.exe manage.py check
 .\.venv\Scripts\python.exe manage.py makemigrations --check --dry-run
 .\.venv\Scripts\python.exe manage.py test
-.\.venv\Scripts\python.exe -m pip_audit -r requirements.txt
+.\.venv\Scripts\python.exe -m pip_audit -r requirements.lock
 ```
+
+Les dépendances directes sont déclarées dans `requirements.in`. Le fichier
+`requirements.lock` est généré avec `pip-compile --generate-hashes` et constitue
+la source reproductible utilisée par Render, Docker et la CI.
 
 Pour vérifier les paramètres production :
 

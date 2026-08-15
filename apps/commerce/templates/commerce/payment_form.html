@@ -1,0 +1,26 @@
+{% extends 'base/base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "Nouveau règlement" %} - El Amine ERP{% endblock %}
+{% block page_title %}{% trans "Nouveau règlement" %}{% endblock %}
+
+{% block content %}
+<div class="card card-dashboard p-4 bg-white">
+    <p class="text-muted">
+        {% if document_type == 'sale' %}{% trans "Facture" %} {{ document.invoice_number }}{% else %}{% trans "Achat" %} {{ document.reference }}{% endif %}
+        · {% trans "Solde restant" %}: {{ due_total|floatformat:2 }} DZD
+    </p>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        <div class="row g-3">
+            <div class="col-md-6">{{ form.amount.label_tag }}{{ form.amount }}{{ form.amount.errors }}</div>
+            <div class="col-md-6">{{ form.payment_type.label_tag }}{{ form.payment_type }}{{ form.payment_type.errors }}</div>
+        </div>
+        <div class="form-actions mt-3">
+            <button class="btn btn-success">{% trans "Enregistrer" %}</button>
+            <a class="btn btn-outline-secondary" href="{% if document_type == 'sale' %}{% url 'sale_payment_list' document.pk %}{% else %}{% url 'purchase_payment_list' document.pk %}{% endif %}">{% trans "Annuler" %}</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

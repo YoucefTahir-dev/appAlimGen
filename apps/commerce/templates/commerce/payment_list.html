@@ -1,0 +1,94 @@
+{% extends 'base/base.html' %}
+{% load i18n access_tags %}
+
+{% block title %}{% trans "Règlements" %} - El Amine ERP{% endblock %}
+{% block page_title %}{% trans "Règlements" %}{% endblock %}
+
+{% block content %}
+{% if document_type == 'sale' %}
+    {% has_access 'commerce.change_sale' as can_manage_payments %}
+{% else %}
+    {% has_access 'commerce.change_purchase' as can_manage_payments %}
+{% endif %}
+<div class="card card-dashboard p-4 bg-white">
+    <div class="page-toolbar mb-3">
+        <div>
+            <h5 class="mb-1">
+                {% if document_type == 'sale' %}{% trans "Facture" %} {{ document.invoice_number }}{% else %}{% trans "Achat" %} {{ document.reference }}{% endif %}
+            </h5>
+            <div class="text-muted">
+                {% trans "Total" %}: {{ document.total|floatformat:2 }} DZD ·
+                {% trans "Réglé" %}: {{ paid_total|floatformat:2 }} DZD ·
+                {% trans "Solde" %}: {{ due_total|floatformat:2 }} DZD
+            </div>
+        </div>
+        {% if can_manage_payments and due_total > 0 %}
+            {% if document_type == 'sale' %}
+                <a class="btn btn-success" href="{% url 'sale_payment_create' document.pk %}">{% trans "Ajouter un règlement" %}</a>
+            {% else %}
+                <a class="btn btn-success" href="{% url 'purchase_payment_create' document.pk %}">{% trans "Ajouter un règlement" %}</a>
+            {% endif %}
+        {% endif %}
+    </div>
+
+    {% if payment_status == 'unreconciled' %}
+        <div class="alert alert-warning">
+            {% trans "Ce document existait avant l’activation du suivi des règlements. Son état doit être rapproché manuellement." %}
+            {% if can_manage_payments %}
+                <form method="post" class="d-inline">
+                    {% csrf_token %}
+                    {% if document_type == 'sale' %}
+                        <button class="btn btn-sm btn-outline-dark" formaction="{% url 'sale_payment_tracking_initialize' document.pk %}">{% trans "Confirmer sans règlement antérieur" %}</button>
+                    {% else %}
+                        <button class="btn btn-sm btn-outline-dark" formaction="{% url 'purchase_payment_tracking_initialize' document.pk %}">{% trans "Confirmer sans règlement antérieur" %}</button>
+                    {% endif %}
+                </form>
+            {% endif %}
+        </div>
+    {% elif payment_status == 'paid' %}
+        <div class="alert alert-success">{% trans "Document intégralement réglé." %}</div>
+    {% elif payment_status == 'partial' %}
+        <div class="alert alert-info">{% trans "Document partiellement réglé." %}</div>
+    {% else %}
+        <div class="alert alert-danger">{% trans "Aucun règlement enregistré." %}</div>
+    {% endif %}
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>{% trans "Référence" %}</th>
+                    <th>{% trans "Date" %}</th>
+                    <th>{% trans "Mode" %}</th>
+                    <th>{% trans "Montant" %}</th>
+                    <th>{% trans "Saisi par" %}</th>
+                    {% if can_manage_payments %}<th>{% trans "Actions" %}</th>{% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for payment in payments %}
+                    <tr>
+                        <td>{{ payment.reference }}</td>
+                        <td>{{ payment.created_at|date:'d/m/Y H:i' }}</td>
+                        <td>{{ payment.get_payment_type_display }}</td>
+                        <td>{{ payment.amount|floatformat:2 }} DZD</td>
+                        <td>{{ payment.created_by|default:'—' }}</td>
+                        {% if can_manage_payments %}
+                            <td>
+                                {% if document_type == 'sale' %}
+                                    <a class="btn btn-sm btn-outline-danger" href="{% url 'sale_payment_delete' document.pk payment.pk %}">{% trans "Supprimer" %}</a>
+                                {% else %}
+                                    <a class="btn btn-sm btn-outline-danger" href="{% url 'purchase_payment_delete' document.pk payment.pk %}">{% trans "Supprimer" %}</a>
+                                {% endif %}
+                            </td>
+                        {% endif %}
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="{% if can_manage_payments %}6{% else %}5{% endif %}" class="text-center">{% trans "Aucun règlement." %}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <a class="btn btn-outline-secondary" href="{% if document_type == 'sale' %}{% url 'sale_list' %}{% else %}{% url 'purchase_list' %}{% endif %}">{% trans "Retour" %}</a>
+</div>
+{% endblock %}

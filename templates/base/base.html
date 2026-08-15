@@ -1,4 +1,4 @@
-{% load i18n static %}
+{% load i18n static access_tags %}
 {% get_current_language as CURRENT_LANGUAGE %}
 {% get_current_language_bidi as LANGUAGE_BIDI %}
 <!DOCTYPE html>
@@ -15,30 +15,42 @@
 <body class="bg-light {% if LANGUAGE_BIDI %}rtl{% endif %}">
 <div class="{% if user.is_authenticated %}app-shell{% else %}auth-shell{% endif %}" id="page-wrapper">
     {% if user.is_authenticated %}
-    <nav class="sidebar offcanvas-lg offcanvas-start bg-dark text-white" tabindex="-1" id="appSidebar" aria-labelledby="appSidebarLabel">
+    {% has_access 'accounts.view_dashboard' as can_view_dashboard %}
+    {% has_access 'inventory.view_product' as can_view_products %}
+    {% has_access 'inventory.view_client' as can_view_clients %}
+    {% has_access 'inventory.add_client' as can_add_clients %}
+    {% has_access 'inventory.view_supplier' as can_view_suppliers %}
+    {% has_access 'accounts.view_stock' as can_view_stock %}
+    {% has_access 'commerce.view_sale' as can_view_sales %}
+    {% has_access 'commerce.view_purchase' as can_view_purchases %}
+    {% has_access 'expenses.view_expense' as can_view_expenses %}
+    {% has_access 'accounts.view_user' as can_view_users %}
+    {% has_access 'auth.view_group' as can_view_roles %}
+    <nav class="sidebar offcanvas-lg {% if LANGUAGE_BIDI %}offcanvas-end{% else %}offcanvas-start{% endif %} bg-dark text-white" tabindex="-1" id="appSidebar" aria-labelledby="appSidebarLabel">
         <div class="sidebar-header offcanvas-header d-lg-block p-3 text-center">
             <div>
                 <img src="{% static 'img/logo.png' %}" alt="{% trans 'Logo' %}" class="img-fluid sidebar-logo mb-2" />
-                <h5 class="text-white sidebar-title mb-0" id="appSidebarLabel">El Amine ERP</h5>
+                <h5 class="text-white sidebar-title mb-0" id="appSidebarLabel">{% trans "El Amine ERP" %}</h5>
             </div>
             <button type="button" class="btn-close btn-close-white d-lg-none" data-bs-dismiss="offcanvas" data-bs-target="#appSidebar" aria-label="{% trans 'Fermer le menu' %}"></button>
         </div>
         <div class="offcanvas-body d-block p-0">
             <ul class="nav flex-column p-2">
-                <li class="nav-item"><a class="nav-link text-white" data-sidebar-link href="{% url 'dashboard' %}"><i class="bi bi-speedometer2 me-2"></i> {% trans "Tableau de bord" %}</a></li>
+                {% if can_view_dashboard %}<li class="nav-item"><a class="nav-link text-white" data-sidebar-link href="{% url 'dashboard' %}"><i class="bi bi-speedometer2 me-2"></i> {% trans "Tableau de bord" %}</a></li>{% endif %}
                 <li class="nav-item"><a class="nav-link text-white" data-sidebar-link href="{% url 'profile' %}"><i class="bi bi-person-circle me-2"></i> {% trans "Mon profil" %}</a></li>
-                <li class="nav-item"><a class="nav-link text-white" data-sidebar-link href="{% url 'product_list' %}"><i class="bi bi-box-seam me-2"></i> {% trans "Produits" %}</a></li>
-                {% if can_manage %}
+                {% if can_view_products %}<li class="nav-item"><a class="nav-link text-white" data-sidebar-link href="{% url 'product_list' %}"><i class="bi bi-box-seam me-2"></i> {% trans "Produits" %}</a></li>{% endif %}
+                {% if can_view_clients %}
                     <li class="nav-item"><a class="nav-link text-white" data-sidebar-link href="{% url 'client_list' %}"><i class="bi bi-people me-2"></i> {% trans "Clients" %}</a></li>
-                    <li class="nav-item"><a class="nav-link text-white" data-sidebar-link href="{% url 'supplier_list' %}"><i class="bi bi-truck me-2"></i> {% trans "Fournisseurs" %}</a></li>
-                {% else %}
+                {% elif can_add_clients %}
                     <li class="nav-item"><a class="nav-link text-white" data-sidebar-link href="{% url 'client_create' %}"><i class="bi bi-person-plus me-2"></i> {% trans "Nouveau client" %}</a></li>
                 {% endif %}
-                <li class="nav-item"><a class="nav-link text-white" data-sidebar-link href="{% url 'sale_list' %}"><i class="bi bi-receipt me-2"></i> {% trans "Ventes" %}</a></li>
-                {% if can_manage %}
-                    <li class="nav-item"><a class="nav-link text-white" data-sidebar-link href="{% url 'purchase_list' %}"><i class="bi bi-cart-plus me-2"></i> {% trans "Achats" %}</a></li>
-                    <li class="nav-item"><a class="nav-link text-white" data-sidebar-link href="{% url 'expense_list' %}"><i class="bi bi-cash-coin me-2"></i> {% trans "Charges" %}</a></li>
-                {% endif %}
+                {% if can_view_suppliers %}<li class="nav-item"><a class="nav-link text-white" data-sidebar-link href="{% url 'supplier_list' %}"><i class="bi bi-truck me-2"></i> {% trans "Fournisseurs" %}</a></li>{% endif %}
+                {% if can_view_stock %}<li class="nav-item"><a class="nav-link text-white" data-sidebar-link href="{% url 'stock_movement_list' %}"><i class="bi bi-arrow-left-right me-2"></i> {% trans "Stock" %}</a></li>{% endif %}
+                {% if can_view_sales %}<li class="nav-item"><a class="nav-link text-white" data-sidebar-link href="{% url 'sale_list' %}"><i class="bi bi-receipt me-2"></i> {% trans "Ventes" %}</a></li>{% endif %}
+                {% if can_view_purchases %}<li class="nav-item"><a class="nav-link text-white" data-sidebar-link href="{% url 'purchase_list' %}"><i class="bi bi-cart-plus me-2"></i> {% trans "Achats" %}</a></li>{% endif %}
+                {% if can_view_expenses %}<li class="nav-item"><a class="nav-link text-white" data-sidebar-link href="{% url 'expense_list' %}"><i class="bi bi-cash-coin me-2"></i> {% trans "Charges" %}</a></li>{% endif %}
+                {% if can_view_users %}<li class="nav-item"><a class="nav-link text-white" data-sidebar-link href="{% url 'user_list' %}"><i class="bi bi-person-gear me-2"></i> {% trans "Utilisateurs" %}</a></li>{% endif %}
+                {% if can_view_roles %}<li class="nav-item"><a class="nav-link text-white" data-sidebar-link href="{% url 'role_list' %}"><i class="bi bi-shield-lock me-2"></i> {% trans "Rôles" %}</a></li>{% endif %}
             </ul>
         </div>
     </nav>
@@ -67,7 +79,14 @@
                         <li class="px-3 py-2 d-md-none">{% include 'base/language_switcher.html' %}</li>
                         <li><a class="dropdown-item" href="{% url 'profile' %}"><i class="bi bi-person me-2"></i>{% trans "Mon profil" %}</a></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item text-danger" href="{% url 'logout' %}"><i class="bi bi-box-arrow-right me-2"></i>{% trans "Se déconnecter" %}</a></li>
+                        <li>
+                            <form method="post" action="{% url 'logout' %}">
+                                {% csrf_token %}
+                                <button class="dropdown-item text-danger" type="submit">
+                                    <i class="bi bi-box-arrow-right me-2"></i>{% trans "Se déconnecter" %}
+                                </button>
+                            </form>
+                        </li>
                     </ul>
                 </div>
             </div>

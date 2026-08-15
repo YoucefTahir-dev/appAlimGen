@@ -1,23 +1,37 @@
 from django.conf import settings
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 
 from apps.core.security import expense_receipt_upload_to, validate_receipt_upload
 from apps.inventory.models import Supplier
 
 
 class ExpenseCategory(models.Model):
-    name = models.CharField('Nom', max_length=120, unique=True)
-    is_active = models.BooleanField('Active', default=True)
+    name = models.CharField(_('Nom'), max_length=120, unique=True)
+    is_active = models.BooleanField(_('Active'), default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        verbose_name = 'Catégorie de charge'
-        verbose_name_plural = 'Catégories de charges'
+        verbose_name = _('Catégorie de charge')
+        verbose_name_plural = _('Catégories de charges')
         ordering = ['name']
 
     def __str__(self):
         return self.name
+
+
+class ExpenseSequence(models.Model):
+    year = models.PositiveIntegerField(unique=True)
+    last_number = models.PositiveIntegerField(default=0)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = _('Séquence charge')
+        verbose_name_plural = _('Séquences charges')
+
+    def __str__(self):
+        return f'{self.year} - {self.last_number}'
 
 
 class Expense(models.Model):
@@ -26,29 +40,32 @@ class Expense(models.Model):
     TRANSFER = 'transfer'
     CARD = 'card'
     PAYMENT_CHOICES = [
-        (CASH, 'Espèces'),
-        (CHEQUE, 'Chèque'),
-        (TRANSFER, 'Virement'),
-        (CARD, 'Carte'),
+        (CASH, _('Espèces')),
+        (CHEQUE, _('Chèque')),
+        (TRANSFER, _('Virement')),
+        (CARD, _('Carte')),
     ]
 
-    number = models.CharField('Numéro', max_length=100, unique=True, editable=False)
-    date = models.DateField('Date', default=timezone.localdate)
+    number = models.CharField(_('Numéro'), max_length=100, unique=True, editable=False)
+    date = models.DateField(_('Date'), default=timezone.localdate)
     category = models.ForeignKey(ExpenseCategory, on_delete=models.PROTECT, related_name='expenses')
-    description = models.CharField('Description', max_length=255)
-    amount = models.DecimalField('Montant', max_digits=14, decimal_places=2)
-    payment_method = models.CharField('Moyen de paiement', max_length=20, choices=PAYMENT_CHOICES, default=CASH)
+    description = models.CharField(_('Description'), max_length=255)
+    amount = models.DecimalField(_('Montant'), max_digits=14, decimal_places=2)
+    payment_method = models.CharField(_('Moyen de paiement'), max_length=20, choices=PAYMENT_CHOICES, default=CASH)
     supplier = models.ForeignKey(Supplier, on_delete=models.SET_NULL, null=True, blank=True, related_name='expenses')
-    receipt = models.FileField('Pièce justificative', upload_to=expense_receipt_upload_to, validators=[validate_receipt_upload], blank=True, null=True)
+    receipt = models.FileField(_('Pièce justificative'), upload_to=expense_receipt_upload_to, validators=[validate_receipt_upload], blank=True, null=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='expenses')
-    observation = models.TextField('Observation', blank=True)
+    observation = models.TextField(_('Observation'), blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name = 'Charge'
-        verbose_name_plural = 'Charges'
+        verbose_name = _('Charge')
+        verbose_name_plural = _('Charges')
         ordering = ['-date', '-pk']
+        indexes = [
+            models.Index(fields=['date', '-id'], name='expense_date_id_idx'),
+        ]
 
     def __str__(self):
         return self.number
@@ -57,15 +74,16 @@ class Expense(models.Model):
     def generate_number(cls):
         year = timezone.localdate().year
         prefix = f'CHG-{year}-'
-        last = cls.objects.filter(number__startswith=prefix).order_by('-number').first()
-        if last and last.number:
-            try:
-                last_number = int(last.number.split('-')[-1])
-            except (TypeError, ValueError):
-                last_number = 0
-        else:
-            last_number = 0
-        return f'{prefix}{last_number + 1:06d}'
+        with transaction.atomic():
+            sequence, _created = ExpenseSequence.objects.select_for_update().get_or_create(
+                year=year
+            )
+            while True:
+                sequence.last_number += 1
+                sequence.save(update_fields=['last_number', 'updated_at'])
+                candidate = f'{prefix}{sequence.last_number:06d}'
+                if not cls.objects.filter(number=candidate).exists():
+                    return candidate
 
     def save(self, *args, **kwargs):
         if not self.number:

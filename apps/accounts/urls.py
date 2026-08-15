@@ -8,6 +8,16 @@ from .views import (
     UserPasswordResetConfirmView,
     UserPasswordResetCompleteView,
     UserPasswordChangeDoneView,
+    role_create,
+    role_delete,
+    role_list,
+    role_update,
+    user_create,
+    user_delete,
+    user_list,
+    user_password_reset_admin,
+    user_toggle_active,
+    user_update,
 )
 
 urlpatterns = [
@@ -19,4 +29,14 @@ urlpatterns = [
     path('password-reset/done/', UserPasswordResetDoneView.as_view(), name='password_reset_done'),
     path('reset/<uidb64>/<token>/', UserPasswordResetConfirmView.as_view(), name='password_reset_confirm'),
     path('reset/done/', UserPasswordResetCompleteView.as_view(), name='password_reset_complete'),
+    path('users/', user_list, name='user_list'),
+    path('users/new/', user_create, name='user_create'),
+    path('users/<int:pk>/edit/', user_update, name='user_update'),
+    path('users/<int:pk>/toggle-active/', user_toggle_active, name='user_toggle_active'),
+    path('users/<int:pk>/reset-password/', user_password_reset_admin, name='user_password_reset_admin'),
+    path('users/<int:pk>/delete/', user_delete, name='user_delete'),
+    path('roles/', role_list, name='role_list'),
+    path('roles/new/', role_create, name='role_create'),
+    path('roles/<int:pk>/edit/', role_update, name='role_update'),
+    path('roles/<int:pk>/delete/', role_delete, name='role_delete'),
 ]

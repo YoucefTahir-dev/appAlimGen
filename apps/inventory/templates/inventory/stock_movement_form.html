@@ -9,11 +9,15 @@
 <div class="card card-dashboard p-4 bg-white">
     <form method="post">
         {% csrf_token %}
+        {{ form.non_field_errors }}
         <div class="row g-3">
-            <div class="col-md-6">{{ form.product.label_tag }}{{ form.product }}</div>
-            <div class="col-md-6">{{ form.movement_type.label_tag }}{{ form.movement_type }}</div>
-            <div class="col-md-6">{{ form.quantity.label_tag }}{{ form.quantity }}</div>
-            <div class="col-md-6">{{ form.reason.label_tag }}{{ form.reason }}</div>
+            <div class="col-md-6">{{ form.product.label_tag }}{{ form.product }}{{ form.product.errors }}</div>
+            <div class="col-md-6">{{ form.movement_type.label_tag }}{{ form.movement_type }}{{ form.movement_type.errors }}</div>
+            <div class="col-md-6">
+                {{ form.quantity.label_tag }}{{ form.quantity }}{{ form.quantity.errors }}
+                {% if form.quantity.help_text %}<div class="form-text">{{ form.quantity.help_text }}</div>{% endif %}
+            </div>
+            <div class="col-md-6">{{ form.reason.label_tag }}{{ form.reason }}{{ form.reason.errors }}</div>
         </div>
         <div class="form-actions mt-3">
             <button class="btn btn-success">{% trans "Enregistrer" %}</button>

@@ -1,4 +1,4 @@
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
@@ -9,6 +9,63 @@ from apps.core.models import AuditLog
 
 
 class AuthTests(TestCase):
+    @override_settings(LOGIN_FAILURE_LIMIT=2, LOGIN_FAILURE_WINDOW_SECONDS=900)
+    def test_login_is_temporarily_rate_limited(self):
+        User = get_user_model()
+        User.objects.create_user(username='limited_user', password='ValidPass123!')
+        url = reverse('login')
+
+        for _ in range(2):
+            response = self.client.post(url, {'username': 'limited_user', 'password': 'wrong'})
+            self.assertEqual(response.status_code, 200)
+
+        blocked_response = self.client.post(url, {'username': 'limited_user', 'password': 'ValidPass123!'})
+        self.assertEqual(blocked_response.status_code, 429)
+        self.assertIn('Retry-After', blocked_response)
+
+    @override_settings(
+        LOGIN_FAILURE_LIMIT=10,
+        LOGIN_FAILURE_IP_LIMIT=2,
+        LOGIN_FAILURE_WINDOW_SECONDS=900,
+    )
+    def test_login_ip_limit_cannot_be_bypassed_by_rotating_usernames(self):
+        url = reverse('login')
+
+        for username in ('unknown-one', 'unknown-two'):
+            response = self.client.post(url, {'username': username, 'password': 'wrong'})
+            self.assertEqual(response.status_code, 200)
+
+        blocked_response = self.client.post(
+            url,
+            {'username': 'unknown-three', 'password': 'wrong'},
+        )
+        self.assertEqual(blocked_response.status_code, 429)
+        self.assertIn('Retry-After', blocked_response)
+
+    @override_settings(PASSWORD_RESET_LIMIT=1, PASSWORD_RESET_WINDOW_SECONDS=3600)
+    def test_password_reset_is_rate_limited(self):
+        url = reverse('password_reset')
+
+        first_response = self.client.post(url, {'email': 'unknown@example.invalid'})
+        self.assertEqual(first_response.status_code, 302)
+
+        blocked_response = self.client.post(url, {'email': 'unknown@example.invalid'})
+        self.assertEqual(blocked_response.status_code, 429)
+        self.assertIn('Retry-After', blocked_response)
+
+    @override_settings(LOGIN_FAILURE_LIMIT=1, LOGIN_FAILURE_WINDOW_SECONDS=900)
+    def test_admin_login_is_rate_limited(self):
+        url = reverse('admin:login')
+
+        first_response = self.client.post(url, {'username': 'unknown', 'password': 'wrong'})
+        self.assertEqual(first_response.status_code, 200)
+
+        blocked_response = self.client.post(url, {'username': 'unknown', 'password': 'wrong'})
+        self.assertEqual(blocked_response.status_code, 429)
+        self.assertIn('Retry-After', blocked_response)
+        self.assertIn('Content-Security-Policy', blocked_response)
+        self.assertEqual(blocked_response['X-Frame-Options'], 'DENY')
+
     def test_login_view_and_authentication(self):
         User = get_user_model()
         user = User.objects.create_user(username='authuser', password='secret')
@@ -24,9 +81,41 @@ class AuthTests(TestCase):
         User = get_user_model()
         user = User.objects.create_user(username='authuser2', password='secret')
         self.client.login(username='authuser2', password='secret')
-        resp = self.client.get(reverse('logout'))
+        get_response = self.client.get(reverse('logout'))
+        self.assertEqual(get_response.status_code, 405)
+
+        resp = self.client.post(reverse('logout'))
         # logout redirects to login
         self.assertIn(resp.status_code, (302, 301))
+
+    def test_forced_password_change_blocks_other_pages_until_completed(self):
+        User = get_user_model()
+        user = User.objects.create_user(
+            username='temporary_password_user',
+            password='OldPass123!',
+            force_password_change=True,
+        )
+        self.client.force_login(user)
+
+        blocked_response = self.client.get(reverse('dashboard'))
+        self.assertRedirects(blocked_response, reverse('profile'))
+
+        change_response = self.client.post(
+            reverse('profile'),
+            {
+                'change_password': '1',
+                'old_password': 'OldPass123!',
+                'new_password1': 'NewPass456!',
+                'new_password2': 'NewPass456!',
+            },
+        )
+        self.assertRedirects(change_response, reverse('password_change_done'))
+        user.refresh_from_db()
+        self.assertFalse(user.force_password_change)
+        self.assertTrue(user.check_password('NewPass456!'))
+
+        allowed_response = self.client.get(reverse('dashboard'))
+        self.assertEqual(allowed_response.status_code, 200)
 
     def test_reset_admin_command_updates_existing_admin_password(self):
         User = get_user_model()

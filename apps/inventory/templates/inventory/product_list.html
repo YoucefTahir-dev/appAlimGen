@@ -1,21 +1,22 @@
 {% extends 'base/base.html' %}
-{% load i18n %}
+{% load i18n access_tags %}
 
 {% block title %}{% trans "Produits" %} - El Amine ERP{% endblock %}
 
 {% block page_title %}{% trans "Produits" %}{% endblock %}
 
 {% block content %}
+{% has_access 'inventory.add_product' as can_add_product %}
+{% has_access 'inventory.change_product' as can_change_product %}
+{% has_access 'inventory.delete_product' as can_delete_product %}
 <div class="card card-dashboard p-4 bg-white">
     <div class="page-toolbar mb-3">
         <h5>{% trans "Liste des produits" %}</h5>
-        {% if can_manage %}
-            <div class="toolbar-actions">
-                <a class="btn btn-outline-success" href="{% url 'product_import' %}">{% trans "Import Excel" %}</a>
-                <a class="btn btn-outline-secondary" href="{% url 'product_export' %}">{% trans "Export Excel" %}</a>
-                <a class="btn btn-success" href="{% url 'product_create' %}">{% trans "Ajouter produit" %}</a>
-            </div>
-        {% endif %}
+        <div class="toolbar-actions">
+            {% if can_add_product %}<a class="btn btn-outline-success" href="{% url 'product_import' %}">{% trans "Import Excel" %}</a>{% endif %}
+            {% if can_change_product %}<a class="btn btn-outline-secondary" href="{% url 'product_export' %}">{% trans "Export Excel" %}</a>{% endif %}
+            {% if can_add_product %}<a class="btn btn-success" href="{% url 'product_create' %}">{% trans "Ajouter produit" %}</a>{% endif %}
+        </div>
     </div>
     <form method="get" class="mb-3 search-form">
         <input type="search" name="q" class="form-control" placeholder="{% trans 'Rechercher...' %}" value="{{ request.GET.q }}" />
@@ -32,7 +33,7 @@
                     <th>{% trans "Prix vente" %}</th>
                     <th>{% trans "Stock" %}</th>
                     <th>{% trans "Seuil" %}</th>
-                    {% if can_manage %}<th>{% trans "Actions" %}</th>{% endif %}
+                    {% if can_change_product or can_delete_product %}<th>{% trans "Actions" %}</th>{% endif %}
                 </tr>
             </thead>
             <tbody>
@@ -45,22 +46,23 @@
                         <td>{{ product.sale_price|floatformat:2 }} {% trans "DZD" %}</td>
                         <td>{{ product.quantity }}</td>
                         <td>{{ product.minimum_stock }}</td>
-                        {% if can_manage %}
+                        {% if can_change_product or can_delete_product %}
                             <td>
                                 <div class="table-actions">
-                                    <a class="btn btn-sm btn-outline-primary" href="{% url 'product_update' product.pk %}">{% trans "Modifier" %}</a>
-                                    <a class="btn btn-sm btn-outline-danger" href="{% url 'product_delete' product.pk %}">{% trans "Supprimer" %}</a>
+                                    {% if can_change_product %}<a class="btn btn-sm btn-outline-primary" href="{% url 'product_update' product.pk %}">{% trans "Modifier" %}</a>{% endif %}
+                                    {% if can_delete_product %}<a class="btn btn-sm btn-outline-danger" href="{% url 'product_delete' product.pk %}">{% trans "Supprimer" %}</a>{% endif %}
                                 </div>
                             </td>
                         {% endif %}
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="{% if can_manage %}8{% else %}7{% endif %}" class="text-center">{% trans "Aucun produit trouvé." %}</td>
+                        <td colspan="{% if can_change_product or can_delete_product %}8{% else %}7{% endif %}" class="text-center">{% trans "Aucun produit trouvé." %}</td>
                     </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
+    {% include 'base/pagination.html' %}
 </div>
 {% endblock %}

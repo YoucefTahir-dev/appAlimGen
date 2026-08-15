@@ -9,6 +9,7 @@
 <div class="card card-dashboard p-4 bg-white">
     <form method="post">
         {% csrf_token %}
+        {{ form.non_field_errors }}
         <div class="row g-3">
             {% if form.instance.pk %}
                 <div class="col-md-6">
@@ -16,10 +17,11 @@
                     <input type="text" class="form-control" value="{{ form.instance.invoice_number }}" readonly>
                 </div>
             {% endif %}
-            <div class="col-md-6">{{ form.client.label_tag }}{{ form.client }}</div>
-            <div class="col-md-6">{{ form.discount.label_tag }}{{ form.discount }}</div>
-            <div class="col-md-6">{{ form.tax_rate.label_tag }}{{ form.tax_rate }}</div>
-            <div class="col-md-6">{{ form.payment_type.label_tag }}{{ form.payment_type }}</div>
+            <div class="col-md-6">{{ form.client.label_tag }}{{ form.client }}{{ form.client.errors }}</div>
+            <div class="col-md-6">{{ form.discount.label_tag }}{{ form.discount }}{{ form.discount.errors }}</div>
+            <div class="col-md-6">{{ form.tax_rate.label_tag }}{{ form.tax_rate }}{{ form.tax_rate.errors }}</div>
+            <div class="col-md-6">{{ form.payment_type.label_tag }}{{ form.payment_type }}{{ form.payment_type.errors }}</div>
+            <div class="col-md-6">{{ form.settlement_action.label_tag }}{{ form.settlement_action }}{{ form.settlement_action.errors }}</div>
         </div>
         <hr>
         {{ formset.management_form }}
@@ -48,9 +50,9 @@
                             </tr>
                         {% endif %}
                         <tr>
-                            <td>{{ form_line.product }}</td>
-                            <td>{{ form_line.quantity }}</td>
-                            <td>{{ form_line.unit_price }}</td>
+                            <td>{{ form_line.product }}{{ form_line.product.errors }}</td>
+                            <td>{{ form_line.quantity }}{{ form_line.quantity.errors }}</td>
+                            <td>{{ form_line.unit_price }}{{ form_line.unit_price.errors }}</td>
                             <td>{{ form_line.DELETE }}</td>
                         </tr>
                     {% endfor %}

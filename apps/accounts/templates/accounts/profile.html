@@ -14,11 +14,13 @@
                 <label class="form-label">{% trans "Langue de l'interface" %}</label>
                 {% include 'base/language_switcher.html' %}
             </div>
-            <form method="post">{% csrf_token %}
+            <form method="post" enctype="multipart/form-data">{% csrf_token %}
                 {{ profile_form.non_field_errors }}
-                <div class="mb-3">{{ profile_form.first_name.label_tag }}{{ profile_form.first_name }}</div>
-                <div class="mb-3">{{ profile_form.last_name.label_tag }}{{ profile_form.last_name }}</div>
-                <div class="mb-3">{{ profile_form.email.label_tag }}{{ profile_form.email }}</div>
+                <div class="mb-3">{{ profile_form.first_name.label_tag }}{{ profile_form.first_name }}{{ profile_form.first_name.errors }}</div>
+                <div class="mb-3">{{ profile_form.last_name.label_tag }}{{ profile_form.last_name }}{{ profile_form.last_name.errors }}</div>
+                <div class="mb-3">{{ profile_form.email.label_tag }}{{ profile_form.email }}{{ profile_form.email.errors }}</div>
+                <div class="mb-3">{{ profile_form.phone.label_tag }}{{ profile_form.phone }}{{ profile_form.phone.errors }}</div>
+                <div class="mb-3">{{ profile_form.photo.label_tag }}{{ profile_form.photo }}{{ profile_form.photo.errors }}</div>
                 <button class="btn btn-primary" name="update_profile" type="submit">{% trans "Mettre à jour" %}</button>
             </form>
         </div>
@@ -28,9 +30,9 @@
             <h2 class="h5 mb-4">{% trans "Changer mon mot de passe" %}</h2>
             <form method="post">{% csrf_token %}
                 {{ password_form.non_field_errors }}
-                <div class="mb-3">{{ password_form.old_password.label_tag }}{{ password_form.old_password }}</div>
-                <div class="mb-3">{{ password_form.new_password1.label_tag }}{{ password_form.new_password1 }}</div>
-                <div class="mb-3">{{ password_form.new_password2.label_tag }}{{ password_form.new_password2 }}</div>
+                <div class="mb-3">{{ password_form.old_password.label_tag }}{{ password_form.old_password }}{{ password_form.old_password.errors }}</div>
+                <div class="mb-3">{{ password_form.new_password1.label_tag }}{{ password_form.new_password1 }}{{ password_form.new_password1.errors }}</div>
+                <div class="mb-3">{{ password_form.new_password2.label_tag }}{{ password_form.new_password2 }}{{ password_form.new_password2.errors }}</div>
                 <button class="btn btn-success" name="change_password" type="submit">{% trans "Enregistrer" %}</button>
             </form>
         </div>

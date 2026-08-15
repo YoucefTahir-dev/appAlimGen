@@ -1,5 +1,6 @@
 from django import forms
 from django.contrib.auth import password_validation
+from django.contrib.auth.models import Group, Permission
 from django.contrib.auth.forms import (
     AuthenticationForm,
     UserCreationForm,
@@ -11,6 +12,39 @@ from django.contrib.auth.forms import (
 from django.utils.translation import gettext_lazy as _
 
 from .models import User
+from .permissions import get_managed_permissions
+
+
+LEGACY_ROLE_BY_GROUP = {
+    'Administrateur': User.ADMIN,
+    'Gestionnaire': User.MANAGER,
+    'Vendeur': User.SELLER,
+}
+
+
+def clear_permission_caches(user):
+    for attribute in (
+        '_perm_cache',
+        '_group_perm_cache',
+        '_user_perm_cache',
+        '_denied_permission_names_cache',
+        '_has_dynamic_role_cache',
+    ):
+        if hasattr(user, attribute):
+            delattr(user, attribute)
+
+
+def validate_permission_overrides(form, cleaned_data):
+    granted = set(cleaned_data.get('individual_permissions') or ())
+    denied = set(cleaned_data.get('denied_permissions') or ())
+    overlap = granted & denied
+    if overlap:
+        message = _(
+            'Une permission ne peut pas être à la fois accordée et refusée.'
+        )
+        form.add_error('individual_permissions', message)
+        form.add_error('denied_permissions', message)
+    return cleaned_data
 
 
 class LoginForm(AuthenticationForm):
@@ -33,38 +67,152 @@ class LoginForm(AuthenticationForm):
 
 
 class UserCreateForm(UserCreationForm):
+    assigned_role = forms.ModelChoiceField(
+        label=_('Rôle'),
+        queryset=Group.objects.none(),
+        widget=forms.Select(attrs={'class': 'form-select'}),
+    )
+    individual_permissions = forms.ModelMultipleChoiceField(
+        label=_('Permissions individuelles supplémentaires'),
+        queryset=Permission.objects.none(),
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+    )
+    denied_permissions = forms.ModelMultipleChoiceField(
+        label=_('Permissions individuelles refusées'),
+        queryset=Permission.objects.none(),
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+        help_text=_('Ces refus sont prioritaires sur les droits du rôle.'),
+    )
+
     class Meta:
         model = User
-        fields = ('username', 'email', 'role', 'first_name', 'last_name')
+        fields = (
+            'username',
+            'first_name',
+            'last_name',
+            'email',
+            'phone',
+            'photo',
+            'is_active',
+            'force_password_change',
+        )
         widgets = {
             'username': forms.TextInput(attrs={'class': 'form-control'}),
             'email': forms.EmailInput(attrs={'class': 'form-control'}),
-            'role': forms.Select(attrs={'class': 'form-select'}),
             'first_name': forms.TextInput(attrs={'class': 'form-control'}),
             'last_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'phone': forms.TextInput(attrs={'class': 'form-control'}),
+            'photo': forms.ClearableFileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'force_password_change': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['assigned_role'].queryset = Group.objects.order_by('name')
+        self.fields['individual_permissions'].queryset = get_managed_permissions()
+        self.fields['denied_permissions'].queryset = get_managed_permissions()
+        self.fields['email'].required = True
+        self.fields['password1'].widget.attrs['class'] = 'form-control'
+        self.fields['password2'].widget.attrs['class'] = 'form-control'
+
+    def clean(self):
+        return validate_permission_overrides(self, super().clean())
+
+    def save(self, commit=True):
+        user = super().save(commit=commit)
+        if commit:
+            assigned_role = self.cleaned_data['assigned_role']
+            user.groups.set([assigned_role])
+            user.user_permissions.set(self.cleaned_data['individual_permissions'])
+            user.denied_permissions.set(self.cleaned_data['denied_permissions'])
+            legacy_role = LEGACY_ROLE_BY_GROUP.get(assigned_role.name)
+            if legacy_role and user.role != legacy_role:
+                user.role = legacy_role
+                user.save(update_fields=['role'])
+            clear_permission_caches(user)
+        return user
 
 
 class UserUpdateForm(UserChangeForm):
     password = None
+    assigned_role = forms.ModelChoiceField(
+        label=_('Rôle'),
+        queryset=Group.objects.none(),
+        widget=forms.Select(attrs={'class': 'form-select'}),
+    )
+    individual_permissions = forms.ModelMultipleChoiceField(
+        label=_('Permissions individuelles supplémentaires'),
+        queryset=Permission.objects.none(),
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+    )
+    denied_permissions = forms.ModelMultipleChoiceField(
+        label=_('Permissions individuelles refusées'),
+        queryset=Permission.objects.none(),
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+        help_text=_('Ces refus sont prioritaires sur les droits du rôle.'),
+    )
 
     class Meta:
         model = User
-        fields = ('username', 'email', 'role', 'first_name', 'last_name', 'is_active')
+        fields = (
+            'username',
+            'first_name',
+            'last_name',
+            'email',
+            'phone',
+            'photo',
+            'is_active',
+            'force_password_change',
+        )
         widgets = {
             'username': forms.TextInput(attrs={'class': 'form-control'}),
             'email': forms.EmailInput(attrs={'class': 'form-control'}),
-            'role': forms.Select(attrs={'class': 'form-select'}),
             'first_name': forms.TextInput(attrs={'class': 'form-control'}),
             'last_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'phone': forms.TextInput(attrs={'class': 'form-control'}),
+            'photo': forms.ClearableFileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
             'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'force_password_change': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['assigned_role'].queryset = Group.objects.order_by('name')
+        self.fields['individual_permissions'].queryset = get_managed_permissions()
+        self.fields['denied_permissions'].queryset = get_managed_permissions()
+        self.fields['email'].required = True
+        if self.instance and self.instance.pk:
+            self.fields['assigned_role'].initial = self.instance.primary_role
+            self.fields['individual_permissions'].initial = self.instance.user_permissions.all()
+            self.fields['denied_permissions'].initial = self.instance.denied_permissions.all()
+
+    def clean(self):
+        return validate_permission_overrides(self, super().clean())
+
+    def save(self, commit=True):
+        user = super().save(commit=commit)
+        if commit:
+            assigned_role = self.cleaned_data['assigned_role']
+            user.groups.set([assigned_role])
+            user.user_permissions.set(self.cleaned_data['individual_permissions'])
+            user.denied_permissions.set(self.cleaned_data['denied_permissions'])
+            legacy_role = LEGACY_ROLE_BY_GROUP.get(assigned_role.name)
+            if legacy_role and user.role != legacy_role:
+                user.role = legacy_role
+                user.save(update_fields=['role'])
+            clear_permission_caches(user)
+        return user
 
 
 class ProfileForm(forms.ModelForm):
     class Meta:
         model = User
-        fields = ('first_name', 'last_name', 'email')
+        fields = ('first_name', 'last_name', 'email', 'phone', 'photo')
         widgets = {
             'first_name': forms.TextInput(
                 attrs={'class': 'form-control', 'placeholder': _('Prénom')}
@@ -73,9 +221,35 @@ class ProfileForm(forms.ModelForm):
                 attrs={'class': 'form-control', 'placeholder': _('Nom')}
             ),
             'email': forms.EmailInput(
-                attrs={'class': 'form-control', 'placeholder': 'Email'}
+                attrs={'class': 'form-control', 'placeholder': _('Email')}
+            ),
+            'phone': forms.TextInput(
+                attrs={'class': 'form-control', 'placeholder': _('Téléphone')}
+            ),
+            'photo': forms.ClearableFileInput(
+                attrs={'class': 'form-control', 'accept': 'image/*'}
             ),
         }
+
+
+class RoleForm(forms.ModelForm):
+    permissions = forms.ModelMultipleChoiceField(
+        label=_('Permissions'),
+        queryset=Permission.objects.none(),
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+    )
+
+    class Meta:
+        model = Group
+        fields = ('name', 'permissions')
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['permissions'].queryset = get_managed_permissions()
 
 
 class StyledPasswordChangeForm(PasswordChangeForm):
@@ -113,6 +287,13 @@ class StyledPasswordChangeForm(PasswordChangeForm):
             }
         ),
     )
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        user.force_password_change = False
+        if commit:
+            user.save()
+        return user
 
 
 class StyledPasswordResetForm(PasswordResetForm):

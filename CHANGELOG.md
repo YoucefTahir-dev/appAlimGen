@@ -4,12 +4,32 @@ Toutes les modifications notables de ce projet seront documentées ici.
 
 ## [Non publié]
 
+### Paiements et coûts historiques
+
+- Suivi transactionnel des règlements clients et fournisseurs avec paiements partiels, soldes et statuts.
+- Références de règlement automatiques et audit de l’utilisateur ayant saisi le paiement.
+- Coût d’achat figé sur chaque ligne de vente pour conserver des bénéfices historiques stables.
+- Index de dates commerciales et pagination des listes ventes/achats à 25 lignes.
+- Les règlements orphelins, liés à deux documents, négatifs ou en surpaiement sont bloqués sous verrou transactionnel.
+- Les documents historiques dont l’état de paiement est inconnu sont à rapprocher et ne créent pas de fausses alertes d’impayé.
+- Le Dashboard utilise le coût historique vendu plutôt que le prix d’achat courant du produit.
+
 ### Ajouté
 
+- Journal de stock traçable avec variation appliquée, soldes avant/après, origine et auteur.
+- Annulation des mouvements par contrepassation sans suppression de l’historique.
 - Ticket de caisse thermique 58 mm et 80 mm.
 - Numérotation indépendante des tickets au format `TCK-AAAA-000001`.
 - Module Charges avec catégories, CRUD, recherche, impression, export PDF et export Excel.
 - Indicateurs dashboard pour charges du jour, du mois, de l'année, bénéfice brut et bénéfice net.
+
+### Corrigé
+
+- Les entrées, sorties et ajustements manuels mettent désormais à jour le stock dans une transaction verrouillée.
+- Les créations, modifications et suppressions de lignes d’achat/vente, les stocks initiaux et les imports Excel utilisent désormais le même journal transactionnel avec verrouillage et origine métier.
+- Les ventes concurrentes et les réductions d’achat impossibles échouent sans stock négatif ni écriture commerciale partielle.
+- Une sortie manuelle ne peut plus produire un stock négatif.
+- L’historique de stock est protégé contre les modifications et suppressions directes.
 
 ## [v1.0.0] - 2026-06-29
 

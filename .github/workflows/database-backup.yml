@@ -1,0 +1,91 @@
+name: Encrypted database backup
+
+on:
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-database-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+      POSTGRES_IMAGE: postgres:17-alpine
+    steps:
+      - name: Validate required secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$DATABASE_URL" || { echo "BACKUP_DATABASE_URL is missing" >&2; exit 1; }
+          test -n "$BACKUP_PASSPHRASE" || { echo "BACKUP_PASSPHRASE is missing" >&2; exit 1; }
+          test "${#BACKUP_PASSPHRASE}" -ge 24 || {
+            echo "BACKUP_PASSPHRASE must contain at least 24 characters" >&2
+            exit 1
+          }
+          case "$DATABASE_URL" in
+            postgres://*|postgresql://*) ;;
+            *) echo "BACKUP_DATABASE_URL must be a PostgreSQL URL" >&2; exit 1 ;;
+          esac
+
+      - name: Create and validate PostgreSQL backup
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p backups
+          stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+          filename="database-${stamp}.dump"
+          echo "BACKUP_FILE=${filename}" >> "$GITHUB_ENV"
+          docker run --rm --pull=always \
+            --user "$(id -u):$(id -g)" \
+            -e DATABASE_URL \
+            -v "$GITHUB_WORKSPACE/backups:/backups" \
+            "$POSTGRES_IMAGE" \
+            sh -ceu 'pg_dump --format=custom --no-owner --no-acl \
+              --file="/backups/$1" --dbname="$DATABASE_URL"' backup "$filename"
+          docker run --rm --pull=always \
+            --user "$(id -u):$(id -g)" \
+            -v "$GITHUB_WORKSPACE/backups:/backups:ro" \
+            "$POSTGRES_IMAGE" \
+            pg_restore --list "/backups/${filename}" >/dev/null
+
+      - name: Encrypt backup and create checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          plaintext="backups/${BACKUP_FILE}"
+          encrypted="${plaintext}.gpg"
+          trap 'rm -f "$plaintext"' EXIT
+          printf '%s' "$BACKUP_PASSPHRASE" | gpg \
+            --batch --yes --no-symkey-cache --pinentry-mode loopback --passphrase-fd 0 \
+            --symmetric --cipher-algo AES256 --s2k-mode 3 \
+            --s2k-digest-algo SHA512 --s2k-count 65011712 --compress-algo none \
+            --output "$encrypted" "$plaintext"
+          (
+            cd backups
+            sha256sum "${BACKUP_FILE}.gpg" > "${BACKUP_FILE}.gpg.sha256"
+            sha256sum --check "${BACKUP_FILE}.gpg.sha256"
+          )
+          rm -f "$plaintext"
+          trap - EXIT
+
+      - name: Store encrypted off-provider copy
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: production-database-${{ github.run_id }}
+          path: |
+            backups/${{ env.BACKUP_FILE }}.gpg
+            backups/${{ env.BACKUP_FILE }}.gpg.sha256
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0

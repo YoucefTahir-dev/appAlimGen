@@ -9,13 +9,15 @@
 <div class="card card-dashboard p-4 bg-white">
     <form method="post">
         {% csrf_token %}
+        {{ form.non_field_errors }}
         <div class="row g-3">
-            <div class="col-md-6">{{ form.reference.label_tag }}{{ form.reference }}</div>
-            <div class="col-md-6">{{ form.supplier.label_tag }}{{ form.supplier }}</div>
-            <div class="col-md-6">{{ form.tax_rate.label_tag }}{{ form.tax_rate }}</div>
+            <div class="col-md-6">{{ form.reference.label_tag }}{{ form.reference }}{{ form.reference.errors }}</div>
+            <div class="col-md-6">{{ form.supplier.label_tag }}{{ form.supplier }}{{ form.supplier.errors }}</div>
+            <div class="col-md-6">{{ form.tax_rate.label_tag }}{{ form.tax_rate }}{{ form.tax_rate.errors }}</div>
         </div>
         <hr>
         {{ formset.management_form }}
+        {{ formset.non_form_errors }}
         <div class="table-responsive">
             <table class="table table-bordered align-middle formset-table">
                 <thead>
@@ -29,9 +31,9 @@
                 <tbody>
                     {% for form_line in formset %}
                         <tr>
-                            <td>{{ form_line.product }}</td>
-                            <td>{{ form_line.quantity }}</td>
-                            <td>{{ form_line.purchase_price }}</td>
+                            <td>{{ form_line.product }}{{ form_line.product.errors }}</td>
+                            <td>{{ form_line.quantity }}{{ form_line.quantity.errors }}</td>
+                            <td>{{ form_line.purchase_price }}{{ form_line.purchase_price.errors }}</td>
                             <td>{{ form_line.DELETE }}</td>
                         </tr>
                     {% endfor %}

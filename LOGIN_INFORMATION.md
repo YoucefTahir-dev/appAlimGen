@@ -1,10 +1,15 @@
 # Informations de connexion
 
-## Identifiants administrateur
+## Compte administrateur
 
-- Nom d'utilisateur : admin
-- Mot de passe : Admin123456!
-- URL de connexion : http://localhost:8000/
+Aucun identifiant ni mot de passe par défaut n'est conservé dans le dépôt.
+
+Le compte administrateur doit être créé ou réinitialisé depuis un environnement
+de confiance, puis son mot de passe doit être stocké uniquement dans un
+gestionnaire de secrets. Ne placez jamais un mot de passe dans Git, un ticket,
+un journal applicatif ou une variable versionnée.
+
+- URL locale de connexion : `http://localhost:8000/`
 
 ## Récupération du mot de passe
 
@@ -20,6 +25,10 @@ Pour créer ou réinitialiser le compte administrateur :
 ```bash
 python manage.py reset_admin
 ```
+
+La commande demande le nouveau mot de passe sans l'afficher et applique les
+validateurs de mot de passe Django. En production, révoquez également les
+sessions existantes après toute récupération d'urgence.
 
 ## Notes
 

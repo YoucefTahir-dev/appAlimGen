@@ -1,4 +1,3 @@
-version: '3.9'
 services:
   db:
     image: postgres:15
@@ -6,33 +5,49 @@ services:
     environment:
       POSTGRES_DB: gestio_stock
       POSTGRES_USER: gestio_user
-      POSTGRES_PASSWORD: gestio_pass
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gestio_pass}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gestio_user -d gestio_stock"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     networks:
       - gestio_net
 
   web:
     build: .
-    command: gunicorn gestio_stock.wsgi:application --bind 0.0.0.0:8000
+    command: bash start.sh
     volumes:
-      - .:/app
+      - media_data:/app/media
     ports:
       - "8000:8000"
     environment:
-      - DJANGO_DEBUG=False
+      - DJANGO_DEBUG=${DJANGO_DEBUG:-True}
+      - SECRET_KEY=${SECRET_KEY:-docker-development-secret-key-change-before-production-1234567890}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost 127.0.0.1 0.0.0.0}
+      - SECURE_SSL_REDIRECT=${SECURE_SSL_REDIRECT:-False}
+      - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-False}
+      - CSRF_COOKIE_SECURE=${CSRF_COOKIE_SECURE:-False}
+      - DATABASE_ENGINE=postgresql
       - DATABASE_HOST=db
       - DATABASE_NAME=gestio_stock
       - DATABASE_USER=gestio_user
-      - DATABASE_PASSWORD=gestio_pass
+      - DATABASE_PASSWORD=${POSTGRES_PASSWORD:-gestio_pass}
       - DATABASE_PORT=5432
+      - MEDIA_STORAGE_BACKEND=filesystem
+      - MEDIA_FILESYSTEM_PERSISTENT=True
+      - MEDIA_ROOT=/app/media
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     networks:
       - gestio_net
 
 volumes:
   postgres_data:
+  media_data:
 
 networks:
   gestio_net:

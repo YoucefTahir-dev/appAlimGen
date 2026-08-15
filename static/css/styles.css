@@ -38,6 +38,14 @@ img {
     height: auto;
 }
 
+.errorlist {
+    margin: 0.35rem 0 0;
+    padding: 0;
+    color: var(--bs-danger-text-emphasis, #842029);
+    font-size: 0.875rem;
+    list-style: none;
+}
+
 .app-shell {
     min-height: 100vh;
 }

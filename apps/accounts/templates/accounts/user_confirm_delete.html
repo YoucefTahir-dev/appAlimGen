@@ -1,0 +1,5 @@
+{% extends 'base/base.html' %}
+{% load i18n %}
+{% block title %}{% trans "Supprimer utilisateur" %}{% endblock %}
+{% block page_title %}{% trans "Supprimer utilisateur" %}{% endblock %}
+{% block content %}<div class="card card-dashboard p-4 bg-white"><div class="alert alert-danger">{% blocktrans with username=target_user.username %}Confirmer la suppression définitive de l'utilisateur « {{ username }} » ?{% endblocktrans %}</div><p>{% trans "Ses journaux d'audit seront conservés sans effacer l'historique." %}</p><form method="post">{% csrf_token %}<button class="btn btn-danger" type="submit">{% trans "Confirmer la suppression" %}</button> <a class="btn btn-outline-secondary" href="{% url 'user_list' %}">{% trans "Annuler" %}</a></form></div>{% endblock %}

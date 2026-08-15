@@ -1,4 +1,6 @@
 from django import forms
+from django.core.exceptions import ValidationError
+from django.utils.translation import gettext_lazy as _
 
 from .models import Expense, ExpenseCategory
 
@@ -33,3 +35,9 @@ class ExpenseForm(forms.ModelForm):
         self.fields['category'].queryset = ExpenseCategory.objects.filter(is_active=True).order_by('name')
         self.fields['supplier'].required = False
         self.fields['receipt'].required = False
+
+    def clean_amount(self):
+        amount = self.cleaned_data['amount']
+        if amount <= 0:
+            raise ValidationError(_('Le montant doit être strictement positif.'))
+        return amount

@@ -1,15 +1,16 @@
 {% extends 'base/base.html' %}
-{% load i18n %}
+{% load i18n access_tags %}
 
-{% block title %}Mouvements stock - El Amine ERP{% endblock %}
+{% block title %}{% trans "Mouvements de stock" %} - El Amine ERP{% endblock %}
 
-{% block page_title %}Mouvements de stock{% endblock %}
+{% block page_title %}{% trans "Mouvements de stock" %}{% endblock %}
 
 {% block content %}
+{% has_access 'accounts.manage_stock' as can_manage_stock %}
 <div class="card card-dashboard p-4 bg-white">
     <div class="page-toolbar mb-3">
         <h5>{% trans "Liste des mouvements" %}</h5>
-        {% if can_manage %}
+        {% if can_manage_stock %}
             <a href="{% url 'stock_movement_create' %}" class="btn btn-success">{% trans "Ajouter mouvement" %}</a>
         {% endif %}
     </div>
@@ -19,10 +20,13 @@
                 <tr>
                     <th>{% trans "Produit" %}</th>
                     <th>{% trans "Type" %}</th>
-                    <th>Quantité</th>
+                    <th>{% trans "Quantité saisie" %}</th>
+                    <th>{% trans "Variation" %}</th>
+                    <th>{% trans "Stock après" %}</th>
+                    <th>{% trans "Origine" %}</th>
                     <th>{% trans "Motif" %}</th>
                     <th>{% trans "Date" %}</th>
-                    {% if can_manage %}<th>{% trans "Actions" %}</th>{% endif %}
+                    {% if can_manage_stock %}<th>{% trans "Actions" %}</th>{% endif %}
                 </tr>
             </thead>
             <tbody>
@@ -31,21 +35,35 @@
                         <td>{{ movement.product.name }}</td>
                         <td>{{ movement.get_movement_type_display }}</td>
                         <td>{{ movement.quantity }}</td>
+                        <td>
+                            {% if movement.applied_delta is None %}
+                                <span class="badge text-bg-secondary">{% trans "Historique antérieur" %}</span>
+                            {% else %}
+                                {% if movement.applied_delta > 0 %}+{% endif %}{{ movement.applied_delta }}
+                            {% endif %}
+                        </td>
+                        <td>{{ movement.balance_after|default_if_none:"-" }}</td>
+                        <td>{{ movement.get_source_type_display }}</td>
                         <td>{{ movement.reason }}</td>
                         <td>{{ movement.created_at|date:'d/m/Y H:i' }}</td>
-                        {% if can_manage %}
+                        {% if can_manage_stock %}
                             <td>
                                 <div class="table-actions">
-                                    <a href="{% url 'stock_movement_delete' movement.pk %}" class="btn btn-sm btn-danger">{% trans "Supprimer" %}</a>
+                                    {% if movement.applied_delta is not None and movement.source_type != 'reversal' and not movement.has_reversal %}
+                                        <a href="{% url 'stock_movement_delete' movement.pk %}" class="btn btn-sm btn-warning">{% trans "Annuler le mouvement" %}</a>
+                                    {% else %}
+                                        <span class="text-muted">{% trans "Non annulable" %}</span>
+                                    {% endif %}
                                 </div>
                             </td>
                         {% endif %}
                     </tr>
                 {% empty %}
-                    <tr><td colspan="{% if can_manage %}6{% else %}5{% endif %}" class="text-center">Aucun mouvement de stock enregistré.</td></tr>
+                    <tr><td colspan="{% if can_manage_stock %}9{% else %}8{% endif %}" class="text-center">{% trans "Aucun mouvement de stock enregistré." %}</td></tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
+    {% include 'base/pagination.html' %}
 </div>
 {% endblock %}
