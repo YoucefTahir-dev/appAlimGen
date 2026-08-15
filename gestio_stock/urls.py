@@ -3,7 +3,11 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path, include
 
+from apps.core.views import health, readiness
+
 urlpatterns = [
+    path('healthz/', health, name='health'),
+    path('readyz/', readiness, name='readiness'),
     path('i18n/', include('django.conf.urls.i18n')),
     path('admin/', admin.site.urls),
     path('', include('apps.accounts.urls')),

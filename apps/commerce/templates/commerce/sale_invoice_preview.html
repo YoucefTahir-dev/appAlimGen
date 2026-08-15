@@ -1,5 +1,7 @@
-{% load i18n %}
+{% load i18n access_tags %}
 {% load static %}
+{% has_access 'accounts.download_invoice_pdf' as can_download_invoice %}
+{% has_access 'accounts.print_invoice' as can_print_invoice %}
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -31,10 +33,10 @@
 <div class="print-actions py-3">
     <div class="container d-flex flex-wrap gap-2 justify-content-end">
         <a href="{% url 'sale_list' %}" class="btn btn-outline-secondary">{% trans "Retour" %}</a>
-        <a href="{% url 'sale_invoice_pdf' sale.pk %}" class="btn btn-danger">Télécharger PDF</a>
-        <button onclick="window.print()" class="btn btn-success">{% trans "Imprimer" %}</button>
+        {% if can_download_invoice %}<a href="{% url 'sale_invoice_pdf' sale.pk %}" class="btn btn-danger">Télécharger PDF</a>{% endif %}
+        {% if can_print_invoice %}<button onclick="window.print()" class="btn btn-success">{% trans "Imprimer" %}</button>
         <a href="{% url 'sale_ticket_preview' sale.pk 80 %}" class="btn btn-dark">{% trans "Ticket" %} 80 mm</a>
-        <a href="{% url 'sale_ticket_preview' sale.pk 58 %}" class="btn btn-dark">{% trans "Ticket" %} 58 mm</a>
+        <a href="{% url 'sale_ticket_preview' sale.pk 58 %}" class="btn btn-dark">{% trans "Ticket" %} 58 mm</a>{% endif %}
     </div>
 </div>
 

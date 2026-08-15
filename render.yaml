@@ -5,6 +5,9 @@ services:
     plan: free
     buildCommand: bash build.sh
     startCommand: bash start.sh
+    # Liveness must not depend on a transient database connection. Keep
+    # /readyz/ available for external readiness monitoring.
+    healthCheckPath: /healthz/
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.8
@@ -32,9 +35,39 @@ services:
         value: "False"
       - key: USE_X_FORWARDED_PROTO
         value: "True"
+      - key: TRUST_X_FORWARDED_FOR
+        value: "True"
       - key: SESSION_IDLE_TIMEOUT_SECONDS
         value: "1800"
+      - key: LOGIN_FAILURE_LIMIT
+        value: "5"
+      - key: LOGIN_FAILURE_IP_LIMIT
+        value: "20"
+      - key: LOGIN_FAILURE_WINDOW_SECONDS
+        value: "900"
+      - key: PASSWORD_RESET_LIMIT
+        value: "5"
+      - key: PASSWORD_RESET_WINDOW_SECONDS
+        value: "3600"
       - key: WEB_CONCURRENCY
         value: "2"
       - key: WEB_TIMEOUT
         value: "120"
+      - key: MEDIA_STORAGE_BACKEND
+        value: s3
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_STORAGE_BUCKET_NAME
+        sync: false
+      - key: AWS_S3_ENDPOINT_URL
+        sync: false
+      - key: AWS_S3_REGION_NAME
+        sync: false
+      - key: MEDIA_CSP_ORIGINS
+        sync: false
+      - key: AWS_QUERYSTRING_AUTH
+        value: "True"
+      - key: AWS_QUERYSTRING_EXPIRE
+        value: "900"

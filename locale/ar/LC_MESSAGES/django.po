@@ -836,3 +836,49 @@ msgstr "الربح الإجمالي"
 
 msgid "Gain net"
 msgstr "الربح الصافي"
+
+msgid "La période demandée est invalide."
+msgstr "الفترة المطلوبة غير صالحة."
+
+msgid "La date de début est obligatoire pour une période personnalisée."
+msgstr "تاريخ البداية إلزامي للفترة المخصصة."
+
+msgid "La date de fin est obligatoire pour une période personnalisée."
+msgstr "تاريخ النهاية إلزامي للفترة المخصصة."
+
+msgid "La date de fin doit être postérieure ou égale à la date de début."
+msgstr "يجب أن يكون تاريخ النهاية بعد تاريخ البداية أو مساويا له."
+
+#, python-format
+msgid "Période invalide : %(errors)s"
+msgstr "فترة غير صالحة: %(errors)s"
+
+msgid "Valeur du stock (instantané actuel)"
+msgstr "قيمة المخزون (لقطة حالية)"
+
+msgid "Nombre de produits (instantané actuel)"
+msgstr "عدد المنتجات (لقطة حالية)"
+
+msgid "Nombre de clients (instantané actuel)"
+msgstr "عدد الزبائن (لقطة حالية)"
+
+msgid "Nombre de fournisseurs (instantané actuel)"
+msgstr "عدد الموردين (لقطة حالية)"
+
+msgid "Graphiques de la période"
+msgstr "رسوم الفترة البيانية"
+
+msgid "Répartitions"
+msgstr "التوزيعات"
+
+msgid "Catégorie de vente"
+msgstr "فئة المبيعات"
+
+msgid "Catégorie de charge"
+msgstr "فئة المصاريف"
+
+msgid "Ventes par catégorie"
+msgstr "المبيعات حسب الفئة"
+
+msgid "Charges par catégorie"
+msgstr "المصاريف حسب الفئة"

@@ -5,7 +5,7 @@ from django.conf import settings
 import tempfile
 import shutil
 
-from ..models import Product, Category, Brand, Unit
+from ..models import Product, Category, Brand, StockMovement, Unit
 from django.contrib.auth import get_user_model
 
 
@@ -57,6 +57,12 @@ class ProductModelTests(TestCase):
         self.assertTrue(default_storage.exists(p.barcode_image.name))
         self.assertIsNotNone(p.qr_code)
         self.assertTrue(default_storage.exists(p.qr_code.name))
+        movement = StockMovement.objects.get(
+            product=p,
+            source_type=StockMovement.SOURCE_PRODUCT,
+        )
+        self.assertEqual(movement.applied_delta, 2)
+        self.assertEqual(movement.created_by, self.user)
 
     def test_product_detail_displays_barcode(self):
         self.client.login(username='tester', password='pass')

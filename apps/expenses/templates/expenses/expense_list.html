@@ -1,20 +1,27 @@
 {% extends 'base/base.html' %}
-{% load i18n %}
+{% load i18n access_tags %}
 
 {% block title %}{% trans "Charges" %} - El Amine ERP{% endblock %}
 
 {% block page_title %}{% trans "Charges" %}{% endblock %}
 
 {% block content %}
+{% has_access 'expenses.add_expense' as can_add_expense %}
+{% has_access 'expenses.change_expense' as can_change_expense %}
+{% has_access 'expenses.delete_expense' as can_delete_expense %}
+{% has_access 'expenses.add_expensecategory' as can_add_expense_category %}
+{% has_access 'accounts.view_reports' as can_view_reports %}
+{% has_access 'accounts.export_reports_excel' as can_export_excel %}
+{% has_access 'accounts.export_reports_pdf' as can_export_pdf %}
 <div class="card card-dashboard p-4 bg-white">
     <div class="page-toolbar mb-3">
         <h5>{% trans "Liste des charges" %}</h5>
         <div class="toolbar-actions">
-            <a class="btn btn-outline-primary" href="{% url 'expense_category_create' %}">{% trans "Nouvelle catégorie" %}</a>
-            <a class="btn btn-outline-success" href="{% url 'expense_export_excel' %}?{{ request.GET.urlencode }}">{% trans "Export Excel" %}</a>
-            <a class="btn btn-outline-danger" href="{% url 'expense_export_pdf' %}?{{ request.GET.urlencode }}">{% trans "Export PDF" %}</a>
-            <a class="btn btn-outline-secondary" href="{% url 'expense_print' %}?{{ request.GET.urlencode }}" target="_blank">{% trans "Imprimer" %}</a>
-            <a class="btn btn-success" href="{% url 'expense_create' %}">{% trans "Nouvelle charge" %}</a>
+            {% if can_add_expense_category %}<a class="btn btn-outline-primary" href="{% url 'expense_category_create' %}">{% trans "Nouvelle catégorie" %}</a>{% endif %}
+            {% if can_view_reports and can_export_excel %}<a class="btn btn-outline-success" href="{% url 'expense_export_excel' %}?{{ request.GET.urlencode }}">{% trans "Export Excel" %}</a>{% endif %}
+            {% if can_view_reports and can_export_pdf %}<a class="btn btn-outline-danger" href="{% url 'expense_export_pdf' %}?{{ request.GET.urlencode }}">{% trans "Export PDF" %}</a>{% endif %}
+            {% if can_view_reports %}<a class="btn btn-outline-secondary" href="{% url 'expense_print' %}?{{ request.GET.urlencode }}" target="_blank">{% trans "Imprimer" %}</a>{% endif %}
+            {% if can_add_expense %}<a class="btn btn-success" href="{% url 'expense_create' %}">{% trans "Nouvelle charge" %}</a>{% endif %}
         </div>
     </div>
 
@@ -59,8 +66,8 @@
                         <td>{% if expense.receipt %}<a href="{{ expense.receipt.url }}" target="_blank">{% trans "Voir" %}</a>{% else %}<span class="badge text-bg-warning">{% trans "Absent" %}</span>{% endif %}</td>
                         <td>
                             <div class="table-actions">
-                                <a class="btn btn-sm btn-outline-success" href="{% url 'expense_update' expense.pk %}">{% trans "Modifier" %}</a>
-                                <a class="btn btn-sm btn-outline-danger" href="{% url 'expense_delete' expense.pk %}">{% trans "Supprimer" %}</a>
+                                {% if can_change_expense %}<a class="btn btn-sm btn-outline-success" href="{% url 'expense_update' expense.pk %}">{% trans "Modifier" %}</a>{% endif %}
+                                {% if can_delete_expense %}<a class="btn btn-sm btn-outline-danger" href="{% url 'expense_delete' expense.pk %}">{% trans "Supprimer" %}</a>{% endif %}
                             </div>
                         </td>
                     </tr>
@@ -70,5 +77,6 @@
             </tbody>
         </table>
     </div>
+    {% include 'base/pagination.html' %}
 </div>
 {% endblock %}

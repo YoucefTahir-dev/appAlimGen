@@ -55,24 +55,35 @@ INSTALLED_APPS = [
     'apps.expenses',
 ]
 
+MEDIA_STORAGE_BACKEND = os.getenv('MEDIA_STORAGE_BACKEND', 'filesystem').strip().lower()
+if MEDIA_STORAGE_BACKEND == 's3':
+    if not find_spec('storages'):
+        raise ImproperlyConfigured('django-storages est requis lorsque MEDIA_STORAGE_BACKEND=s3.')
+    INSTALLED_APPS.append('storages')
+elif MEDIA_STORAGE_BACKEND != 'filesystem':
+    raise ImproperlyConfigured('MEDIA_STORAGE_BACKEND doit valoir filesystem ou s3.')
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'apps.core.security.SecurityHeadersMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.locale.LocaleMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'apps.core.security.SessionIdleTimeoutMiddleware',
+    'apps.core.security.ForcePasswordChangeMiddleware',
+    'apps.accounts.permissions.RoutePermissionMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'apps.core.security.SecurityAuditMiddleware',
-    'apps.core.security.SecurityHeadersMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
 if find_spec('whitenoise'):
     MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
 
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https') if env_bool('USE_X_FORWARDED_PROTO', not DEBUG) else None
+TRUST_X_FORWARDED_FOR = env_bool('TRUST_X_FORWARDED_FOR', False)
 SECURE_SSL_REDIRECT = env_bool('SECURE_SSL_REDIRECT', not DEBUG)
 SECURE_HSTS_SECONDS = env_int('SECURE_HSTS_SECONDS', 0 if DEBUG else 31536000)
 SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool('SECURE_HSTS_INCLUDE_SUBDOMAINS', not DEBUG)
@@ -89,9 +100,16 @@ X_FRAME_OPTIONS = os.getenv('X_FRAME_OPTIONS', 'DENY')
 SESSION_COOKIE_AGE = env_int('SESSION_COOKIE_AGE', 60 * 60 * 8)
 SESSION_SAVE_EVERY_REQUEST = env_bool('SESSION_SAVE_EVERY_REQUEST', True)
 SESSION_IDLE_TIMEOUT_SECONDS = env_int('SESSION_IDLE_TIMEOUT_SECONDS', 60 * 30)
+LOGIN_FAILURE_LIMIT = env_int('LOGIN_FAILURE_LIMIT', 5)
+LOGIN_FAILURE_IP_LIMIT = env_int('LOGIN_FAILURE_IP_LIMIT', 20)
+LOGIN_FAILURE_WINDOW_SECONDS = env_int('LOGIN_FAILURE_WINDOW_SECONDS', 15 * 60)
+PASSWORD_RESET_LIMIT = env_int('PASSWORD_RESET_LIMIT', 5)
+PASSWORD_RESET_WINDOW_SECONDS = env_int('PASSWORD_RESET_WINDOW_SECONDS', 60 * 60)
 MAX_IMAGE_UPLOAD_SIZE = env_int('MAX_IMAGE_UPLOAD_SIZE', 5 * 1024 * 1024)
 MAX_EXCEL_UPLOAD_SIZE = env_int('MAX_EXCEL_UPLOAD_SIZE', 10 * 1024 * 1024)
+MAX_RECEIPT_UPLOAD_SIZE = env_int('MAX_RECEIPT_UPLOAD_SIZE', 10 * 1024 * 1024)
 
+MEDIA_CSP_ORIGINS = os.getenv('MEDIA_CSP_ORIGINS', '').strip()
 SECURITY_RESPONSE_HEADERS = {
     'Content-Security-Policy': os.getenv(
         'CONTENT_SECURITY_POLICY',
@@ -99,7 +117,7 @@ SECURITY_RESPONSE_HEADERS = {
         "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
         "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
         "font-src 'self' https://cdn.jsdelivr.net data:; "
-        "img-src 'self' data:; "
+        f"img-src 'self' data: {MEDIA_CSP_ORIGINS}; "
         "object-src 'none'; "
         "base-uri 'self'; "
         "form-action 'self'; "
@@ -152,6 +170,11 @@ if DATABASE_URL:
     }
 else:
     DATABASE_ENGINE = os.getenv('DATABASE_ENGINE', 'sqlite').lower()
+    if not DEBUG and DATABASE_ENGINE in ('sqlite', 'sqlite3') and not env_bool('ALLOW_SQLITE_IN_PRODUCTION', False):
+        raise ImproperlyConfigured(
+            'DATABASE_URL PostgreSQL est obligatoire en production. '
+            'SQLite est réservé au développement local.'
+        )
     if DATABASE_ENGINE in ('sqlite', 'sqlite3'):
         DATABASES = {
             'default': {
@@ -193,8 +216,14 @@ LANGUAGE_CODE = 'fr'
 LANGUAGES = [
     ('fr', _('Français')),
     ('ar', _('العربية')),
+    ('en', _('English')),
 ]
 LOCALE_PATHS = [BASE_DIR / 'locale']
+LANGUAGE_COOKIE_NAME = 'django_language'
+LANGUAGE_COOKIE_AGE = 365 * 24 * 60 * 60
+LANGUAGE_COOKIE_SAMESITE = 'Lax'
+LANGUAGE_COOKIE_SECURE = SESSION_COOKIE_SECURE
+LANGUAGE_COOKIE_HTTPONLY = True
 TIME_ZONE = 'Africa/Algiers'
 USE_I18N = True
 USE_L10N = True
@@ -203,10 +232,61 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage' if find_spec('whitenoise') else 'django.contrib.staticfiles.storage.StaticFilesStorage'
+STORAGES = {
+    'staticfiles': {
+        'BACKEND': (
+            'whitenoise.storage.CompressedManifestStaticFilesStorage'
+            if find_spec('whitenoise')
+            else 'django.contrib.staticfiles.storage.StaticFilesStorage'
+        ),
+    },
+}
 
 MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_ROOT_SETTING = Path(os.getenv('MEDIA_ROOT', 'media'))
+MEDIA_ROOT = MEDIA_ROOT_SETTING if MEDIA_ROOT_SETTING.is_absolute() else BASE_DIR / MEDIA_ROOT_SETTING
+
+if MEDIA_STORAGE_BACKEND == 's3':
+    required_s3_settings = {
+        'AWS_ACCESS_KEY_ID': os.getenv('AWS_ACCESS_KEY_ID', '').strip(),
+        'AWS_SECRET_ACCESS_KEY': os.getenv('AWS_SECRET_ACCESS_KEY', '').strip(),
+        'AWS_STORAGE_BUCKET_NAME': os.getenv('AWS_STORAGE_BUCKET_NAME', '').strip(),
+    }
+    missing_s3_settings = [name for name, value in required_s3_settings.items() if not value]
+    if missing_s3_settings:
+        raise ImproperlyConfigured(
+            'Configuration du stockage objet incomplète : ' + ', '.join(missing_s3_settings)
+        )
+    STORAGES['default'] = {
+        'BACKEND': 'storages.backends.s3.S3Storage',
+        'OPTIONS': {
+            'access_key': required_s3_settings['AWS_ACCESS_KEY_ID'],
+            'secret_key': required_s3_settings['AWS_SECRET_ACCESS_KEY'],
+            'bucket_name': required_s3_settings['AWS_STORAGE_BUCKET_NAME'],
+            'endpoint_url': os.getenv('AWS_S3_ENDPOINT_URL') or None,
+            'region_name': os.getenv('AWS_S3_REGION_NAME') or None,
+            'custom_domain': os.getenv('AWS_S3_CUSTOM_DOMAIN') or None,
+            'addressing_style': os.getenv('AWS_S3_ADDRESSING_STYLE', 'auto'),
+            'signature_version': 's3v4',
+            'default_acl': None,
+            'file_overwrite': False,
+            'querystring_auth': env_bool('AWS_QUERYSTRING_AUTH', True),
+            'querystring_expire': env_int('AWS_QUERYSTRING_EXPIRE', 900),
+        },
+    }
+else:
+    if not DEBUG and not env_bool('MEDIA_FILESYSTEM_PERSISTENT', False):
+        raise ImproperlyConfigured(
+            'Le stockage média local est interdit en production sans '
+            'MEDIA_FILESYSTEM_PERSISTENT=True et un disque réellement persistant.'
+        )
+    STORAGES['default'] = {
+        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+        'OPTIONS': {
+            'location': MEDIA_ROOT,
+            'base_url': MEDIA_URL,
+        },
+    }
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'accounts.User'

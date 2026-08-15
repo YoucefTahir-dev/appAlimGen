@@ -1,0 +1,16 @@
+{% extends 'base/base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "Supprimer le règlement" %} - El Amine ERP{% endblock %}
+{% block page_title %}{% trans "Supprimer le règlement" %}{% endblock %}
+
+{% block content %}
+<div class="card card-dashboard p-4 bg-white">
+    <p>{% blocktrans with reference=payment.reference amount=payment.amount %}Supprimer le règlement {{ reference }} de {{ amount }} DZD ?{% endblocktrans %}</p>
+    <form method="post">
+        {% csrf_token %}
+        <button class="btn btn-danger">{% trans "Supprimer" %}</button>
+        <a class="btn btn-outline-secondary" href="{% if document_type == 'sale' %}{% url 'sale_payment_list' document.pk %}{% else %}{% url 'purchase_payment_list' document.pk %}{% endif %}">{% trans "Annuler" %}</a>
+    </form>
+</div>
+{% endblock %}

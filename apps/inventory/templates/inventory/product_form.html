@@ -9,30 +9,31 @@
 <div class="card card-dashboard p-4 bg-white">
     <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
+        {{ form.non_field_errors }}
         <div class="row g-3">
             {% if form.instance.pk %}
             <div class="col-12 mb-2">
-                <label class="form-label">Référence</label>
+                <label class="form-label">{% trans "Référence" %}</label>
                 <input type="text" class="form-control" value="{{ form.instance.reference }}" readonly />
             </div>
             {% endif %}
-            <div class="col-md-6">{{ form.barcode_display.label_tag }}{{ form.barcode_display }}</div>
-            <div class="col-md-6">{{ form.name.label_tag }}{{ form.name }}</div>
-            <div class="col-md-6">{{ form.brand_text.label_tag }}{{ form.brand_text }}</div>
-            <div class="col-md-4">{{ form.purchase_price.label_tag }}{{ form.purchase_price }}</div>
-            <div class="col-md-4">{{ form.sale_price.label_tag }}{{ form.sale_price }}</div>
-            <div class="col-md-4">{{ form.quantity.label_tag }}{{ form.quantity }}</div>
-            <div class="col-md-4">{{ form.minimum_stock.label_tag }}{{ form.minimum_stock }}</div>
-            <div class="col-md-8">{{ form.photo.label_tag }}{{ form.photo }}</div>
+            <div class="col-md-6">{{ form.barcode_display.label_tag }}{{ form.barcode_display }}{{ form.barcode_display.errors }}</div>
+            <div class="col-md-6">{{ form.name.label_tag }}{{ form.name }}{{ form.name.errors }}</div>
+            <div class="col-md-6">{{ form.brand_text.label_tag }}{{ form.brand_text }}{{ form.brand_text.errors }}</div>
+            <div class="col-md-4">{{ form.purchase_price.label_tag }}{{ form.purchase_price }}{{ form.purchase_price.errors }}</div>
+            <div class="col-md-4">{{ form.sale_price.label_tag }}{{ form.sale_price }}{{ form.sale_price.errors }}</div>
+            <div class="col-md-4">{{ form.quantity.label_tag }}{{ form.quantity }}{{ form.quantity.errors }}</div>
+            <div class="col-md-4">{{ form.minimum_stock.label_tag }}{{ form.minimum_stock }}{{ form.minimum_stock.errors }}</div>
+            <div class="col-md-8">{{ form.photo.label_tag }}{{ form.photo }}{{ form.photo.errors }}</div>
             {% if form.instance.pk and form.instance.qr_code %}
             <div class="col-md-4 text-center">
                 <label class="form-label">{% trans "QR Code" %}</label>
                 <div>
-                    <img src="{{ form.instance.qr_code.url }}" alt="QR" class="img-fluid qr-image-sm" />
+                    <img src="{{ form.instance.qr_code.url }}" alt="{% trans 'QR Code' %}" class="img-fluid qr-image-sm" />
                 </div>
             </div>
             {% endif %}
-            <div class="col-12">{{ form.description.label_tag }}{{ form.description }}</div>
+            <div class="col-12">{{ form.description.label_tag }}{{ form.description }}{{ form.description.errors }}</div>
         </div>
         <div class="form-actions mt-3">
             <button class="btn btn-success">{% trans "Enregistrer" %}</button>

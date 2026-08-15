@@ -8,9 +8,11 @@ htmlcov/
 .mypy_cache/
 staticfiles/
 media/
+backups/
 logs/
 scripts/nssm/
 .DS_Store
 .vscode/
 *.sqlite3
 test_run_output.txt
+tmp/

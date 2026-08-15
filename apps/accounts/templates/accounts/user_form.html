@@ -1,0 +1,52 @@
+{% extends 'base/base.html' %}
+{% load i18n %}
+
+{% block title %}{% if is_create %}{% trans "Nouvel utilisateur" %}{% else %}{% trans "Modifier utilisateur" %}{% endif %}{% endblock %}
+{% block page_title %}{% if is_create %}{% trans "Nouvel utilisateur" %}{% else %}{% trans "Modifier utilisateur" %}{% endif %}{% endblock %}
+
+{% block content %}
+<form method="post" enctype="multipart/form-data" novalidate>{% csrf_token %}
+    <div class="card card-dashboard p-4 bg-white mb-4">
+        {{ form.non_field_errors }}
+        <div class="row g-3">
+            <div class="col-md-6">{{ form.first_name.label_tag }}{{ form.first_name }}{{ form.first_name.errors }}</div>
+            <div class="col-md-6">{{ form.last_name.label_tag }}{{ form.last_name }}{{ form.last_name.errors }}</div>
+            <div class="col-md-6">{{ form.username.label_tag }}{{ form.username }}{{ form.username.errors }}</div>
+            <div class="col-md-6">{{ form.email.label_tag }}{{ form.email }}{{ form.email.errors }}</div>
+            <div class="col-md-6">{{ form.phone.label_tag }}{{ form.phone }}{{ form.phone.errors }}</div>
+            <div class="col-md-6">{{ form.photo.label_tag }}{{ form.photo }}{{ form.photo.errors }}</div>
+            <div class="col-md-6">{{ form.assigned_role.label_tag }}{{ form.assigned_role }}{{ form.assigned_role.errors }}</div>
+            {% if form.password1 %}<div class="col-md-6">{{ form.password1.label_tag }}{{ form.password1 }}{{ form.password1.errors }}</div><div class="col-md-6">{{ form.password2.label_tag }}{{ form.password2 }}{{ form.password2.errors }}</div>{% endif %}
+            <div class="col-12 d-flex flex-wrap gap-4">
+                <div class="form-check">{{ form.is_active }}{{ form.is_active.label_tag }}</div>
+                <div class="form-check">{{ form.force_password_change }}{{ form.force_password_change.label_tag }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="card card-dashboard p-4 bg-white mb-4">
+        <h2 class="h5">{% trans "Permissions individuelles supplémentaires" %}</h2>
+        <p class="text-muted">{% trans "Elles s'ajoutent aux permissions héritées du rôle." %}</p>
+        {{ form.individual_permissions.errors }}
+        <div class="row g-3">
+        {% for section in permission_sections %}
+            <div class="col-sm-6 col-xl-4"><fieldset class="border rounded p-3 h-100"><legend class="float-none w-auto px-2 fs-6 fw-semibold">{{ section.module }}</legend>
+            {% for item in section.permissions %}<div class="form-check"><input class="form-check-input" type="checkbox" name="individual_permissions" value="{{ item.permission.pk }}" id="user-permission-{{ item.permission.pk }}" {% if item.checked %}checked{% endif %}><label class="form-check-label" for="user-permission-{{ item.permission.pk }}">{{ item.label }}</label></div>{% endfor %}
+            </fieldset></div>
+        {% endfor %}
+        </div>
+    </div>
+    <div class="card card-dashboard border-danger p-4 bg-white mb-4">
+        <h2 class="h5 text-danger">{% trans "Permissions individuelles refusées" %}</h2>
+        <p class="text-muted">{% trans "Un refus est prioritaire sur les permissions accordées par le rôle. Le superutilisateur n'est jamais limité par ces refus." %}</p>
+        {{ form.denied_permissions.errors }}
+        <div class="row g-3">
+        {% for section in denied_permission_sections %}
+            <div class="col-sm-6 col-xl-4"><fieldset class="border border-danger-subtle rounded p-3 h-100"><legend class="float-none w-auto px-2 fs-6 fw-semibold">{{ section.module }}</legend>
+            {% for item in section.permissions %}<div class="form-check"><input class="form-check-input" type="checkbox" name="denied_permissions" value="{{ item.permission.pk }}" id="denied-permission-{{ item.permission.pk }}" {% if item.checked %}checked{% endif %}><label class="form-check-label" for="denied-permission-{{ item.permission.pk }}">{{ item.label }}</label></div>{% endfor %}
+            </fieldset></div>
+        {% endfor %}
+        </div>
+    </div>
+    <div class="d-flex flex-wrap gap-2"><button class="btn btn-success" type="submit">{% trans "Enregistrer" %}</button><a class="btn btn-outline-secondary" href="{% url 'user_list' %}">{% trans "Annuler" %}</a></div>
+</form>
+{% endblock %}

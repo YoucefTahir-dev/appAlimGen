@@ -32,7 +32,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.13'
+          python-version: '3.12.8'
 
       - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y libpq-dev
@@ -40,7 +40,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install --require-hashes -r requirements.lock
 
       - name: Configure environment
         run: |
@@ -48,17 +48,30 @@ jobs:
           sed -i 's|^DATABASE_URL=.*|DATABASE_URL=postgresql://postgres:postgres@localhost:5432/test_db|' .env
           sed -i 's|^DJANGO_DEBUG=.*|DJANGO_DEBUG=False|' .env
           sed -i 's|^SECRET_KEY=.*|SECRET_KEY=ci-secret-key-for-tests-only-abcdefghijklmnopqrstuvwxyz-1234567890|' .env
+          sed -i 's|^MEDIA_FILESYSTEM_PERSISTENT=.*|MEDIA_FILESYSTEM_PERSISTENT=True|' .env
+          sed -i 's|^MEDIA_ROOT=.*|MEDIA_ROOT=/tmp/gestio-stock-media|' .env
 
       - name: Check pending migrations
         run: python manage.py makemigrations --check --dry-run
+
+      - name: Validate production settings
+        run: python manage.py check --deploy
+
+      - name: Validate static assets
+        run: python manage.py collectstatic --noinput
 
       - name: Run migrations
         run: python manage.py migrate --noinput
 
       - name: Run tests
         run: python manage.py test --verbosity=2
+        env:
+          SECURE_SSL_REDIRECT: "False"
+          SESSION_COOKIE_SECURE: "False"
+          CSRF_COOKIE_SECURE: "False"
+          ALLOWED_HOSTS: "localhost 127.0.0.1 testserver"
 
       - name: Audit dependencies
         run: |
           pip install pip-audit
-          python -m pip_audit -r requirements.txt
+          python -m pip_audit -r requirements.lock

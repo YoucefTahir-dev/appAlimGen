@@ -4,6 +4,7 @@ from django.urls import reverse
 
 from apps.commerce.models import Purchase, PurchaseLine, Sale, SaleLine
 from apps.inventory.models import Brand, Category, Client, Product, StockMovement, Supplier, Unit
+from apps.inventory.services import record_stock_movement
 
 
 class InventoryPermissionTests(TestCase):
@@ -34,7 +35,7 @@ class InventoryPermissionTests(TestCase):
         )
         self.client_obj = Client.objects.create(name='Client permission')
         self.supplier = Supplier.objects.create(name='Supplier permission')
-        self.movement = StockMovement.objects.create(
+        self.movement = record_stock_movement(
             product=self.product,
             movement_type=StockMovement.ENTRY,
             quantity=1,

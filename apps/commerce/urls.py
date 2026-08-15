@@ -11,6 +11,14 @@ from .views import (
     sale_invoice_pdf,
     sale_invoice_preview,
     sale_ticket_preview,
+    sale_payment_create,
+    sale_payment_delete,
+    sale_payment_list,
+    sale_payment_tracking_initialize,
+    purchase_payment_create,
+    purchase_payment_delete,
+    purchase_payment_list,
+    purchase_payment_tracking_initialize,
 )
 
 urlpatterns = [
@@ -21,8 +29,16 @@ urlpatterns = [
     path('sales/<int:pk>/preview/', sale_invoice_preview, name='sale_invoice_preview'),
     path('sales/<int:pk>/invoice/', sale_invoice_pdf, name='sale_invoice_pdf'),
     path('sales/<int:pk>/ticket/<str:width>/', sale_ticket_preview, name='sale_ticket_preview'),
+    path('sales/<int:pk>/payments/', sale_payment_list, name='sale_payment_list'),
+    path('sales/<int:pk>/payments/new/', sale_payment_create, name='sale_payment_create'),
+    path('sales/<int:pk>/payments/initialize/', sale_payment_tracking_initialize, name='sale_payment_tracking_initialize'),
+    path('sales/<int:sale_pk>/payments/<int:pk>/delete/', sale_payment_delete, name='sale_payment_delete'),
     path('purchases/', purchase_list, name='purchase_list'),
     path('purchases/new/', purchase_create, name='purchase_create'),
     path('purchases/<int:pk>/edit/', purchase_update, name='purchase_update'),
     path('purchases/<int:pk>/delete/', purchase_delete, name='purchase_delete'),
+    path('purchases/<int:pk>/payments/', purchase_payment_list, name='purchase_payment_list'),
+    path('purchases/<int:pk>/payments/new/', purchase_payment_create, name='purchase_payment_create'),
+    path('purchases/<int:pk>/payments/initialize/', purchase_payment_tracking_initialize, name='purchase_payment_tracking_initialize'),
+    path('purchases/<int:purchase_pk>/payments/<int:pk>/delete/', purchase_payment_delete, name='purchase_payment_delete'),
 ]

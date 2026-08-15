@@ -1,28 +1,35 @@
 {% extends 'base/base.html' %}
-{% load i18n %}
+{% load i18n access_tags %}
 
-{% block title %}{% trans "Fournisseur" %}s - El Amine ERP{% endblock %}
+{% block title %}{% trans "Fournisseurs" %} - El Amine ERP{% endblock %}
 
-{% block page_title %}{% trans "Fournisseur" %}s{% endblock %}
+{% block page_title %}{% trans "Fournisseurs" %}{% endblock %}
 
 {% block content %}
+{% has_access 'inventory.add_supplier' as can_add_supplier %}
+{% has_access 'inventory.change_supplier' as can_change_supplier %}
+{% has_access 'inventory.delete_supplier' as can_delete_supplier %}
 <div class="card card-dashboard p-4 bg-white">
     <div class="page-toolbar mb-3">
         <h5>{% trans "Liste des fournisseurs" %}</h5>
-        {% if can_manage %}
+        {% if can_add_supplier %}
             <a href="{% url 'supplier_create' %}" class="btn btn-success">{% trans "Ajouter fournisseur" %}</a>
         {% endif %}
     </div>
+    <form method="get" class="mb-3 search-form">
+        <input type="search" name="q" class="form-control" placeholder="{% trans 'Rechercher nom, téléphone, email, RC ou NIF...' %}" value="{{ request.GET.q }}">
+        <button type="submit" class="btn btn-primary">{% trans "Rechercher" %}</button>
+    </form>
     <div class="table-responsive">
         <table class="table table-hover align-middle">
             <thead>
                 <tr>
                     <th>{% trans "Nom" %}</th>
-                    <th>Téléphone</th>
+                    <th>{% trans "Téléphone" %}</th>
                     <th>{% trans "Wilaya" %}</th>
                     <th>{% trans "Email" %}</th>
                     <th>{% trans "RC" %}</th>
-                    {% if can_manage %}<th>{% trans "Actions" %}</th>{% endif %}
+                    {% if can_change_supplier or can_delete_supplier %}<th>{% trans "Actions" %}</th>{% endif %}
                 </tr>
             </thead>
             <tbody>
@@ -33,20 +40,21 @@
                         <td>{{ supplier.wilaya }}</td>
                         <td>{{ supplier.email }}</td>
                         <td>{{ supplier.rc_number }}</td>
-                        {% if can_manage %}
+                        {% if can_change_supplier or can_delete_supplier %}
                             <td>
                                 <div class="table-actions">
-                                    <a href="{% url 'supplier_update' supplier.pk %}" class="btn btn-sm btn-secondary">{% trans "Modifier" %}</a>
-                                    <a href="{% url 'supplier_delete' supplier.pk %}" class="btn btn-sm btn-danger">{% trans "Supprimer" %}</a>
+                                    {% if can_change_supplier %}<a href="{% url 'supplier_update' supplier.pk %}" class="btn btn-sm btn-secondary">{% trans "Modifier" %}</a>{% endif %}
+                                    {% if can_delete_supplier %}<a href="{% url 'supplier_delete' supplier.pk %}" class="btn btn-sm btn-danger">{% trans "Supprimer" %}</a>{% endif %}
                                 </div>
                             </td>
                         {% endif %}
                     </tr>
                 {% empty %}
-                    <tr><td colspan="{% if can_manage %}6{% else %}5{% endif %}" class="text-center">Aucun fournisseur enregistré.</td></tr>
+                    <tr><td colspan="{% if can_change_supplier or can_delete_supplier %}6{% else %}5{% endif %}" class="text-center">{% trans "Aucun fournisseur enregistré." %}</td></tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
+    {% include 'base/pagination.html' %}
 </div>
 {% endblock %}

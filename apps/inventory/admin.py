@@ -18,12 +18,44 @@ class ProductAdmin(admin.ModelAdmin):
     list_display = ('reference', 'barcode', 'name', 'category', 'brand', 'quantity', 'minimum_stock', 'sale_price')
     search_fields = ('reference', 'barcode', 'name')
     list_filter = ('category', 'brand')
-    readonly_fields = ('reference', 'barcode', 'qr_code', 'barcode_image')
+    readonly_fields = ('reference', 'barcode', 'quantity', 'qr_code', 'barcode_image')
 
 @admin.register(StockMovement)
 class StockMovementAdmin(admin.ModelAdmin):
-    list_display = ('product', 'movement_type', 'quantity', 'created_at')
-    list_filter = ('movement_type',)
+    list_display = (
+        'product',
+        'movement_type',
+        'quantity',
+        'applied_delta',
+        'balance_after',
+        'source_type',
+        'created_at',
+    )
+    list_filter = ('movement_type', 'source_type')
+    readonly_fields = (
+        'product',
+        'movement_type',
+        'quantity',
+        'reason',
+        'applied_delta',
+        'balance_before',
+        'balance_after',
+        'source_type',
+        'source_reference',
+        'created_by',
+        'reversal_of',
+        'created_at',
+    )
+    actions = None
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 @admin.register(Client)
 class ClientAdmin(admin.ModelAdmin):

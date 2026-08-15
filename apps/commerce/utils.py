@@ -23,6 +23,7 @@ from reportlab.platypus import (
 )
 
 from apps.core.models import CompanySettings
+from apps.core.export_security import pdf_safe_text
 
 
 COMPANY_NAME_FR = 'El Amine lil Mawad El Ghidhaiya wa Ghayr El Ghidhaiya'
@@ -113,8 +114,19 @@ def get_company_logo_path(company):
     if company and company.logo:
         try:
             return company.logo.path
-        except Exception:
-            pass
+        except (AttributeError, NotImplementedError, ValueError):
+            try:
+                company.logo.open('rb')
+                logo_buffer = io.BytesIO(company.logo.read())
+                logo_buffer.seek(0)
+                return logo_buffer
+            except (OSError, ValueError):
+                pass
+            finally:
+                try:
+                    company.logo.close()
+                except Exception:
+                    pass
     static_logo = finders.find('img/logo.png')
     return static_logo
 
@@ -193,16 +205,24 @@ def generate_invoice_pdf(response, sale):
             logo_cell = ''
 
     company_lines = [
-        Paragraph(f"<b>{context['company_name_fr']}</b>", styles['ERPTitle']),
-        Paragraph(format_arabic(context['company_name_ar']), styles['ERPArabic']),
-        Paragraph(f"Adresse : {company.address if company else ''}", styles['ERPSubTitle']),
-        Paragraph(f"Téléphone : {company.phone if company else ''} | Email : {company.email if company else ''}", styles['ERPSubTitle']),
-        Paragraph(f"RC : {company.rc_number if company else ''} | NIF : {company.tax_number if company else ''}", styles['ERPSubTitle']),
+        Paragraph(f"<b>{pdf_safe_text(context['company_name_fr'])}</b>", styles['ERPTitle']),
+        Paragraph(pdf_safe_text(format_arabic(context['company_name_ar'])), styles['ERPArabic']),
+        Paragraph(f"Adresse : {pdf_safe_text(company.address if company else '')}", styles['ERPSubTitle']),
+        Paragraph(
+            f"Téléphone : {pdf_safe_text(company.phone if company else '')} | "
+            f"Email : {pdf_safe_text(company.email if company else '')}",
+            styles['ERPSubTitle'],
+        ),
+        Paragraph(
+            f"RC : {pdf_safe_text(company.rc_number if company else '')} | "
+            f"NIF : {pdf_safe_text(company.tax_number if company else '')}",
+            styles['ERPSubTitle'],
+        ),
     ]
     invoice_box = Table(
         [
             [Paragraph('<b>FACTURE</b>', styles['ERPBoxTitle'])],
-            [Paragraph(f"<b>N° :</b> {sale.invoice_number}", styles['ERPSubTitle'])],
+            [Paragraph(f"<b>N° :</b> {pdf_safe_text(sale.invoice_number)}", styles['ERPSubTitle'])],
             [Paragraph(f"<b>Date :</b> {sale.created_at:%d/%m/%Y}", styles['ERPSubTitle'])],
             [Paragraph('<b>Statut :</b> Validée', styles['ERPSubTitle'])],
         ],
@@ -222,7 +242,10 @@ def generate_invoice_pdf(response, sale):
     client_table = Table(
         [[
             Paragraph(
-                f"<b>Client</b><br/>{client.name}<br/>Téléphone : {client.phone}<br/>Adresse : {client.address}<br/>NIF : {client.tax_number}",
+                f"<b>Client</b><br/>{pdf_safe_text(client.name)}"
+                f"<br/>Téléphone : {pdf_safe_text(client.phone)}"
+                f"<br/>Adresse : {pdf_safe_text(client.address)}"
+                f"<br/>NIF : {pdf_safe_text(client.tax_number)}",
                 styles['ERPSubTitle'],
             )
         ]],
@@ -239,7 +262,7 @@ def generate_invoice_pdf(response, sale):
     for index, line in enumerate(context['lines'], start=1):
         table_data.append([
             str(index),
-            Paragraph(line.product.name, styles['ERPSmall']),
+            Paragraph(pdf_safe_text(line.product.name), styles['ERPSmall']),
             str(line.quantity),
             money(line.unit_price),
             f"{context['tax_rate']}%",
@@ -289,7 +312,13 @@ def generate_invoice_pdf(response, sale):
         [[
             Paragraph('Signature et cachet<br/><br/>____________________________', styles['ERPSubTitle']),
             Image(qr_buffer, width=26 * mm, height=26 * mm),
-            Paragraph('Merci pour votre confiance.<br/>Téléphone : ' + (company.phone if company else '') + '<br/>Email : ' + (company.email if company else ''), styles['ERPSubTitle']),
+            Paragraph(
+                'Merci pour votre confiance.<br/>Téléphone : '
+                + pdf_safe_text(company.phone if company else '')
+                + '<br/>Email : '
+                + pdf_safe_text(company.email if company else ''),
+                styles['ERPSubTitle'],
+            ),
         ]],
         colWidths=[70 * mm, 30 * mm, 78 * mm],
     )

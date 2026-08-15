@@ -1,4 +1,5 @@
 from django import forms
+from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from apps.core.security import validate_excel_upload
 from .models import Product, Client, Supplier, StockMovement, Brand
@@ -37,11 +38,22 @@ class ProductForm(forms.ModelForm):
     def save(self, commit=True):
         brand_name = self.cleaned_data.get('brand_text', '').strip()
         if brand_name:
-            brand, _ = Brand.objects.get_or_create(name=brand_name)
-            self.instance.brand = brand
+            self.instance.brand = Brand.objects.resolve(brand_name)
         else:
             self.instance.brand = None
         return super().save(commit=commit)
+
+    def clean_purchase_price(self):
+        purchase_price = self.cleaned_data['purchase_price']
+        if purchase_price < 0:
+            raise ValidationError(_("Le prix d'achat ne peut pas être négatif."))
+        return purchase_price
+
+    def clean_sale_price(self):
+        sale_price = self.cleaned_data['sale_price']
+        if sale_price < 0:
+            raise ValidationError(_('Le prix de vente ne peut pas être négatif.'))
+        return sale_price
 
 class ClientForm(forms.ModelForm):
     class Meta:
@@ -77,10 +89,15 @@ class StockMovementForm(forms.ModelForm):
     class Meta:
         model = StockMovement
         fields = ['product', 'movement_type', 'quantity', 'reason']
+        help_texts = {
+            'quantity': _(
+                'Entrée/sortie : nombre d’unités. Ajustement : stock physique final compté.'
+            ),
+        }
         widgets = {
             'product': forms.Select(attrs={'class': 'form-select'}),
             'movement_type': forms.Select(attrs={'class': 'form-select'}),
-            'quantity': forms.NumberInput(attrs={'class': 'form-control'}),
+            'quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
             'reason': forms.TextInput(attrs={'class': 'form-control'}),
         }
 

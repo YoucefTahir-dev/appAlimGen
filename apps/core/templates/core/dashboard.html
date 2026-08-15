@@ -1,34 +1,46 @@
 {% extends 'base/base.html' %}
-{% load i18n %}
+{% load i18n access_tags %}
 
 {% block title %}{% trans "Tableau de bord" %} - El Amine ERP{% endblock %}
 
 {% block page_title %}{% trans "Tableau de bord décisionnel" %}{% endblock %}
 
 {% block content %}
+{% has_access 'accounts.view_reports' as can_view_reports %}
+{% has_access 'accounts.export_reports_pdf' as can_export_reports_pdf %}
+{% has_access 'accounts.export_reports_excel' as can_export_reports_excel %}
+{% if period_errors %}
+<div class="alert alert-danger" role="alert">
+    <strong>{% trans "La période demandée est invalide." %}</strong>
+    <ul class="mb-0 mt-2">
+        {% for error in period_errors %}<li>{{ error }}</li>{% endfor %}
+    </ul>
+</div>
+{% endif %}
 <form method="get" class="card card-dashboard p-3 p-lg-4 bg-white mb-4">
     <div class="row g-3 align-items-end">
         <div class="col-12 col-md-4 col-xl-3">
-            <label class="form-label">{% trans "Période" %}</label>
-            <select name="period" class="form-select" id="dashboardPeriod">
-                {% for value, label in period_options %}
-                    <option value="{{ value }}" {% if period == value %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-            </select>
+            {{ period_form.period.label_tag }}
+            {{ period_form.period }}
+            {{ period_form.period.errors }}
         </div>
         <div class="col-12 col-md-4 col-xl-3 custom-period-field">
-            <label class="form-label">{% trans "Date de début" %}</label>
-            <input type="date" name="start_date" class="form-control" value="{{ start_date|date:'Y-m-d' }}">
+            {{ period_form.start_date.label_tag }}
+            {{ period_form.start_date }}
+            {{ period_form.start_date.errors }}
         </div>
         <div class="col-12 col-md-4 col-xl-3 custom-period-field">
-            <label class="form-label">{% trans "Date de fin" %}</label>
-            <input type="date" name="end_date" class="form-control" value="{{ end_date|date:'Y-m-d' }}">
+            {{ period_form.end_date.label_tag }}
+            {{ period_form.end_date }}
+            {{ period_form.end_date.errors }}
         </div>
         <div class="col-12 col-xl-3">
             <div class="toolbar-actions justify-content-xl-end">
                 <button class="btn btn-primary" type="submit"><i class="bi bi-funnel me-2"></i>{% trans "Appliquer" %}</button>
-                <a class="btn btn-outline-danger" href="{% url 'dashboard_export_pdf' %}?{{ request.GET.urlencode }}"><i class="bi bi-file-earmark-pdf me-2"></i>{% trans "Export PDF" %}</a>
-                <a class="btn btn-outline-success" href="{% url 'dashboard_export_excel' %}?{{ request.GET.urlencode }}"><i class="bi bi-file-earmark-excel me-2"></i>{% trans "Export Excel" %}</a>
+                {% if period_is_valid %}
+                    {% if can_view_reports and can_export_reports_pdf %}<a class="btn btn-outline-danger" href="{% url 'dashboard_export_pdf' %}?{{ export_querystring }}"><i class="bi bi-file-earmark-pdf me-2"></i>{% trans "Export PDF" %}</a>{% endif %}
+                    {% if can_view_reports and can_export_reports_excel %}<a class="btn btn-outline-success" href="{% url 'dashboard_export_excel' %}?{{ export_querystring }}"><i class="bi bi-file-earmark-excel me-2"></i>{% trans "Export Excel" %}</a>{% endif %}
+                {% endif %}
             </div>
         </div>
     </div>
@@ -102,7 +114,7 @@
         </div>
     </div>
 
-    <div class="col-12 col-sm-6 col-xl-3"><div class="card card-dashboard dashboard-card p-4 bg-white"><h5>{% trans "Valeur du stock" %}</h5><p class="display-6 mb-0">{{ stock_value|floatformat:2 }} {% trans "DZD" %}</p></div></div>
+    <div class="col-12 col-sm-6 col-xl-3"><div class="card card-dashboard dashboard-card p-4 bg-white"><h5>{% trans "Valeur du stock (instantané actuel)" %}</h5><p class="display-6 mb-0">{{ stock_value|floatformat:2 }} {% trans "DZD" %}</p></div></div>
     <div class="col-12 col-sm-6 col-xl-3"><div class="card card-dashboard dashboard-card p-4 bg-white"><h5>{% trans "Nombre de produits" %}</h5><p class="display-6 mb-0">{{ total_products }}</p></div></div>
     <div class="col-12 col-sm-6 col-xl-3"><div class="card card-dashboard dashboard-card p-4 bg-white"><h5>{% trans "Nombre de clients" %}</h5><p class="display-6 mb-0">{{ total_clients }}</p></div></div>
     <div class="col-12 col-sm-6 col-xl-3"><div class="card card-dashboard dashboard-card p-4 bg-white"><h5>{% trans "Nombre de fournisseurs" %}</h5><p class="display-6 mb-0">{{ total_suppliers }}</p></div></div>
@@ -181,7 +193,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const customFields = document.querySelectorAll('.custom-period-field');
     const updateCustomFields = () => {
         const isCustom = periodSelect && periodSelect.value === 'custom';
-        customFields.forEach((field) => field.classList.toggle('d-none', !isCustom));
+        customFields.forEach((field) => {
+            field.classList.toggle('d-none', !isCustom);
+            const input = field.querySelector('input');
+            if (input) input.required = isCustom;
+        });
     };
     updateCustomFields();
     if (periodSelect) {
