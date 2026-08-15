@@ -304,7 +304,7 @@ class DashboardTests(TestCase):
 
         self.assertEqual(excel_response.status_code, 200)
         workbook = openpyxl.load_workbook(io.BytesIO(excel_response.content))
-        dashboard_sheet = workbook['Dashboard']
+        dashboard_sheet = workbook['Tableau de bord']
         self.assertEqual(dashboard_sheet.cell(row=1, column=2).value, selected_day.isoformat())
         self.assertEqual(dashboard_sheet.cell(row=1, column=3).value, selected_day.isoformat())
         exported_indicators = {
