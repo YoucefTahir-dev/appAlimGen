@@ -59,6 +59,14 @@ def product_create(request):
                 form.add_error('quantity', error)
         else:
             messages.success(request, _('Produit ajouté avec succès.'))
+            if getattr(product, '_generated_media_errors', None):
+                messages.warning(
+                    request,
+                    _(
+                        'Le produit a été créé, mais ses images QR/code-barres '
+                        'n’ont pas pu être stockées. Vérifiez le stockage média.'
+                    ),
+                )
             return redirect('product_list')
     return render(request, 'inventory/product_form.html', {'form': form, 'title': _('Ajouter un produit')})
 
