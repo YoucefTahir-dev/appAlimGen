@@ -94,8 +94,10 @@ jamais les trois tarifs dans la ressource Produit.
 - Démarrage Django et route `/healthz/` : validés (`HTTP 200`).
 - Schéma OpenAPI : généré et validé.
 - Dérive de migration : aucune.
-- Validation PostgreSQL CI : à confirmer après push de la branche.
+- Validation PostgreSQL 16 CI : réussie (migrations, paramètres production,
+  statiques, compilation, OpenAPI, 206 tests et audit des dépendances).
+- Exécution : https://github.com/YoucefTahir-dev/appAlimGen/actions/runs/33780898345
 - Neon production : non modifiée.
 
-🟡 **VALIDÉE AVEC RÉSERVES** — validation PostgreSQL/CI et recette staging
-requises avant toute fusion dans `main`.
+🟡 **VALIDÉE AVEC RÉSERVES** — la recette fonctionnelle sur Neon staging
+reste requise avant toute fusion dans `main`.
