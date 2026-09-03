@@ -21,6 +21,7 @@
                 return;
             }
             const productSelect = row.querySelector('select[name$="-product"]');
+            const packagingSelect = row.querySelector('select[name$="-packaging"]');
             const priceInput = row.querySelector('input[name$="-unit_price"]');
             if (!productSelect || !productSelect.value || !priceInput) {
                 return;
@@ -31,6 +32,9 @@
                 client_id: clientSelect.value,
                 product_id: productSelect.value,
             });
+            if (packagingSelect && packagingSelect.value) {
+                query.set('packaging_id', packagingSelect.value);
+            }
             try {
                 const response = await fetch(`${priceUrl}?${query.toString()}`, {
                     headers: {'Accept': 'application/json'},
@@ -67,6 +71,13 @@
             if (productSelect && productSelect.dataset.pricingBound !== 'true') {
                 productSelect.dataset.pricingBound = 'true';
                 productSelect.addEventListener('change', function () {
+                    updateRowPrice(row);
+                });
+            }
+            const packagingSelect = row.querySelector('select[name$="-packaging"]');
+            if (packagingSelect && packagingSelect.dataset.pricingBound !== 'true') {
+                packagingSelect.dataset.pricingBound = 'true';
+                packagingSelect.addEventListener('change', function () {
                     updateRowPrice(row);
                 });
             }

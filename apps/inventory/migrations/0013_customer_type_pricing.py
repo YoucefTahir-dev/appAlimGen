@@ -3,6 +3,18 @@
 from django.db import migrations, models
 
 
+def validate_existing_prices(apps, schema_editor):
+    Product = apps.get_model('inventory', 'Product')
+    invalid_count = Product.objects.filter(
+        sale_price__lt=models.F('purchase_price')
+    ).count()
+    if invalid_count:
+        raise RuntimeError(
+            f'Migration tarifs interrompue : {invalid_count} produit(s) ont un '
+            'prix de vente inférieur au prix d\'achat.'
+        )
+
+
 def copy_existing_retail_prices(apps, schema_editor):
     Product = apps.get_model('inventory', 'Product')
     Product.objects.all().update(
@@ -60,6 +72,7 @@ class Migration(migrations.Migration):
             name='wholesale_price',
             field=models.DecimalField(decimal_places=2, default=0, max_digits=12, verbose_name='Prix Gros'),
         ),
+        migrations.RunPython(validate_existing_prices, migrations.RunPython.noop),
         migrations.RunPython(copy_existing_retail_prices, migrations.RunPython.noop),
         migrations.AddConstraint(
             model_name='product',

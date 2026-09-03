@@ -7,7 +7,7 @@ from django.urls import reverse
 from openpyxl import load_workbook
 
 from apps.inventory.forms import ClientForm, ProductForm
-from apps.inventory.models import Brand, Category, Client, Product, Unit
+from apps.inventory.models import Brand, Category, Client, Product, ProductPackaging, Unit
 from apps.inventory.pricing import get_sale_price
 
 
@@ -96,11 +96,57 @@ class CustomerPricingTests(TestCase):
         self.assertFalse(form.is_valid())
         self.assertIn('customer_type', form.errors)
 
+    def test_client_detail_displays_customer_type_without_email(self):
+        User = get_user_model()
+        manager = User.objects.create_user(
+            username='client-detail-manager', password='StrongPass123!', role=User.MANAGER
+        )
+        customer = Client.objects.create(
+            name='Client fiche gros',
+            customer_type=Client.CustomerType.WHOLESALE,
+            email='hidden@example.com',
+        )
+        self.client.force_login(manager)
+
+        response = self.client.get(reverse('client_detail', args=[customer.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Client fiche gros')
+        self.assertContains(response, 'Gros')
+        self.assertNotContains(response, 'hidden@example.com')
+
     def test_seller_price_endpoint_returns_only_applicable_price(self):
         User = get_user_model()
         seller = User.objects.create_user(
             username='pricing-seller', password='StrongPass123!', role=User.SELLER
         )
+
+    def test_web_price_endpoint_applies_packaging_factor(self):
+        User = get_user_model()
+        seller = User.objects.create_user(
+            username='packaging-pricing-seller',
+            password='StrongPass123!',
+            role=User.SELLER,
+        )
+        customer = Client.objects.create(
+            name='Client carton gros', customer_type=Client.CustomerType.WHOLESALE
+        )
+        packaging = ProductPackaging.objects.create(
+            product=self.product,
+            name='Carton de 6',
+            conversion_factor=6,
+            default_sale_price='720.00',
+        )
+        self.client.force_login(seller)
+
+        response = self.client.get(reverse('sale_price_lookup'), {
+            'product_id': self.product.pk,
+            'client_id': customer.pk,
+            'packaging_id': packaging.pk,
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['price'], '720.00')
         customer = Client.objects.create(
             name='Client gros', customer_type=Client.CustomerType.WHOLESALE
         )

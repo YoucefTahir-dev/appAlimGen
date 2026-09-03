@@ -356,6 +356,18 @@ def client_create(request):
         return redirect('client_list')
     return render(request, 'inventory/client_form.html', {'form': form, 'title': _('Ajouter un client')})
 
+
+@manager_required
+def client_detail(request, pk):
+    client_obj = get_object_or_404(Client, pk=pk)
+    sales = client_obj.sales.prefetch_related('lines__product').order_by('-created_at', '-pk')[:50]
+    return render(
+        request,
+        'inventory/client_detail.html',
+        {'client_obj': client_obj, 'sales': sales},
+    )
+
+
 @manager_required
 def client_update(request, pk):
     client_obj = get_object_or_404(Client, pk=pk)

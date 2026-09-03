@@ -51,3 +51,18 @@ msgstr "Les tarifs doivent respecter l’ordre : Super Gros ≤ Gros ≤ Détail
 
 msgid "Produit et client obligatoires."
 msgstr "Produit et client obligatoires."
+
+msgid "Fiche client"
+msgstr "Fiche client"
+
+msgid "Historique des ventes"
+msgstr "Historique des ventes"
+
+msgid "Le prix Détail est obligatoire."
+msgstr "Le prix Détail est obligatoire."
+
+msgid "Le client est obligatoire."
+msgstr "Le client est obligatoire."
+
+msgid "Client invalide."
+msgstr "Client invalide."

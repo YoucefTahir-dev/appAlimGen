@@ -1,0 +1,47 @@
+{% extends 'base/base.html' %}
+{% load i18n access_tags %}
+
+{% block title %}{{ client_obj.name }} - El Amine ERP{% endblock %}
+{% block page_title %}{% trans "Fiche client" %}{% endblock %}
+
+{% block content %}
+{% has_access 'inventory.change_client' as can_change_client %}
+<div class="card card-dashboard p-4 bg-white mb-4">
+    <div class="page-toolbar mb-3">
+        <h2 class="h4 mb-0">{{ client_obj.name }}</h2>
+        {% if can_change_client %}
+            <a class="btn btn-outline-primary" href="{% url 'client_update' client_obj.pk %}">{% trans "Modifier" %}</a>
+        {% endif %}
+    </div>
+    <div class="row g-3">
+        <div class="col-12 col-md-6"><strong>{% trans "Type de client" %} :</strong> {{ client_obj.get_customer_type_display }}</div>
+        <div class="col-12 col-md-6"><strong>{% trans "Téléphone" %} :</strong> {{ client_obj.phone|default:"-" }}</div>
+        <div class="col-12 col-md-6"><strong>{% trans "Adresse" %} :</strong> {{ client_obj.address|default:"-" }}</div>
+        <div class="col-12 col-md-6"><strong>{% trans "Wilaya" %} :</strong> {{ client_obj.wilaya|default:"-" }}</div>
+        <div class="col-12 col-md-6"><strong>{% trans "NIF" %} :</strong> {{ client_obj.tax_number|default:"-" }}</div>
+        <div class="col-12 col-md-6"><strong>{% trans "Solde" %} :</strong> {{ client_obj.balance|floatformat:2 }} DZD</div>
+        {% if client_obj.notes %}<div class="col-12"><strong>{% trans "Notes" %} :</strong> {{ client_obj.notes|linebreaksbr }}</div>{% endif %}
+    </div>
+</div>
+
+<div class="card card-dashboard p-4 bg-white">
+    <h3 class="h5">{% trans "Historique des ventes" %}</h3>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead><tr><th>{% trans "Facture" %}</th><th>{% trans "Date" %}</th><th>{% trans "Total" %}</th></tr></thead>
+            <tbody>
+            {% for sale in sales %}
+                <tr>
+                    <td>{{ sale.invoice_number }}</td>
+                    <td>{{ sale.created_at|date:"SHORT_DATETIME_FORMAT" }}</td>
+                    <td>{{ sale.total|floatformat:2 }} DZD</td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="3" class="text-center">{% trans "Aucune vente enregistrée." %}</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <a class="btn btn-secondary align-self-start" href="{% url 'client_list' %}">{% trans "Retour" %}</a>
+</div>
+{% endblock %}

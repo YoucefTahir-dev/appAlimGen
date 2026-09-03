@@ -13,7 +13,7 @@ from django.utils.translation import gettext as _
 
 from apps.accounts.permissions import manager_required, permission_required, seller_required
 from apps.core.pagination import paginate_queryset
-from apps.inventory.models import Client, Product
+from apps.inventory.models import Client, Product, ProductPackaging
 from apps.inventory.pricing import get_sale_price
 
 from .forms import PaymentForm, PurchaseForm, PurchaseLineFormSet, SaleForm, SaleLineFormSet
@@ -161,7 +161,16 @@ def sale_price_lookup(request):
         return JsonResponse({'error': _('Produit et client obligatoires.')}, status=400)
     product = get_object_or_404(Product, pk=product_id)
     customer = get_object_or_404(Client, pk=client_id)
-    price = get_sale_price(product, customer)
+    packaging = None
+    packaging_id = request.GET.get('packaging_id')
+    if packaging_id:
+        packaging = get_object_or_404(
+            ProductPackaging,
+            pk=packaging_id,
+            product=product,
+            is_active=True,
+        )
+    price = get_sale_price(product, customer, packaging)
     return JsonResponse(
         {
             'customer_type': customer.customer_type,

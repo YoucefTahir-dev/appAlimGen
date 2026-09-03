@@ -6,6 +6,7 @@ from django.utils import timezone
 from django.utils.translation import gettext as _
 
 from apps.inventory.models import Product, ProductPackaging
+from apps.inventory.pricing import get_sale_price
 
 from .models import InvoiceSequence, Payment, Purchase, PurchaseLine, Sale, SaleLine, TicketSequence
 
@@ -99,9 +100,10 @@ def create_sale(*, client, lines, discount=0, tax_rate=0, payment_type=Sale.CASH
         if packaging_quantity <= 0:
             raise ValidationError({'quantity': _('La quantité doit être strictement positive.')})
         factor = packaging.conversion_factor if packaging else 1
+        tariff_price = get_sale_price(product, client, packaging)
         package_price = raw_line.get('unit_price')
         if package_price is None:
-            package_price = packaging.default_sale_price if packaging else product.sale_price
+            package_price = tariff_price
         package_price = money(package_price)
         stock_quantity = packaging_quantity * factor
         requested[product.pk] = requested.get(product.pk, 0) + stock_quantity

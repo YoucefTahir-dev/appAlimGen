@@ -45,6 +45,12 @@ class MobileApiTests(APITestCase):
             purchase_price=Decimal('50.00'), sale_price=Decimal('80.00'),
             quantity=0, minimum_stock=2,
         )
+        cls.product.super_wholesale_price = Decimal('60.00')
+        cls.product.wholesale_price = Decimal('70.00')
+        cls.product.retail_price = Decimal('80.00')
+        cls.product.save(update_fields=(
+            'super_wholesale_price', 'wholesale_price', 'retail_price',
+        ))
         from apps.inventory.services import record_stock_movement
 
         record_stock_movement(
@@ -134,6 +140,9 @@ class MobileApiTests(APITestCase):
         payload = barcode.data.get('data', barcode.data)
         self.assertEqual(payload['reference'], self.product.reference)
         self.assertIn('purchase_price', payload)
+        self.assertEqual(payload['super_wholesale_price'], '60.00')
+        self.assertEqual(payload['wholesale_price'], '70.00')
+        self.assertEqual(payload['retail_price'], '80.00')
 
     def test_product_creation_journals_initial_stock(self):
         self.authenticate()
@@ -148,6 +157,109 @@ class MobileApiTests(APITestCase):
         self.assertEqual(product.quantity, 8)
         movement = product.movements.get(source_type=StockMovement.SOURCE_PRODUCT)
         self.assertEqual(movement.balance_after, 8)
+
+    def test_product_creation_accepts_three_prices_without_legacy_price(self):
+        self.authenticate()
+        response = self.client.post(reverse('api-product-list'), {
+            'name': 'Produit trois tarifs API',
+            'category': self.category.pk,
+            'brand': self.brand.pk,
+            'unit': self.unit.pk,
+            'purchase_price': '20.00',
+            'super_wholesale_price': '22.00',
+            'wholesale_price': '24.00',
+            'retail_price': '27.00',
+            'quantity': 0,
+            'minimum_stock': 2,
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        product = Product.objects.get(name='Produit trois tarifs API')
+        self.assertEqual(product.sale_price, Decimal('27.00'))
+
+    def test_product_prices_are_hidden_without_sensitive_permission(self):
+        seller = User.objects.create_user(
+            username='api-pricing-seller', password=self.password, role=User.SELLER
+        )
+        self.authenticate(seller)
+
+        response = self.client.get(reverse('api-product-detail', args=[self.product.pk]))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        payload = response.data.get('data', response.data)
+        for field_name in (
+            'purchase_price', 'sale_price', 'super_wholesale_price',
+            'wholesale_price', 'retail_price',
+        ):
+            self.assertNotIn(field_name, payload)
+
+    def test_price_endpoint_uses_customer_type_and_packaging_factor(self):
+        wholesale = Client.objects.create(
+            name='Client gros API', customer_type=Client.CustomerType.WHOLESALE
+        )
+        packaging = ProductPackaging.objects.create(
+            product=self.product,
+            name='Carton tarif API',
+            conversion_factor=6,
+            default_sale_price='480.00',
+            is_active=True,
+        )
+        self.authenticate()
+
+        response = self.client.get(
+            reverse('api-product-price', args=[self.product.pk]),
+            {'client_id': wholesale.pk, 'packaging_id': packaging.pk},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        payload = response.data.get('data', response.data)
+        self.assertEqual(payload['customer_type'], Client.CustomerType.WHOLESALE)
+        self.assertEqual(payload['price'], '420.00')
+
+    def test_api_sale_uses_server_tariff_when_price_is_omitted(self):
+        wholesale = Client.objects.create(
+            name='Client gros vente API', customer_type=Client.CustomerType.WHOLESALE
+        )
+        self.authenticate()
+
+        response = self.client.post(reverse('api-sale-list'), {
+            'client': wholesale.pk,
+            'discount': '0.00',
+            'tax_rate': '0.00',
+            'payment_type': 'cash',
+            'items': [{'product': self.product.pk, 'quantity': 2}],
+        }, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        sale = Sale.objects.get()
+        self.assertEqual(sale.lines.get().unit_price, Decimal('70.00'))
+        self.assertEqual(sale.total, Decimal('140.00'))
+
+    def test_api_accepts_manual_price_above_cost_but_below_tariff(self):
+        wholesale = Client.objects.create(
+            name='Client gros remise API', customer_type=Client.CustomerType.WHOLESALE
+        )
+        self.authenticate()
+
+        response = self.client.post(reverse('api-sale-list'), {
+            'client': wholesale.pk,
+            'discount': '0.00',
+            'tax_rate': '0.00',
+            'payment_type': 'cash',
+            'items': [
+                {'product': self.product.pk, 'quantity': 1, 'unit_price': '55.00'}
+            ],
+        }, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(Sale.objects.get().lines.get().unit_price, Decimal('55.00'))
+
+    def test_client_api_rejects_unknown_customer_type(self):
+        self.authenticate()
+        response = self.client.post(reverse('api-client-list'), {
+            'name': 'Client type invalide API',
+            'customer_type': 'UNKNOWN',
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
 
     def test_valid_sale_is_atomic_numbered_and_updates_stock(self):
         self.authenticate()

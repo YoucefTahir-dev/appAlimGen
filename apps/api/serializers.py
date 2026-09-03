@@ -17,6 +17,7 @@ from apps.inventory.models import (
     Unit,
 )
 from apps.inventory.services import record_stock_movement
+from apps.inventory.pricing import validate_product_prices
 from apps.printing.models import PrinterProfile, PrintProfile, UserPrinterPreference
 
 from .exceptions import BusinessAPIException
@@ -55,7 +56,8 @@ class ProductPackagingSerializer(serializers.ModelSerializer):
     def get_fields(self):
         fields = super().get_fields()
         request = self.context.get('request')
-        if request and not has_permission(request.user, 'inventory.change_product'):
+        if request and not has_permission(request.user, 'inventory.view_product_pricing'):
+            fields.pop('default_sale_price', None)
             fields.pop('minimum_sale_price', None)
         return fields
 
@@ -82,17 +84,71 @@ class ProductSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'reference', 'barcode', 'name', 'category', 'category_name',
             'brand', 'brand_name', 'unit', 'unit_name', 'purchase_price',
-            'sale_price', 'quantity', 'minimum_stock', 'description', 'photo',
+            'sale_price', 'super_wholesale_price', 'wholesale_price', 'retail_price',
+            'quantity', 'minimum_stock', 'description', 'photo',
             'qr_code', 'barcode_image', 'stock_status', 'conditionnements', 'created_at',
         )
         read_only_fields = ('reference', 'barcode', 'qr_code', 'barcode_image', 'created_at')
+        extra_kwargs = {'sale_price': {'required': False}}
 
     def get_fields(self):
         fields = super().get_fields()
         request = self.context.get('request')
-        if request and not has_permission(request.user, 'inventory.change_product'):
+        if request and not has_permission(request.user, 'inventory.view_product_pricing'):
             fields.pop('purchase_price', None)
+            fields.pop('sale_price', None)
+            fields.pop('super_wholesale_price', None)
+            fields.pop('wholesale_price', None)
+            fields.pop('retail_price', None)
         return fields
+
+    def validate(self, attrs):
+        current = self.instance
+        legacy_price = attrs.get(
+            'sale_price',
+            getattr(current, 'sale_price', None),
+        )
+        retail_price = attrs.get(
+            'retail_price',
+            legacy_price if current is None else getattr(current, 'retail_price', legacy_price),
+        )
+        if retail_price is None:
+            raise serializers.ValidationError({'retail_price': _('Le prix Détail est obligatoire.')})
+        attrs.setdefault('retail_price', retail_price)
+        attrs.setdefault(
+            'wholesale_price',
+            (
+                legacy_price if legacy_price is not None else retail_price
+            ) if current is None else getattr(current, 'wholesale_price', retail_price),
+        )
+        attrs.setdefault(
+            'super_wholesale_price',
+            (
+                legacy_price if legacy_price is not None else retail_price
+            ) if current is None else getattr(current, 'super_wholesale_price', retail_price),
+        )
+        attrs['sale_price'] = attrs['retail_price']
+
+        candidate = Product(
+            purchase_price=attrs.get(
+                'purchase_price', getattr(current, 'purchase_price', None)
+            ),
+            super_wholesale_price=attrs['super_wholesale_price'],
+            wholesale_price=attrs['wholesale_price'],
+            retail_price=attrs['retail_price'],
+            sale_price=attrs['retail_price'],
+        )
+        try:
+            validate_product_prices(candidate)
+        except Exception as exc:
+            from django.core.exceptions import ValidationError as DjangoValidationError
+
+            if not isinstance(exc, DjangoValidationError):
+                raise
+            raise serializers.ValidationError(
+                exc.message_dict if hasattr(exc, 'message_dict') else exc.messages
+            ) from exc
+        return attrs
 
     def get_stock_status(self, product) -> str:
         if product.quantity == 0:
@@ -158,7 +214,7 @@ class SupplierSerializer(serializers.ModelSerializer):
 class ProductSummarySerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
-        fields = ('id', 'reference', 'barcode', 'name', 'sale_price')
+        fields = ('id', 'reference', 'barcode', 'name')
 
 
 class SaleLineReadSerializer(serializers.ModelSerializer):

@@ -14,14 +14,18 @@ PRICE_FIELD_BY_CUSTOMER_TYPE = {
 def get_sale_price(product, customer=None, packaging=None):
     """Return the authoritative tariff for a product/customer pair.
 
-    ``packaging`` is reserved for a future packaging model. Production stock is
-    currently managed in base units only, so no conversion is applied here.
+    When a packaging is supplied, prices follow the base-unit tariff and are
+    multiplied by its conversion factor. This keeps one authoritative pricing
+    rule for Web, Android and future desktop clients.
     """
     customer_type = getattr(customer, 'customer_type', 'RETAIL') or 'RETAIL'
     field_name = PRICE_FIELD_BY_CUSTOMER_TYPE.get(customer_type, 'retail_price')
     price = getattr(product, field_name, None)
     selected_price = product.sale_price if price is None else price
-    return Decimal(str(selected_price))
+    selected_price = Decimal(str(selected_price))
+    if packaging is not None:
+        selected_price *= int(packaging.conversion_factor)
+    return selected_price
 
 
 def validate_product_prices(product):

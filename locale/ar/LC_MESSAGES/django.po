@@ -1026,3 +1026,18 @@ msgstr "يجب أن تتبع الأسعار الترتيب: الجملة الك�
 
 msgid "Produit et client obligatoires."
 msgstr "المنتج والعميل مطلوبان."
+
+msgid "Fiche client"
+msgstr "بطاقة العميل"
+
+msgid "Historique des ventes"
+msgstr "سجل المبيعات"
+
+msgid "Le prix Détail est obligatoire."
+msgstr "سعر التجزئة إلزامي."
+
+msgid "Le client est obligatoire."
+msgstr "العميل مطلوب."
+
+msgid "Client invalide."
+msgstr "عميل غير صالح."

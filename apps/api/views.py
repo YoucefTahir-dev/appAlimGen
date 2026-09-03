@@ -17,6 +17,7 @@ from apps.core.dashboard import DashboardPeriodError, dashboard_context
 from apps.core.security import log_security_event
 from apps.expenses.models import Expense, ExpenseCategory
 from apps.inventory.models import Brand, Category, Client, Product, ProductPackaging, StockMovement, Supplier, Unit
+from apps.inventory.pricing import get_sale_price
 from apps.printing.models import PrinterProfile, PrintProfile
 from apps.printing.services import encode_payload, invoice_print_data, printer_test_payload, select_printer_for_user
 
@@ -74,6 +75,7 @@ class ProductViewSet(AuditMutationMixin, viewsets.ModelViewSet):
     required_permissions = {
         'list': 'inventory.view_product', 'retrieve': 'inventory.view_product',
         'barcode': 'inventory.view_product', 'qr': 'inventory.view_product',
+        'price': 'inventory.view_product',
         'create': 'inventory.add_product', 'update': 'inventory.change_product',
         'partial_update': 'inventory.change_product', 'destroy': 'inventory.delete_product',
     }
@@ -97,6 +99,35 @@ class ProductViewSet(AuditMutationMixin, viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
         return Response(self.get_serializer(product).data)
+
+    @action(detail=True, methods=('get',), url_path='price')
+    def price(self, request, pk=None):
+        product = self.get_object()
+        client_id = request.query_params.get('client_id')
+        if not client_id:
+            raise ValidationError({'client_id': _('Le client est obligatoire.')})
+        try:
+            customer = Client.objects.get(pk=client_id)
+        except (Client.DoesNotExist, TypeError, ValueError) as exc:
+            raise ValidationError({'client_id': _('Client invalide.')}) from exc
+
+        packaging = None
+        packaging_id = request.query_params.get('packaging_id')
+        if packaging_id:
+            try:
+                packaging = ProductPackaging.objects.get(
+                    pk=packaging_id,
+                    product=product,
+                    is_active=True,
+                )
+            except (ProductPackaging.DoesNotExist, TypeError, ValueError) as exc:
+                raise ValidationError({'packaging_id': _('Conditionnement invalide ou inactif.')}) from exc
+        price = get_sale_price(product, customer, packaging)
+        return Response({
+            'customer_type': customer.customer_type,
+            'customer_type_label': customer.get_customer_type_display(),
+            'price': f'{price:.2f}',
+        })
 
 
 class ProductPackagingViewSet(AuditMutationMixin, viewsets.ModelViewSet):
