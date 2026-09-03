@@ -202,9 +202,9 @@
                 <tr>
                     <td>
                         <div class="product-name">{{ line.product.name }}</div>
-                        <div class="small muted">{% trans "Conditionnement" %} : Unité</div>
+                        <div class="small muted">{% trans "Conditionnement" %} : {{ line.packaging_name }}</div>
                     </td>
-                    <td class="num">{{ line.quantity }}</td>
+                    <td class="num">{{ line.packaging_quantity }}</td>
                     <td class="num">{{ line.unit_price|floatformat:2 }}</td>
                     <td class="num">{{ line.line_total|floatformat:2 }}</td>
                 </tr>

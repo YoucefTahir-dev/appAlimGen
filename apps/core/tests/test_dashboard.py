@@ -79,7 +79,17 @@ class DashboardTests(TestCase):
 
     def test_historical_profit_uses_the_sale_cost_snapshot(self):
         self.product.purchase_price = Decimal('90.00')
-        self.product.save(update_fields=['purchase_price'])
+        self.product.super_wholesale_price = Decimal('100.00')
+        self.product.wholesale_price = Decimal('100.00')
+        self.product.retail_price = Decimal('100.00')
+        self.product.save(
+            update_fields=[
+                'purchase_price',
+                'super_wholesale_price',
+                'wholesale_price',
+                'retail_price',
+            ]
+        )
 
         response = self.client.get(reverse('dashboard'), {'period': 'today'})
 

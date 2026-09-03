@@ -9,6 +9,7 @@
 {% has_access 'inventory.add_product' as can_add_product %}
 {% has_access 'inventory.change_product' as can_change_product %}
 {% has_access 'inventory.delete_product' as can_delete_product %}
+{% has_access 'inventory.view_product_pricing' as can_view_product_pricing %}
 <div class="card card-dashboard p-4 bg-white">
     <div class="page-toolbar mb-3">
         <h5>{% trans "Liste des produits" %}</h5>
@@ -30,7 +31,11 @@
                     <th>{% trans "Nom" %}</th>
                     <th>{% trans "Catégorie" %}</th>
                     <th>{% trans "Marque" %}</th>
-                    <th>{% trans "Prix vente" %}</th>
+                    {% if can_view_product_pricing %}
+                        <th>{% trans "Prix Super Gros" %}</th>
+                        <th>{% trans "Prix Gros" %}</th>
+                    {% endif %}
+                    <th>{% trans "Prix Détail" %}</th>
                     <th>{% trans "Stock" %}</th>
                     <th>{% trans "Seuil" %}</th>
                     {% if can_change_product or can_delete_product %}<th>{% trans "Actions" %}</th>{% endif %}
@@ -43,7 +48,11 @@
                         <td>{{ product.name }}</td>
                         <td>{{ product.category }}</td>
                         <td>{{ product.brand }}</td>
-                        <td>{{ product.sale_price|floatformat:2 }} {% trans "DZD" %}</td>
+                        {% if can_view_product_pricing %}
+                            <td>{{ product.super_wholesale_price|floatformat:2 }} {% trans "DZD" %}</td>
+                            <td>{{ product.wholesale_price|floatformat:2 }} {% trans "DZD" %}</td>
+                        {% endif %}
+                        <td>{{ product.retail_price|floatformat:2 }} {% trans "DZD" %}</td>
                         <td>{{ product.quantity }}</td>
                         <td>{{ product.minimum_stock }}</td>
                         {% if can_change_product or can_delete_product %}
@@ -57,7 +66,7 @@
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="{% if can_change_product or can_delete_product %}8{% else %}7{% endif %}" class="text-center">{% trans "Aucun produit trouvé." %}</td>
+                        <td colspan="10" class="text-center">{% trans "Aucun produit trouvé." %}</td>
                     </tr>
                 {% endfor %}
             </tbody>

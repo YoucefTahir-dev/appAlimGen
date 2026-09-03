@@ -11,7 +11,14 @@ from django.shortcuts import render, get_object_or_404, redirect
 from apps.accounts.permissions import manager_required, seller_required
 from apps.core.export_security import excel_safe_text
 from apps.core.pagination import paginate_queryset
-from .forms import ProductForm, ClientForm, SupplierForm, StockMovementForm, ImportExcelForm
+from .forms import (
+    ClientForm,
+    ImportExcelForm,
+    ProductForm,
+    ProductPackagingFormSet,
+    StockMovementForm,
+    SupplierForm,
+)
 from .models import Brand, Category, Client, Product, StockMovement, Supplier, Unit
 from .services import record_stock_movement, reverse_stock_movement
 from django.http import FileResponse
@@ -37,13 +44,18 @@ def product_list(request):
 @manager_required
 def product_create(request):
     form = ProductForm(request.POST or None, request.FILES or None)
-    if form.is_valid():
+    packaging_data = request.POST if 'packagings-TOTAL_FORMS' in request.POST else None
+    packaging_formset = ProductPackagingFormSet(packaging_data, prefix='packagings')
+    if form.is_valid() and (not packaging_formset.is_bound or packaging_formset.is_valid()):
         try:
             with transaction.atomic():
                 initial_quantity = form.cleaned_data['quantity']
                 product = form.save(commit=False)
                 product.quantity = 0
                 product.save()
+                if packaging_formset.is_bound:
+                    packaging_formset.instance = product
+                    packaging_formset.save()
                 if initial_quantity:
                     record_stock_movement(
                         product=product,
@@ -68,19 +80,26 @@ def product_create(request):
                     ),
                 )
             return redirect('product_list')
-    return render(request, 'inventory/product_form.html', {'form': form, 'title': _('Ajouter un produit')})
+    return render(request, 'inventory/product_form.html', {
+        'form': form, 'packaging_formset': packaging_formset, 'title': _('Ajouter un produit'),
+    })
 
 @manager_required
 def product_update(request, pk):
     product = get_object_or_404(Product, pk=pk)
     form = ProductForm(request.POST or None, request.FILES or None, instance=product)
-    if form.is_valid():
+    packaging_data = request.POST if 'packagings-TOTAL_FORMS' in request.POST else None
+    packaging_formset = ProductPackagingFormSet(packaging_data, instance=product, prefix='packagings')
+    if form.is_valid() and (not packaging_formset.is_bound or packaging_formset.is_valid()):
         try:
             with transaction.atomic():
                 target_quantity = form.cleaned_data['quantity']
                 locked_product = Product.objects.select_for_update().get(pk=product.pk)
                 form.instance.quantity = locked_product.quantity
                 saved_product = form.save()
+                if packaging_formset.is_bound:
+                    packaging_formset.instance = saved_product
+                    packaging_formset.save()
                 if target_quantity != locked_product.quantity:
                     record_stock_movement(
                         product=saved_product,
@@ -97,7 +116,9 @@ def product_update(request, pk):
         else:
             messages.success(request, _('Produit mis à jour.'))
             return redirect('product_list')
-    return render(request, 'inventory/product_form.html', {'form': form, 'title': _('Modifier le produit')})
+    return render(request, 'inventory/product_form.html', {
+        'form': form, 'packaging_formset': packaging_formset, 'title': _('Modifier le produit'),
+    })
 
 @manager_required
 def product_delete(request, pk):
@@ -125,6 +146,8 @@ def product_import(request):
                 sheet = workbook.active
                 for row in sheet.iter_rows(min_row=2, values_only=True):
                     reference, barcode, name, category, brand, unit, purchase_price, sale_price, quantity, minimum_stock = row[:10]
+                    tier_values = list(row[10:13])
+                    tier_values.extend([None] * (3 - len(tier_values)))
                     reference = str(reference or '').strip()
                     name = str(name or '').strip()
                     if not name:
@@ -133,6 +156,9 @@ def product_import(request):
                     try:
                         purchase_price = Decimal(str(purchase_price or 0))
                         sale_price = Decimal(str(sale_price or 0))
+                        super_wholesale_price = Decimal(str(tier_values[0] if tier_values[0] is not None else sale_price))
+                        wholesale_price = Decimal(str(tier_values[1] if tier_values[1] is not None else sale_price))
+                        retail_price = Decimal(str(tier_values[2] if tier_values[2] is not None else sale_price))
                         quantity_decimal = Decimal(str(quantity or 0))
                         minimum_stock_decimal = Decimal(str(minimum_stock or 0))
                     except InvalidOperation as exc:
@@ -140,6 +166,10 @@ def product_import(request):
                     if (
                         purchase_price < 0
                         or sale_price < 0
+                        or super_wholesale_price < purchase_price
+                        or wholesale_price < purchase_price
+                        or retail_price < purchase_price
+                        or not super_wholesale_price <= wholesale_price <= retail_price
                         or quantity_decimal < 0
                         or minimum_stock_decimal < 0
                         or quantity_decimal != quantity_decimal.to_integral_value()
@@ -165,6 +195,9 @@ def product_import(request):
                             unit=unit_obj,
                             purchase_price=purchase_price,
                             sale_price=sale_price,
+                            super_wholesale_price=super_wholesale_price,
+                            wholesale_price=wholesale_price,
+                            retail_price=retail_price,
                             quantity=0,
                             minimum_stock=int(minimum_stock_decimal),
                         )
@@ -178,6 +211,9 @@ def product_import(request):
                         product.unit = unit_obj
                         product.purchase_price = purchase_price
                         product.sale_price = sale_price
+                        product.super_wholesale_price = super_wholesale_price
+                        product.wholesale_price = wholesale_price
+                        product.retail_price = retail_price
                         product.quantity = current_quantity
                         product.minimum_stock = int(minimum_stock_decimal)
                         product.save()
@@ -216,10 +252,16 @@ def product_export(request):
         _('Référence'),
         _('Code-barres'),
         _('Nom produit'),
+        _('Catégorie'),
+        _('Marque'),
+        _('Unité'),
         _("Prix d'achat"),
         _('Prix de vente'),
         _('Quantité'),
         _('Stock minimum'),
+        _('Prix Super Gros'),
+        _('Prix Gros'),
+        _('Prix Détail'),
     ]
     sheet.append(headers)
     for product in Product.objects.all():
@@ -227,10 +269,16 @@ def product_export(request):
             excel_safe_text(product.reference),
             excel_safe_text(product.barcode),
             excel_safe_text(product.name),
+            excel_safe_text(product.category),
+            excel_safe_text(product.brand),
+            excel_safe_text(product.unit),
             float(product.purchase_price),
             float(product.sale_price),
             product.quantity,
             product.minimum_stock,
+            float(product.super_wholesale_price),
+            float(product.wholesale_price),
+            float(product.retail_price),
         ])
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     response['Content-Disposition'] = 'attachment; filename=produits.xlsx'
@@ -241,6 +289,7 @@ def product_export(request):
 def client_list(request):
     clients = Client.objects.order_by('name', 'pk')
     query = request.GET.get('q', '').strip()
+    customer_type = request.GET.get('customer_type', '').strip()
     if query:
         clients = clients.filter(
             Q(name__icontains=query)
@@ -248,12 +297,55 @@ def client_list(request):
             | Q(email__icontains=query)
             | Q(tax_number__icontains=query)
         )
+    if customer_type in Client.CustomerType.values:
+        clients = clients.filter(customer_type=customer_type)
     page_obj, pagination_query = paginate_queryset(request, clients)
     return render(
         request,
         'inventory/client_list.html',
-        {'clients': page_obj, 'page_obj': page_obj, 'pagination_query': pagination_query},
+        {
+            'clients': page_obj,
+            'page_obj': page_obj,
+            'pagination_query': pagination_query,
+            'customer_types': Client.CustomerType.choices,
+            'selected_customer_type': customer_type,
+        },
     )
+
+
+@manager_required
+def client_export(request):
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.title = str(_('Clients'))[:31]
+    sheet.append([
+        _('Nom'),
+        _('Téléphone'),
+        _('Adresse'),
+        _('Wilaya'),
+        _('Type de client'),
+        _('NIF'),
+        _('Solde'),
+        _('Notes'),
+    ])
+    for client in Client.objects.order_by('name', 'pk'):
+        sheet.append([
+            excel_safe_text(client.name),
+            excel_safe_text(client.phone),
+            excel_safe_text(client.address),
+            excel_safe_text(client.wilaya),
+            excel_safe_text(client.get_customer_type_display()),
+            excel_safe_text(client.tax_number),
+            float(client.balance),
+            excel_safe_text(client.notes),
+        ])
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = 'attachment; filename=clients.xlsx'
+    workbook.save(response)
+    return response
+
 
 @seller_required
 def client_create(request):
@@ -263,6 +355,18 @@ def client_create(request):
         messages.success(request, _('Client ajouté avec succès.'))
         return redirect('client_list')
     return render(request, 'inventory/client_form.html', {'form': form, 'title': _('Ajouter un client')})
+
+
+@manager_required
+def client_detail(request, pk):
+    client_obj = get_object_or_404(Client, pk=pk)
+    sales = client_obj.sales.prefetch_related('lines__product').order_by('-created_at', '-pk')[:50]
+    return render(
+        request,
+        'inventory/client_detail.html',
+        {'client_obj': client_obj, 'sales': sales},
+    )
+
 
 @manager_required
 def client_update(request, pk):
@@ -387,7 +491,7 @@ def stock_movement_delete(request, pk):
 
 @seller_required
 def product_detail(request, pk):
-    product = get_object_or_404(Product, pk=pk)
+    product = get_object_or_404(Product.objects.prefetch_related('packagings'), pk=pk)
     if not product.barcode or not product.barcode_image or not product.qr_code:
         product.save()
         product.refresh_from_db()

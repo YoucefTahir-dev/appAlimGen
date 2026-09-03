@@ -6,7 +6,7 @@ from django.db import transaction
 from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth import get_user_model
-from apps.inventory.models import Product, Category, Brand, Unit, Client, StockMovement, Supplier
+from apps.inventory.models import Product, ProductPackaging, Category, Brand, Unit, Client, StockMovement, Supplier
 from apps.commerce.forms import SaleForm
 from apps.commerce.models import InvoiceSequence, Payment, Purchase, PurchaseLine, Sale, SaleLine, TicketSequence
 from apps.commerce.utils import COMPANY_NAME_AR, format_arabic, register_unicode_font
@@ -91,6 +91,34 @@ class CommerceTests(TestCase):
         self.assertEqual(movement.applied_delta, -3)
         self.assertEqual(movement.created_by, self.user)
         self.assertIn('sale:', movement.source_reference)
+
+    def test_web_sale_by_packaging_uses_shared_conversion_and_price_rule(self):
+        packaging = ProductPackaging.objects.create(
+            product=self.product, name='Pack de 2', conversion_factor=2,
+            default_sale_price='30.00', barcode='WEB-PACK-2',
+        )
+        response = self.client.post(reverse('sale_create'), {
+            'client': self.client_obj.pk,
+            'discount': '0.00',
+            'tax_rate': '0.00',
+            'payment_type': Sale.CASH,
+            'settlement_action': SaleForm.NO_PAYMENT,
+            'lines-TOTAL_FORMS': '1',
+            'lines-INITIAL_FORMS': '0',
+            'lines-MIN_NUM_FORMS': '0',
+            'lines-MAX_NUM_FORMS': '1000',
+            'lines-0-product': str(self.product.pk),
+            'lines-0-packaging': str(packaging.pk),
+            'lines-0-quantity': '3',
+            'lines-0-unit_price': '30.00',
+        })
+        self.assertEqual(response.status_code, 302, response.context['formset'].errors if response.context else None)
+        line = Sale.objects.latest('pk').lines.get()
+        self.assertEqual(line.packaging_quantity, 3)
+        self.assertEqual(line.packaging_factor, 2)
+        self.assertEqual(line.quantity, 6)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.quantity, 4)
 
     def test_sale_form_exposes_dynamic_product_line_controls(self):
         response = self.client.get(reverse('sale_create'))
@@ -558,7 +586,7 @@ class CommerceTests(TestCase):
         self.assertRegex(sale.ticket_number, r'^TCK-\d{4}-000001$')
         self.assertContains(response_80, sale.ticket_number)
         self.assertContains(response_80, 'size: 80mm auto')
-        self.assertContains(response_80, 'Conditionnement : Unité')
+        self.assertContains(response_80, 'Conditionnement : Unit1')
         self.assertContains(response_80, 'data:image/png;base64')
 
         response_58 = self.client.get(reverse('sale_ticket_preview', args=[sale.pk, 58]))

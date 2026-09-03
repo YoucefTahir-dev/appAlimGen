@@ -16,6 +16,12 @@ Toutes les modifications notables de ce projet seront documentées ici.
 
 ### Ajouté
 
+- API REST v1 centralisée pour Web, Android et futur client Windows.
+- JWT avec rotation, blacklist, révocation et clé de signature dédiée.
+- Conditionnements produit partagés Web/API avec conversion du stock en unité de base.
+- Profils imprimantes et formats 58/80/A4, préférences utilisateur et payloads locaux.
+- Diagnostic RPP02N sans connexion Bluetooth depuis le serveur.
+- Contrat OpenAPI versionné et pipeline CI étendu aux branches de fonctionnalités.
 - Journal de stock traçable avec variation appliquée, soldes avant/après, origine et auteur.
 - Annulation des mouvements par contrepassation sans suppression de l’historique.
 - Ticket de caisse thermique 58 mm et 80 mm.
@@ -25,6 +31,8 @@ Toutes les modifications notables de ce projet seront documentées ici.
 
 ### Corrigé
 
+- Mise à niveau de Django REST Framework vers `3.17.2` afin de corriger CVE-2026-73228 et CVE-2026-73229.
+- Lock multi-runtime corrigé en épinglant `typing-extensions`, requis par Python 3.12 en CI/Render mais omis lors d'une résolution sous Python 3.13.
 - Les entrées, sorties et ajustements manuels mettent désormais à jour le stock dans une transaction verrouillée.
 - Les créations, modifications et suppressions de lignes d’achat/vente, les stocks initiaux et les imports Excel utilisent désormais le même journal transactionnel avec verrouillage et origine métier.
 - Les ventes concurrentes et les réductions d’achat impossibles échouent sans stock négatif ni écriture commerciale partielle.
@@ -62,3 +70,12 @@ Toutes les modifications notables de ce projet seront documentées ici.
 ### Tests
 
 - Tests Django pour authentification, permissions, dashboard, inventory, commerce et sécurité.
+# API Android
+
+- ajout d'une API REST versionnée `/api/v1/` sans modification des sessions Web ;
+- authentification JWT avec rotation, blacklist et révocation ;
+- partage du RBAC Django entre Web et API ;
+- endpoints produits, clients, fournisseurs, ventes, achats, factures, stock,
+  charges, Dashboard et alertes ;
+- création transactionnelle des ventes/achats via une couche service partagée ;
+- documentation OpenAPI et guide d'intégration Android.

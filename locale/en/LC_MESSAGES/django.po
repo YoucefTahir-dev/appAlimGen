@@ -1,0 +1,109 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: gestio_stock 1.0\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "Vous ne disposez pas de la permission requise."
+msgstr "You do not have the required permission."
+
+msgid "Vous devez modifier votre mot de passe avant de continuer."
+msgstr "You must change your password before continuing."
+
+msgid "Vous devez modifier votre mot de passe depuis l’application Web."
+msgstr "You must change your password from the Web application."
+
+msgid "Les données envoyées sont invalides."
+msgstr "The submitted data is invalid."
+
+msgid "Le refresh token est obligatoire."
+msgstr "The refresh token is required."
+
+msgid "Refresh token invalide."
+msgstr "Invalid refresh token."
+
+msgid "Déconnexion effectuée."
+msgstr "You have been logged out."
+
+msgid "Produit introuvable."
+msgstr "Product not found."
+
+msgid "Seule l’unité de base est actuellement disponible."
+msgstr "Only the base unit is currently available."
+
+msgid "Une vente ou un achat doit contenir au moins un produit."
+msgstr "A sale or purchase must contain at least one product."
+
+msgid "Un produit est introuvable."
+msgstr "A product could not be found."
+
+msgid "Le prix ne peut pas être négatif."
+msgstr "The price cannot be negative."
+
+msgid "La remise ne peut pas être négative."
+msgstr "The discount cannot be negative."
+
+msgid "Impossible de vendre un produit à un prix inférieur à son prix d'achat."
+msgstr "A product cannot be sold below its purchase price."
+
+msgid "Stock insuffisant : %(available)s unité(s) disponible(s)."
+msgstr "Insufficient stock: %(available)s unit(s) available."
+
+msgid "Suppression impossible : cet élément est utilisé."
+msgstr "This item cannot be deleted because it is in use."
+
+msgid "Requête ralentie."
+msgstr "Request throttled."
+msgid "Conditionnement invalide ou inactif."
+msgstr "Invalid or inactive packaging."
+
+msgid "La conversion du conditionnement est incohérente."
+msgstr "The packaging conversion is inconsistent."
+
+msgid "Impossible de vendre un produit à un prix inférieur à son prix d'achat."
+msgstr "A product cannot be sold below its purchase cost."
+
+msgid "Le prix du conditionnement ne peut pas être inférieur à son coût d'achat."
+msgstr "The packaging price cannot be lower than its purchase cost."
+
+msgid "Aucune imprimante active configurée."
+msgstr "No active printer is configured."
+
+msgid "Langue d’impression invalide."
+msgstr "Invalid printing language."
+
+msgid "Largeur papier invalide."
+msgstr "Invalid paper width."
+
+msgid "La largeur papier doit être 58 ou 80 mm."
+msgstr "Paper width must be 58 or 80 mm."
+
+msgid "Ce protocole nécessite un adaptateur local dédié."
+msgstr "This protocol requires a dedicated local adapter."
+
+msgid "Test imprimante"
+msgstr "Printer test"
+
+msgid "Imprimantes"
+msgstr "Printers"
+
+msgid "Paramètres des imprimantes"
+msgstr "Printer settings"
+
+msgid "Conditionnements"
+msgstr "Packagings"
+
+msgid "Conditionnement"
+msgstr "Packaging"
+
+msgid "Facteur"
+msgstr "Factor"
+
+msgid "Actif"
+msgstr "Active"
+
+msgid "Inactif"
+msgstr "Inactive"

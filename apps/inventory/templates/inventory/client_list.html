@@ -12,10 +12,17 @@
 <div class="card card-dashboard p-4 bg-white">
     <div class="page-toolbar mb-3">
         <h5>{% trans "Liste des clients" %}</h5>
-        {% if can_add_client %}<a href="{% url 'client_create' %}" class="btn btn-success">{% trans "Ajouter client" %}</a>{% endif %}
+        <div class="toolbar-actions">
+            <a href="{% url 'client_export' %}" class="btn btn-outline-secondary">{% trans "Export Excel" %}</a>
+            {% if can_add_client %}<a href="{% url 'client_create' %}" class="btn btn-success">{% trans "Ajouter client" %}</a>{% endif %}
+        </div>
     </div>
     <form method="get" class="mb-3 search-form">
-        <input type="search" name="q" class="form-control" placeholder="{% trans 'Rechercher nom, téléphone, email ou NIF...' %}" value="{{ request.GET.q }}">
+        <input type="search" name="q" class="form-control" placeholder="{% trans 'Rechercher nom, téléphone ou NIF...' %}" value="{{ request.GET.q }}">
+        <select name="customer_type" class="form-select">
+            <option value="">{% trans "Tous les types" %}</option>
+            {% for value, label in customer_types %}<option value="{{ value }}" {% if selected_customer_type == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
         <button type="submit" class="btn btn-primary">{% trans "Rechercher" %}</button>
     </form>
     <div class="table-responsive">
@@ -25,7 +32,7 @@
                     <th>{% trans "Nom" %}</th>
                     <th>{% trans "Téléphone" %}</th>
                     <th>{% trans "Wilaya" %}</th>
-                    <th>{% trans "Email" %}</th>
+                    <th>{% trans "Type de client" %}</th>
                     <th>{% trans "Solde" %}</th>
                     {% if can_change_client or can_delete_client %}<th>{% trans "Actions" %}</th>{% endif %}
                 </tr>
@@ -33,10 +40,10 @@
             <tbody>
                 {% for client in clients %}
                     <tr>
-                        <td>{{ client.name }}</td>
+                        <td><a href="{% url 'client_detail' client.pk %}">{{ client.name }}</a></td>
                         <td>{{ client.phone }}</td>
                         <td>{{ client.wilaya }}</td>
-                        <td>{{ client.email }}</td>
+                        <td>{{ client.get_customer_type_display }}</td>
                         <td>{{ client.balance|floatformat:2 }} DZD</td>
                         {% if can_change_client or can_delete_client %}
                             <td>

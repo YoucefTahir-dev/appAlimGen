@@ -94,8 +94,8 @@
                 {% for line in lines %}
                     <tr>
                         <td>{{ forloop.counter }}</td>
-                        <td>{{ line.product.name }}</td>
-                        <td class="text-end">{{ line.quantity }}</td>
+                        <td>{{ line.product.name }} <span class="text-muted">— {{ line.packaging_name }}</span></td>
+                        <td class="text-end">{{ line.packaging_quantity }}</td>
                         <td class="text-end">{{ line.unit_price|floatformat:2 }} DZD</td>
                         <td class="text-end">{{ sale.tax_rate|floatformat:2 }}%</td>
                         <td class="text-end">{{ line.line_total|floatformat:2 }} DZD</td>

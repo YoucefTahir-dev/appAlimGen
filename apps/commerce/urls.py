@@ -3,6 +3,7 @@ from .views import (
     sale_list,
     purchase_list,
     sale_create,
+    sale_price_lookup,
     sale_update,
     sale_delete,
     purchase_create,
@@ -24,6 +25,7 @@ from .views import (
 urlpatterns = [
     path('sales/', sale_list, name='sale_list'),
     path('sales/new/', sale_create, name='sale_create'),
+    path('sales/price/', sale_price_lookup, name='sale_price_lookup'),
     path('sales/<int:pk>/edit/', sale_update, name='sale_update'),
     path('sales/<int:pk>/delete/', sale_delete, name='sale_delete'),
     path('sales/<int:pk>/preview/', sale_invoice_preview, name='sale_invoice_preview'),

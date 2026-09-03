@@ -1,4 +1,5 @@
 import io
+from decimal import Decimal
 import logging
 
 import qrcode
@@ -121,6 +122,9 @@ class Product(models.Model):
     unit = models.ForeignKey(Unit, on_delete=models.SET_NULL, null=True, related_name='products')
     purchase_price = models.DecimalField(_("Prix d'achat"), max_digits=12, decimal_places=2)
     sale_price = models.DecimalField(_('Prix de vente'), max_digits=12, decimal_places=2)
+    super_wholesale_price = models.DecimalField(_('Prix Super Gros'), max_digits=12, decimal_places=2, default=0)
+    wholesale_price = models.DecimalField(_('Prix Gros'), max_digits=12, decimal_places=2, default=0)
+    retail_price = models.DecimalField(_('Prix Détail'), max_digits=12, decimal_places=2, default=0)
     quantity = models.PositiveIntegerField(_('Quantité en stock'), default=0)
     minimum_stock = models.PositiveIntegerField(_('Stock minimum'), default=0)
     description = models.TextField(_('Description'), blank=True)
@@ -133,9 +137,47 @@ class Product(models.Model):
         verbose_name = _('Produit')
         verbose_name_plural = _('Produits')
         ordering = ['name']
+        permissions = [
+            ('view_product_pricing', 'Peut voir les trois tarifs produit'),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(super_wholesale_price__gte=models.F('purchase_price')),
+                name='product_super_price_gte_cost',
+            ),
+            models.CheckConstraint(
+                condition=Q(wholesale_price__gte=models.F('purchase_price')),
+                name='product_wholesale_price_gte_cost',
+            ),
+            models.CheckConstraint(
+                condition=Q(retail_price__gte=models.F('purchase_price')),
+                name='product_retail_price_gte_cost',
+            ),
+            models.CheckConstraint(
+                condition=(
+                    Q(super_wholesale_price__lte=models.F('wholesale_price'))
+                    & Q(wholesale_price__lte=models.F('retail_price'))
+                ),
+                name='product_price_tiers_ordered',
+            ),
+        ]
+
+    def __init__(self, *args, **kwargs):
+        legacy_sale_price = kwargs.get('sale_price')
+        if legacy_sale_price is not None:
+            kwargs.setdefault('super_wholesale_price', legacy_sale_price)
+            kwargs.setdefault('wholesale_price', legacy_sale_price)
+            kwargs.setdefault('retail_price', legacy_sale_price)
+        super().__init__(*args, **kwargs)
 
     def __str__(self):
         return self.name
+
+    def clean(self):
+        super().clean()
+        from .pricing import validate_product_prices
+
+        validate_product_prices(self)
 
     @classmethod
     def _generate_reference(cls):
@@ -168,6 +210,14 @@ class Product(models.Model):
 
     def save(self, *args, **kwargs):
         self._generated_media_errors = []
+
+        self.sale_price = self.retail_price
+        from .pricing import validate_product_prices
+
+        validate_product_prices(self)
+        update_fields = kwargs.get('update_fields')
+        if update_fields and 'retail_price' in update_fields and 'sale_price' not in update_fields:
+            kwargs['update_fields'] = set(update_fields) | {'sale_price'}
 
         if not self.reference:
             self.reference = Product._generate_reference()
@@ -207,6 +257,53 @@ class Product(models.Model):
                     'Unable to generate or store the QR code image for product %s.',
                     self.reference,
                 )
+
+
+class ProductPackaging(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='packagings')
+    name = models.CharField(_('Nom du conditionnement'), max_length=100)
+    conversion_factor = models.PositiveIntegerField(
+        _('Facteur de conversion'),
+        help_text=_("Nombre d'unités de base contenues dans ce conditionnement."),
+    )
+    default_sale_price = models.DecimalField(
+        _('Prix de vente par défaut'), max_digits=12, decimal_places=2,
+    )
+    barcode = models.CharField(_('Code-barres'), max_length=100, unique=True, blank=True, null=True)
+    is_active = models.BooleanField(_('Actif'), default=True)
+
+    class Meta:
+        ordering = ('product__name', 'conversion_factor', 'name')
+        constraints = [
+            models.UniqueConstraint(fields=('product', 'name'), name='uniq_packaging_name_per_product'),
+            models.CheckConstraint(condition=Q(conversion_factor__gte=1), name='packaging_factor_gte_1'),
+            models.CheckConstraint(condition=Q(default_sale_price__gte=0), name='packaging_price_gte_0'),
+        ]
+
+    @property
+    def minimum_sale_price(self):
+        return Decimal(str(self.product.purchase_price)) * int(self.conversion_factor)
+
+    def clean(self):
+        super().clean()
+        if self.conversion_factor and self.default_sale_price is not None:
+            if self.default_sale_price < self.minimum_sale_price:
+                raise ValidationError({
+                    'default_sale_price': _(
+                        "Le prix du conditionnement ne peut pas être inférieur à son coût d'achat."
+                    )
+                })
+
+    def save(self, *args, **kwargs):
+        self.name = normalize_business_text(self.name)
+        self.barcode = normalize_business_text(self.barcode) or None
+        self.conversion_factor = int(self.conversion_factor)
+        self.default_sale_price = Decimal(str(self.default_sale_price))
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.product.name} — {self.name} (x{self.conversion_factor})'
 
 
 class ImmutableStockMovementQuerySet(models.QuerySet):
@@ -345,10 +442,21 @@ class StockMovement(models.Model):
 
 
 class Client(models.Model):
+    class CustomerType(models.TextChoices):
+        SUPER_WHOLESALE = 'SUPER_WHOLESALE', _('Super Gros')
+        WHOLESALE = 'WHOLESALE', _('Gros')
+        RETAIL = 'RETAIL', _('Détail')
+
     name = models.CharField(_('Nom'), max_length=200)
     phone = models.CharField(_('Téléphone'), max_length=50, blank=True)
     address = models.CharField(_('Adresse'), max_length=255, blank=True)
     wilaya = models.CharField(_('Wilaya'), max_length=100, blank=True)
+    customer_type = models.CharField(
+        _('Type de client'),
+        max_length=20,
+        choices=CustomerType.choices,
+        default=CustomerType.RETAIL,
+    )
     email = models.EmailField(_('Email'), blank=True)
     tax_number = models.CharField(_('NIF'), max_length=100, blank=True)
     balance = models.DecimalField(_('Solde'), max_digits=12, decimal_places=2, default=0)

@@ -7,6 +7,7 @@
 
 {% block content %}
 {% has_access 'inventory.change_product' as can_change_product %}
+{% has_access 'inventory.view_product_pricing' as can_view_product_pricing %}
 <div class="card card-dashboard p-4 bg-white">
     <div class="row g-4 align-items-start">
         <div class="col-12 col-lg-8">
@@ -15,8 +16,30 @@
             <p><strong>{% trans "Code-barres" %} :</strong> {{ product.barcode }}</p>
             <p><strong>{% trans "Catégorie" %} :</strong> {{ product.category }}</p>
             <p><strong>{% trans "Marque" %} :</strong> {{ product.brand }}</p>
-            <p><strong>{% trans "Prix de vente" %} :</strong> {{ product.sale_price }} {% trans "DZD" %}</p>
+            {% if can_view_product_pricing %}
+                <p><strong>{% trans "Prix Super Gros" %} :</strong> {{ product.super_wholesale_price }} {% trans "DZD" %}</p>
+                <p><strong>{% trans "Prix Gros" %} :</strong> {{ product.wholesale_price }} {% trans "DZD" %}</p>
+            {% endif %}
+            <p><strong>{% trans "Prix Détail" %} :</strong> {{ product.retail_price }} {% trans "DZD" %}</p>
             <p><strong>{% trans "Quantité" %} :</strong> {{ product.quantity }}</p>
+            <h4 class="h6 mt-4">{% trans "Conditionnements" %}</h4>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead><tr><th>{% trans "Nom" %}</th><th>{% trans "Facteur" %}</th><th>{% trans "Prix de vente" %}</th><th>{% trans "Statut" %}</th></tr></thead>
+                    <tbody>
+                    {% for packaging in product.packagings.all %}
+                        <tr>
+                            <td>{{ packaging.name }}</td>
+                            <td>{{ packaging.conversion_factor }}</td>
+                            <td>{{ packaging.default_sale_price }} {% trans "DZD" %}</td>
+                            <td>{% if packaging.is_active %}{% trans "Actif" %}{% else %}{% trans "Inactif" %}{% endif %}</td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="4" class="text-muted">{% trans "Aucun conditionnement configuré." %}</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
 
         <div class="col-12 col-lg-4 text-lg-center">

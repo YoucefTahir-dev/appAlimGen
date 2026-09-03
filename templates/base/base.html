@@ -26,6 +26,7 @@
     {% has_access 'expenses.view_expense' as can_view_expenses %}
     {% has_access 'accounts.view_user' as can_view_users %}
     {% has_access 'auth.view_group' as can_view_roles %}
+    {% has_access 'printing.view_printerprofile' as can_view_printers %}
     <nav class="sidebar offcanvas-lg {% if LANGUAGE_BIDI %}offcanvas-end{% else %}offcanvas-start{% endif %} bg-dark text-white" tabindex="-1" id="appSidebar" aria-labelledby="appSidebarLabel">
         <div class="sidebar-header offcanvas-header d-lg-block p-3 text-center">
             <div>
@@ -51,6 +52,7 @@
                 {% if can_view_expenses %}<li class="nav-item"><a class="nav-link text-white" data-sidebar-link href="{% url 'expense_list' %}"><i class="bi bi-cash-coin me-2"></i> {% trans "Charges" %}</a></li>{% endif %}
                 {% if can_view_users %}<li class="nav-item"><a class="nav-link text-white" data-sidebar-link href="{% url 'user_list' %}"><i class="bi bi-person-gear me-2"></i> {% trans "Utilisateurs" %}</a></li>{% endif %}
                 {% if can_view_roles %}<li class="nav-item"><a class="nav-link text-white" data-sidebar-link href="{% url 'role_list' %}"><i class="bi bi-shield-lock me-2"></i> {% trans "Rôles" %}</a></li>{% endif %}
+                {% if can_view_printers %}<li class="nav-item"><a class="nav-link text-white" data-sidebar-link href="{% url 'printer_list' %}"><i class="bi bi-printer me-2"></i> {% trans "Imprimantes" %}</a></li>{% endif %}
             </ul>
         </div>
     </nav>

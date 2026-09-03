@@ -21,6 +21,7 @@ PERMISSION_MATRIX = OrderedDict(
                 ('inventory.add_product', _('Ajouter')),
                 ('inventory.change_product', _('Modifier')),
                 ('inventory.delete_product', _('Supprimer')),
+                ('inventory.view_product_pricing', _('Voir les trois tarifs')),
             ],
         ),
         (
@@ -118,6 +119,20 @@ PERMISSION_MATRIX = OrderedDict(
             ],
         ),
         (
+            _('Imprimantes'),
+            [
+                ('printing.view_printerprofile', _('Voir')),
+                ('printing.add_printerprofile', _('Ajouter')),
+                ('printing.change_printerprofile', _('Modifier')),
+                ('printing.delete_printerprofile', _('Supprimer')),
+                ('printing.test_printerprofile', _('Tester')),
+                ('printing.view_printprofile', _('Voir les profils')),
+                ('printing.add_printprofile', _('Ajouter un profil')),
+                ('printing.change_printprofile', _('Modifier un profil')),
+                ('printing.delete_printprofile', _('Supprimer un profil')),
+            ],
+        ),
+        (
             _('Sauvegardes'),
             [
                 ('accounts.view_backups', _('Voir')),
@@ -165,6 +180,9 @@ LEGACY_SELLER_PERMISSIONS = frozenset(
         'inventory.add_client',
         'commerce.view_sale',
         'commerce.add_sale',
+        'printing.view_printerprofile',
+        'printing.test_printerprofile',
+        'printing.view_printprofile',
     }
 )
 
@@ -349,6 +367,11 @@ ROUTE_PERMISSIONS = {
     'backup_list': ('accounts.view_backups',),
     'backup_create': ('accounts.create_backups',),
     'backup_restore': ('accounts.restore_backups',),
+    'printer_list': ('printing.view_printerprofile',),
+    'printer_create': ('printing.add_printerprofile',),
+    'printer_update': ('printing.change_printerprofile',),
+    'printer_delete': ('printing.delete_printerprofile',),
+    'printer_test': ('printing.test_printerprofile',),
 }
 
 AUDITED_MUTATIONS = {

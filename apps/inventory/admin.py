@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Category, Brand, Unit, Product, StockMovement, Client, Supplier
+from .models import Category, Brand, Unit, Product, ProductPackaging, StockMovement, Client, Supplier
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
@@ -15,10 +15,28 @@ class UnitAdmin(admin.ModelAdmin):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ('reference', 'barcode', 'name', 'category', 'brand', 'quantity', 'minimum_stock', 'sale_price')
+    list_display = (
+        'reference',
+        'barcode',
+        'name',
+        'category',
+        'brand',
+        'quantity',
+        'minimum_stock',
+        'super_wholesale_price',
+        'wholesale_price',
+        'retail_price',
+    )
     search_fields = ('reference', 'barcode', 'name')
     list_filter = ('category', 'brand')
     readonly_fields = ('reference', 'barcode', 'quantity', 'qr_code', 'barcode_image')
+
+
+@admin.register(ProductPackaging)
+class ProductPackagingAdmin(admin.ModelAdmin):
+    list_display = ('product', 'name', 'conversion_factor', 'default_sale_price', 'barcode', 'is_active')
+    list_filter = ('is_active',)
+    search_fields = ('product__name', 'product__reference', 'name', 'barcode')
 
 @admin.register(StockMovement)
 class StockMovementAdmin(admin.ModelAdmin):
@@ -59,7 +77,8 @@ class StockMovementAdmin(admin.ModelAdmin):
 
 @admin.register(Client)
 class ClientAdmin(admin.ModelAdmin):
-    list_display = ('name', 'phone', 'wilaya', 'balance')
+    list_display = ('name', 'phone', 'wilaya', 'customer_type', 'balance')
+    list_filter = ('customer_type', 'wilaya')
     search_fields = ('name', 'phone')
 
 @admin.register(Supplier)

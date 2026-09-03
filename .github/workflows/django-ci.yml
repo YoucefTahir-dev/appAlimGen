@@ -2,7 +2,7 @@ name: Django CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'feature/**', 'fix/**', 'security/**']
   pull_request:
     branches: [main]
 
@@ -37,10 +37,23 @@ jobs:
       - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y libpq-dev
 
-      - name: Install Python dependencies
+      - name: Upgrade pip
+        run: python -m pip install --upgrade pip
+
+      - name: Install locked Python dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install --require-hashes -r requirements.lock
+          set +e
+          python -m pip install --require-hashes -r requirements.lock > /tmp/pip-install.log 2>&1
+          status=$?
+          cat /tmp/pip-install.log
+          if [ "$status" -ne 0 ]; then
+            message="$(tail -n 20 /tmp/pip-install.log)"
+            message="${message//'%'/'%25'}"
+            message="${message//$'\r'/'%0D'}"
+            message="${message//$'\n'/'%0A'}"
+            echo "::error title=Locked dependency installation failed::$message"
+          fi
+          exit "$status"
 
       - name: Configure environment
         run: |
@@ -48,6 +61,7 @@ jobs:
           sed -i 's|^DATABASE_URL=.*|DATABASE_URL=postgresql://postgres:postgres@localhost:5432/test_db|' .env
           sed -i 's|^DJANGO_DEBUG=.*|DJANGO_DEBUG=False|' .env
           sed -i 's|^SECRET_KEY=.*|SECRET_KEY=ci-secret-key-for-tests-only-abcdefghijklmnopqrstuvwxyz-1234567890|' .env
+          sed -i 's|^JWT_SIGNING_KEY=.*|JWT_SIGNING_KEY=ci-jwt-signing-key-only-abcdefghijklmnopqrstuvwxyz-1234567890|' .env
           sed -i 's|^MEDIA_FILESYSTEM_PERSISTENT=.*|MEDIA_FILESYSTEM_PERSISTENT=True|' .env
           sed -i 's|^MEDIA_ROOT=.*|MEDIA_ROOT=/tmp/gestio-stock-media|' .env
 
@@ -59,6 +73,12 @@ jobs:
 
       - name: Validate static assets
         run: python manage.py collectstatic --noinput
+
+      - name: Compile Python sources
+        run: python -m compileall -q apps gestio_stock
+
+      - name: Validate OpenAPI contract
+        run: python manage.py spectacular --file /tmp/openapi.yaml --validate
 
       - name: Run migrations
         run: python manage.py migrate --noinput
@@ -73,5 +93,5 @@ jobs:
 
       - name: Audit dependencies
         run: |
-          pip install pip-audit
+          pip install pip-audit==2.9.0
           python -m pip_audit -r requirements.lock

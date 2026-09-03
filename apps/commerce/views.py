@@ -6,17 +6,19 @@ from django.db import transaction
 from django.db.models import DecimalField, ExpressionWrapper, F, Sum, Value
 from django.db.models.deletion import ProtectedError
 from django.db.models.functions import Coalesce
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.views.decorators.http import require_POST
-from django.utils import timezone
+from django.views.decorators.http import require_GET, require_POST
 from django.utils.translation import gettext as _
 
 from apps.accounts.permissions import manager_required, permission_required, seller_required
 from apps.core.pagination import paginate_queryset
+from apps.inventory.models import Client, Product, ProductPackaging
+from apps.inventory.pricing import get_sale_price
 
 from .forms import PaymentForm, PurchaseForm, PurchaseLineFormSet, SaleForm, SaleLineFormSet
-from .models import InvoiceSequence, Payment, Purchase, Sale, TicketSequence
+from .models import Payment, Purchase, Sale
+from .services import ensure_ticket_number, generate_invoice_number, generate_ticket_number
 from .utils import build_invoice_context, generate_invoice_pdf, qr_code_data_uri
 
 
@@ -60,33 +62,6 @@ def _with_payment_totals(queryset):
     )
 
 
-def generate_invoice_number():
-    year = timezone.now().year
-    sequence, _ = InvoiceSequence.objects.select_for_update().get_or_create(year=year)
-    sequence.last_number += 1
-    sequence.save(update_fields=['last_number'])
-    return f'FAC-{year}-{sequence.last_number:06d}'
-
-
-def generate_ticket_number():
-    year = timezone.now().year
-    sequence, _ = TicketSequence.objects.select_for_update().get_or_create(year=year)
-    sequence.last_number += 1
-    sequence.save(update_fields=['last_number'])
-    return f'TCK-{year}-{sequence.last_number:06d}'
-
-
-def ensure_ticket_number(sale):
-    if sale.ticket_number:
-        return
-    with transaction.atomic():
-        locked_sale = Sale.objects.select_for_update().get(pk=sale.pk)
-        if not locked_sale.ticket_number:
-            locked_sale.ticket_number = generate_ticket_number()
-            locked_sale.save(update_fields=['ticket_number'])
-        sale.ticket_number = locked_sale.ticket_number
-
-
 def calculate_sale_total(sale, formset):
     total = 0
     for line in formset:
@@ -101,9 +76,11 @@ def discount_exceeds_sale_margin(sale, formset):
     for line in formset:
         if line.cleaned_data and not line.cleaned_data.get('DELETE', False):
             product = line.cleaned_data['product']
+            packaging = line.cleaned_data.get('packaging')
             quantity = line.cleaned_data['quantity']
             unit_price = line.cleaned_data['unit_price']
-            available_margin += quantity * (unit_price - product.purchase_price)
+            factor = packaging.conversion_factor if packaging else 1
+            available_margin += quantity * (unit_price - (product.purchase_price * factor))
     return sale.discount > available_margin
 
 
@@ -158,6 +135,7 @@ def sale_create(request):
                     sale.invoice_number = generate_invoice_number()
                     sale.ticket_number = generate_ticket_number()
                     sale.payment_tracking_initialized = True
+                    sale.created_by = request.user
                     sale.save()
                     formset.instance = sale
                     _set_formset_stock_user(formset, request.user)
@@ -172,6 +150,34 @@ def sale_create(request):
                 messages.success(request, 'Facture enregistrée avec succès.')
                 return redirect('sale_list')
     return render(request, 'commerce/sale_form.html', {'form': form, 'formset': formset, 'title': _('Nouvelle facture')})
+
+
+@require_GET
+@permission_required('commerce.add_sale')
+def sale_price_lookup(request):
+    product_id = request.GET.get('product_id')
+    client_id = request.GET.get('client_id')
+    if not product_id or not client_id:
+        return JsonResponse({'error': _('Produit et client obligatoires.')}, status=400)
+    product = get_object_or_404(Product, pk=product_id)
+    customer = get_object_or_404(Client, pk=client_id)
+    packaging = None
+    packaging_id = request.GET.get('packaging_id')
+    if packaging_id:
+        packaging = get_object_or_404(
+            ProductPackaging,
+            pk=packaging_id,
+            product=product,
+            is_active=True,
+        )
+    price = get_sale_price(product, customer, packaging)
+    return JsonResponse(
+        {
+            'customer_type': customer.customer_type,
+            'customer_type_label': customer.get_customer_type_display(),
+            'price': f'{price:.2f}',
+        }
+    )
 
 
 @manager_required
@@ -419,7 +425,10 @@ def sale_ticket_preview(request, pk, width):
     context.update({
         'ticket_width': ticket_width,
         'auto_print': request.GET.get('print') == '1',
-        'cashier_name': request.user.get_full_name() or request.user.get_username(),
+            'cashier_name': (
+                (sale.created_by.get_full_name() or sale.created_by.get_username())
+                if sale.created_by_id else (request.user.get_full_name() or request.user.get_username())
+            ),
         'qr_code_data_uri': qr_code_data_uri(sale, context['total_ttc']),
     })
     return render(request, 'commerce/sale_ticket.html', context)

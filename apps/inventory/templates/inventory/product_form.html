@@ -21,7 +21,9 @@
             <div class="col-md-6">{{ form.name.label_tag }}{{ form.name }}{{ form.name.errors }}</div>
             <div class="col-md-6">{{ form.brand_text.label_tag }}{{ form.brand_text }}{{ form.brand_text.errors }}</div>
             <div class="col-md-4">{{ form.purchase_price.label_tag }}{{ form.purchase_price }}{{ form.purchase_price.errors }}</div>
-            <div class="col-md-4">{{ form.sale_price.label_tag }}{{ form.sale_price }}{{ form.sale_price.errors }}</div>
+            <div class="col-md-4">{{ form.super_wholesale_price.label_tag }}{{ form.super_wholesale_price }}{{ form.super_wholesale_price.errors }}</div>
+            <div class="col-md-4">{{ form.wholesale_price.label_tag }}{{ form.wholesale_price }}{{ form.wholesale_price.errors }}</div>
+            <div class="col-md-4">{{ form.retail_price.label_tag }}{{ form.retail_price }}{{ form.retail_price.errors }}</div>
             <div class="col-md-4">{{ form.quantity.label_tag }}{{ form.quantity }}{{ form.quantity.errors }}</div>
             <div class="col-md-4">{{ form.minimum_stock.label_tag }}{{ form.minimum_stock }}{{ form.minimum_stock.errors }}</div>
             <div class="col-md-8">{{ form.photo.label_tag }}{{ form.photo }}{{ form.photo.errors }}</div>
@@ -34,6 +36,40 @@
             </div>
             {% endif %}
             <div class="col-12">{{ form.description.label_tag }}{{ form.description }}{{ form.description.errors }}</div>
+        </div>
+        <hr class="my-4">
+        <h2 class="h5">{% trans "Conditionnements" %}</h2>
+        <p class="text-muted small">{% trans "Le facteur indique le nombre d’unités de base contenu dans un conditionnement." %}</p>
+        {{ packaging_formset.management_form }}
+        {{ packaging_formset.non_form_errors }}
+        <div class="table-responsive">
+            <table class="table table-bordered align-middle">
+                <thead>
+                    <tr>
+                        <th>{% trans "Nom" %}</th>
+                        <th>{% trans "Facteur" %}</th>
+                        <th>{% trans "Prix de vente" %}</th>
+                        <th>{% trans "Code-barres" %}</th>
+                        <th>{% trans "Actif" %}</th>
+                        <th>{% trans "Supprimer" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for packaging_form in packaging_formset %}
+                    <tr>
+                        <td>{{ packaging_form.id }}{{ packaging_form.name }}{{ packaging_form.name.errors }}</td>
+                        <td>{{ packaging_form.conversion_factor }}{{ packaging_form.conversion_factor.errors }}</td>
+                        <td>{{ packaging_form.default_sale_price }}{{ packaging_form.default_sale_price.errors }}</td>
+                        <td>{{ packaging_form.barcode }}{{ packaging_form.barcode.errors }}</td>
+                        <td>{{ packaging_form.is_active }}{{ packaging_form.is_active.errors }}</td>
+                        <td>{{ packaging_form.DELETE }}</td>
+                    </tr>
+                    {% if packaging_form.non_field_errors %}
+                    <tr><td colspan="6" class="text-danger">{{ packaging_form.non_field_errors }}</td></tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
         <div class="form-actions mt-3">
             <button class="btn btn-success">{% trans "Enregistrer" %}</button>

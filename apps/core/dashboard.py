@@ -297,7 +297,7 @@ def build_chart_data(bounds, expense_category_rows):
         SaleLine.objects.all(), "sale__created_at", bounds["start_dt"], bounds["end_dt"]
     ).annotate(
         line_total=ExpressionWrapper(
-            F("quantity") * F("unit_price"),
+            F("packaging_quantity") * F("unit_price"),
             output_field=DecimalField(max_digits=18, decimal_places=2),
         )
     )
@@ -338,12 +338,12 @@ def dashboard_context(request, strict_period=False):
         SaleLine.objects.all(), "sale__created_at", bounds["start_dt"], bounds["end_dt"]
     ).annotate(
         line_total=ExpressionWrapper(
-            F("quantity") * F("unit_price"),
+            F("packaging_quantity") * F("unit_price"),
             output_field=DecimalField(max_digits=18, decimal_places=2),
         ),
         line_cost=_cost_expression(),
         line_profit=ExpressionWrapper(
-            F("quantity") * (F("unit_price") - F("unit_cost")),
+            (F("packaging_quantity") * F("unit_price")) - (F("quantity") * F("unit_cost")),
             output_field=DecimalField(max_digits=18, decimal_places=2),
         ),
     )
