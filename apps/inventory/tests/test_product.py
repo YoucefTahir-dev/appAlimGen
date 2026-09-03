@@ -4,6 +4,7 @@ from django.core.files.storage import default_storage
 from django.conf import settings
 import tempfile
 import shutil
+from unittest.mock import patch
 
 from ..models import Product, Category, Brand, StockMovement, Unit
 from django.contrib.auth import get_user_model
@@ -63,6 +64,37 @@ class ProductModelTests(TestCase):
         )
         self.assertEqual(movement.applied_delta, 2)
         self.assertEqual(movement.created_by, self.user)
+
+    def test_create_product_view_survives_generated_media_storage_failure(self):
+        self.client.login(username='tester', password='pass')
+        media_storage = Product._meta.get_field('barcode_image').storage
+        data = {
+            'name': 'Product Without Generated Media',
+            'brand_text': 'Brand1',
+            'purchase_price': '5.00',
+            'sale_price': '8.00',
+            'quantity': 2,
+            'minimum_stock': 0,
+        }
+
+        with patch.object(media_storage, 'save', side_effect=OSError('storage unavailable')):
+            response = self.client.post(reverse('product_create'), data, follow=True)
+
+        self.assertEqual(response.status_code, 200)
+        product = Product.objects.get(name='Product Without Generated Media')
+        self.assertTrue(product.reference.startswith('PRD-'))
+        self.assertTrue(product.barcode.startswith('BC-PRD-'))
+        self.assertFalse(product.barcode_image)
+        self.assertFalse(product.qr_code)
+        self.assertEqual(product.quantity, 2)
+        self.assertTrue(
+            StockMovement.objects.filter(
+                product=product,
+                source_type=StockMovement.SOURCE_PRODUCT,
+                applied_delta=2,
+            ).exists()
+        )
+        self.assertContains(response, 'stockage média')
 
     def test_product_detail_displays_barcode(self):
         self.client.login(username='tester', password='pass')

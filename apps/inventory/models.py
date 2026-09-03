@@ -1,4 +1,5 @@
 import io
+import logging
 
 import qrcode
 from django.conf import settings
@@ -13,6 +14,9 @@ from reportlab.graphics import renderSVG
 from reportlab.graphics.barcode import createBarcodeDrawing
 
 from apps.core.security import product_photo_upload_to, validate_image_upload
+
+
+logger = logging.getLogger(__name__)
 
 
 def normalize_business_text(value):
@@ -163,6 +167,8 @@ class Product(models.Model):
         return renderSVG.drawToString(drawing).encode('utf-8')
 
     def save(self, *args, **kwargs):
+        self._generated_media_errors = []
+
         if not self.reference:
             self.reference = Product._generate_reference()
 
@@ -170,19 +176,37 @@ class Product(models.Model):
             self.barcode = self._generate_barcode(self.reference)
 
         if self.barcode and not self.barcode_image:
-            barcode_svg = self._build_barcode_svg(self.barcode)
-            self.barcode_image.save(f"{self.reference}_barcode.svg", ContentFile(barcode_svg), save=False)
+            try:
+                barcode_svg = self._build_barcode_svg(self.barcode)
+                self.barcode_image.save(
+                    f"{self.reference}_barcode.svg",
+                    ContentFile(barcode_svg),
+                    save=False,
+                )
+            except Exception:  # External media storage must not block the product record.
+                self._generated_media_errors.append('barcode_image')
+                logger.exception(
+                    'Unable to generate or store the barcode image for product %s.',
+                    self.reference,
+                )
 
         super().save(*args, **kwargs)
 
         if not self.qr_code:
-            qr_text = f"REF : {self.reference}\nPRODUIT : {self.name}\nPRIX : {self.sale_price} DA"
-            img = qrcode.make(qr_text)
-            buf = io.BytesIO()
-            img.save(buf, format='PNG')
-            buf.seek(0)
-            self.qr_code.save(f"{self.reference}.png", ContentFile(buf.getvalue()), save=False)
-            super().save(update_fields=['qr_code'])
+            try:
+                qr_text = f"REF : {self.reference}\nPRODUIT : {self.name}\nPRIX : {self.sale_price} DA"
+                img = qrcode.make(qr_text)
+                buf = io.BytesIO()
+                img.save(buf, format='PNG')
+                buf.seek(0)
+                self.qr_code.save(f"{self.reference}.png", ContentFile(buf.getvalue()), save=False)
+                super().save(update_fields=['qr_code'])
+            except Exception:  # External media storage must not block the product record.
+                self._generated_media_errors.append('qr_code')
+                logger.exception(
+                    'Unable to generate or store the QR code image for product %s.',
+                    self.reference,
+                )
 
 
 class ImmutableStockMovementQuerySet(models.QuerySet):
