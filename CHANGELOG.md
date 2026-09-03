@@ -32,6 +32,7 @@ Toutes les modifications notables de ce projet seront documentées ici.
 ### Corrigé
 
 - Mise à niveau de Django REST Framework vers `3.17.2` afin de corriger CVE-2026-73228 et CVE-2026-73229.
+- Lock multi-runtime corrigé en épinglant `typing-extensions`, requis par Python 3.12 en CI/Render mais omis lors d'une résolution sous Python 3.13.
 - Les entrées, sorties et ajustements manuels mettent désormais à jour le stock dans une transaction verrouillée.
 - Les créations, modifications et suppressions de lignes d’achat/vente, les stocks initiaux et les imports Excel utilisent désormais le même journal transactionnel avec verrouillage et origine métier.
 - Les ventes concurrentes et les réductions d’achat impossibles échouent sans stock négatif ni écriture commerciale partielle.
