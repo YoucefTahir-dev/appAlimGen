@@ -22,7 +22,9 @@ Le schéma versionné est `openapi.yaml`.
 
 Le workflow déclenche désormais les branches `feature/**`, valide migrations,
 paramètres de déploiement, sources, OpenAPI, suite PostgreSQL et dépendances.
-Le résultat distant et la recette HTTPS staging doivent être renseignés après push.
+Le workflow GitHub Actions du commit `9d9190b` est entièrement réussi, y compris
+le test de concurrence PostgreSQL et l'audit des dépendances. La recette HTTPS
+staging reste à exécuter après création des ressources dédiées.
 
 ## Réserves
 

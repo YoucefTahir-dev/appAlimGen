@@ -35,10 +35,13 @@ aucune vulnérabilité connue au moment de l'audit.
 
 ## Risques restants
 
-1. GitHub Actions doit être vert après le push de la branche.
-2. Une branche Neon et un bucket staging doivent être créés hors production.
-3. La recette HTTPS et la concurrence PostgreSQL doivent être observées sur staging.
-4. Le vrai matériel RPP02N doit valider ESC/POS, QR, raster arabe et coupe.
+1. Une branche Neon et un bucket staging doivent être créés hors production.
+2. La recette HTTPS doit être observée sur staging.
+3. Le vrai matériel RPP02N doit valider ESC/POS, QR, raster arabe et coupe.
+
+Le workflow GitHub Actions du commit `9d9190b` est vert : installation hachée,
+migrations, contrôles de production, OpenAPI, suite PostgreSQL (avec concurrence)
+et audit des dépendances ont tous réussi.
 
 ## Conclusion
 
