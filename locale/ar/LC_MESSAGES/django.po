@@ -985,3 +985,44 @@ msgstr "نشط"
 
 msgid "Inactif"
 msgstr "غير نشط"
+msgid "Super Gros"
+msgstr "جملة كبرى"
+
+msgid "Gros"
+msgstr "جملة"
+
+msgid "Détail"
+msgstr "تجزئة"
+
+msgid "Prix Super Gros"
+msgstr "سعر الجملة الكبرى"
+
+msgid "Prix Gros"
+msgstr "سعر الجملة"
+
+msgid "Prix Détail"
+msgstr "سعر التجزئة"
+
+msgid "Type de client"
+msgstr "نوع العميل"
+
+msgid "Tous les types"
+msgstr "جميع الأنواع"
+
+msgid "Voir les trois tarifs"
+msgstr "عرض الأسعار الثلاثة"
+
+msgid "Le prix Super Gros ne peut pas être inférieur au prix d’achat."
+msgstr "لا يمكن أن يكون سعر الجملة الكبرى أقل من سعر الشراء."
+
+msgid "Le prix Gros ne peut pas être inférieur au prix d’achat."
+msgstr "لا يمكن أن يكون سعر الجملة أقل من سعر الشراء."
+
+msgid "Le prix Détail ne peut pas être inférieur au prix d’achat."
+msgstr "لا يمكن أن يكون سعر التجزئة أقل من سعر الشراء."
+
+msgid "Les tarifs doivent respecter l’ordre : Super Gros ≤ Gros ≤ Détail."
+msgstr "يجب أن تتبع الأسعار الترتيب: الجملة الكبرى ≤ الجملة ≤ التجزئة."
+
+msgid "Produit et client obligatoires."
+msgstr "المنتج والعميل مطلوبان."

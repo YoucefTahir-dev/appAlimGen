@@ -6,9 +6,46 @@
         const template = document.getElementById('sale-line-template');
         const addButton = document.getElementById('add-sale-line');
         const totalForms = document.getElementById('id_lines-TOTAL_FORMS');
+        const saleForm = document.getElementById('sale-form');
+        const clientSelect = document.getElementById('id_client');
 
         if (!body || !template || !addButton || !totalForms) {
             return;
+        }
+
+        const autoPricing = saleForm && saleForm.dataset.autoPricing === 'true';
+        const priceUrl = saleForm ? saleForm.dataset.priceUrl : '';
+
+        async function updateRowPrice(row) {
+            if (!autoPricing || !priceUrl || !clientSelect || !clientSelect.value) {
+                return;
+            }
+            const productSelect = row.querySelector('select[name$="-product"]');
+            const priceInput = row.querySelector('input[name$="-unit_price"]');
+            if (!productSelect || !productSelect.value || !priceInput) {
+                return;
+            }
+            const requestKey = `${clientSelect.value}:${productSelect.value}`;
+            row.dataset.priceRequest = requestKey;
+            const query = new URLSearchParams({
+                client_id: clientSelect.value,
+                product_id: productSelect.value,
+            });
+            try {
+                const response = await fetch(`${priceUrl}?${query.toString()}`, {
+                    headers: {'Accept': 'application/json'},
+                    credentials: 'same-origin',
+                });
+                if (!response.ok) {
+                    return;
+                }
+                const payload = await response.json();
+                if (row.dataset.priceRequest === requestKey) {
+                    priceInput.value = payload.price;
+                }
+            } catch (_error) {
+                // The price remains manually editable if the lookup is unavailable.
+            }
         }
 
         function bindRemoveButton(row) {
@@ -26,9 +63,22 @@
                     row.remove();
                 }
             });
+            const productSelect = row.querySelector('select[name$="-product"]');
+            if (productSelect && productSelect.dataset.pricingBound !== 'true') {
+                productSelect.dataset.pricingBound = 'true';
+                productSelect.addEventListener('change', function () {
+                    updateRowPrice(row);
+                });
+            }
         }
 
         body.querySelectorAll('.sale-line-row').forEach(bindRemoveButton);
+
+        if (clientSelect && autoPricing) {
+            clientSelect.addEventListener('change', function () {
+                body.querySelectorAll('.sale-line-row:not([hidden])').forEach(updateRowPrice);
+            });
+        }
 
         addButton.addEventListener('click', function () {
             const index = Number.parseInt(totalForms.value, 10);

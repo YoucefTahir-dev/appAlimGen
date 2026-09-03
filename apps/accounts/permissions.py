@@ -21,6 +21,7 @@ PERMISSION_MATRIX = OrderedDict(
                 ('inventory.add_product', _('Ajouter')),
                 ('inventory.change_product', _('Modifier')),
                 ('inventory.delete_product', _('Supprimer')),
+                ('inventory.view_product_pricing', _('Voir les trois tarifs')),
             ],
         ),
         (

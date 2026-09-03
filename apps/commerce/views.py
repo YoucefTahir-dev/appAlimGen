@@ -6,13 +6,15 @@ from django.db import transaction
 from django.db.models import DecimalField, ExpressionWrapper, F, Sum, Value
 from django.db.models.deletion import ProtectedError
 from django.db.models.functions import Coalesce
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 from django.utils.translation import gettext as _
 
 from apps.accounts.permissions import manager_required, permission_required, seller_required
 from apps.core.pagination import paginate_queryset
+from apps.inventory.models import Client, Product
+from apps.inventory.pricing import get_sale_price
 
 from .forms import PaymentForm, PurchaseForm, PurchaseLineFormSet, SaleForm, SaleLineFormSet
 from .models import Payment, Purchase, Sale
@@ -148,6 +150,25 @@ def sale_create(request):
                 messages.success(request, 'Facture enregistrée avec succès.')
                 return redirect('sale_list')
     return render(request, 'commerce/sale_form.html', {'form': form, 'formset': formset, 'title': _('Nouvelle facture')})
+
+
+@require_GET
+@permission_required('commerce.add_sale')
+def sale_price_lookup(request):
+    product_id = request.GET.get('product_id')
+    client_id = request.GET.get('client_id')
+    if not product_id or not client_id:
+        return JsonResponse({'error': _('Produit et client obligatoires.')}, status=400)
+    product = get_object_or_404(Product, pk=product_id)
+    customer = get_object_or_404(Client, pk=client_id)
+    price = get_sale_price(product, customer)
+    return JsonResponse(
+        {
+            'customer_type': customer.customer_type,
+            'customer_type_label': customer.get_customer_type_display(),
+            'price': f'{price:.2f}',
+        }
+    )
 
 
 @manager_required

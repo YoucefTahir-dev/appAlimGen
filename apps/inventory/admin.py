@@ -15,7 +15,18 @@ class UnitAdmin(admin.ModelAdmin):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ('reference', 'barcode', 'name', 'category', 'brand', 'quantity', 'minimum_stock', 'sale_price')
+    list_display = (
+        'reference',
+        'barcode',
+        'name',
+        'category',
+        'brand',
+        'quantity',
+        'minimum_stock',
+        'super_wholesale_price',
+        'wholesale_price',
+        'retail_price',
+    )
     search_fields = ('reference', 'barcode', 'name')
     list_filter = ('category', 'brand')
     readonly_fields = ('reference', 'barcode', 'quantity', 'qr_code', 'barcode_image')
@@ -66,7 +77,8 @@ class StockMovementAdmin(admin.ModelAdmin):
 
 @admin.register(Client)
 class ClientAdmin(admin.ModelAdmin):
-    list_display = ('name', 'phone', 'wilaya', 'balance')
+    list_display = ('name', 'phone', 'wilaya', 'customer_type', 'balance')
+    list_filter = ('customer_type', 'wilaya')
     search_fields = ('name', 'phone')
 
 @admin.register(Supplier)

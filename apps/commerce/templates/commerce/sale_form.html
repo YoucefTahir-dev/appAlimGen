@@ -7,7 +7,7 @@
 
 {% block content %}
 <div class="card card-dashboard p-4 bg-white">
-    <form method="post" id="sale-form">
+    <form method="post" id="sale-form" data-price-url="{% url 'sale_price_lookup' %}" data-auto-pricing="{% if form.instance.pk %}false{% else %}true{% endif %}">
         {% csrf_token %}
         {{ form.non_field_errors }}
         <div class="row g-3">
