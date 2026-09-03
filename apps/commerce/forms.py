@@ -118,8 +118,8 @@ class SaleLineForm(forms.ModelForm):
         widgets = {
             'product': forms.Select(attrs={'class': 'form-select'}),
             'packaging': forms.Select(attrs={'class': 'form-select'}),
-            'quantity': forms.NumberInput(attrs={'class': 'form-control'}),
-            'unit_price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
+            'unit_price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': 0}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -134,6 +134,7 @@ class SaleLineForm(forms.ModelForm):
         self.fields['packaging'].empty_label = _('Unité de base')
         if self.instance and self.instance.pk:
             self.initial['quantity'] = self.instance.packaging_quantity
+        self.fields['quantity'].widget.attrs['min'] = 1
 
     def clean(self):
         cleaned_data = super().clean()

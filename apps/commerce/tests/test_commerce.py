@@ -120,6 +120,56 @@ class CommerceTests(TestCase):
         self.product.refresh_from_db()
         self.assertEqual(self.product.quantity, 4)
 
+    def test_sale_form_exposes_dynamic_product_line_controls(self):
+        response = self.client.get(reverse('sale_create'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="add-sale-line"')
+        self.assertContains(response, 'id="sale-line-template"')
+        self.assertContains(response, 'id="id_lines-TOTAL_FORMS"')
+        self.assertContains(response, 'sale-formset.')
+        self.assertContains(response, 'min="1"')
+
+    def test_sale_create_accepts_multiple_products_on_one_invoice(self):
+        second_product = Product.objects.create(
+            name='Second Product',
+            category=self.cat,
+            brand=self.brand,
+            unit=self.unit,
+            purchase_price='4.00',
+            sale_price='7.00',
+            quantity=20,
+            minimum_stock=1,
+        )
+
+        response = self.client.post(
+            reverse('sale_create'),
+            {
+                'client': self.client_obj.pk,
+                'discount': '0.00',
+                'tax_rate': '0.00',
+                'lines-TOTAL_FORMS': '2',
+                'lines-INITIAL_FORMS': '0',
+                'lines-MIN_NUM_FORMS': '0',
+                'lines-MAX_NUM_FORMS': '1000',
+                'lines-0-product': str(self.product.pk),
+                'lines-0-quantity': '2',
+                'lines-0-unit_price': '15.00',
+                'lines-1-product': str(second_product.pk),
+                'lines-1-quantity': '3',
+                'lines-1-unit_price': '7.00',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        sale = Sale.objects.latest('pk')
+        self.assertEqual(sale.lines.count(), 2)
+        self.assertEqual(sale.total, Decimal('51.00'))
+        self.product.refresh_from_db()
+        second_product.refresh_from_db()
+        self.assertEqual(self.product.quantity, 8)
+        self.assertEqual(second_product.quantity, 17)
+
     def test_sale_lines_roll_back_together_when_stock_becomes_insufficient(self):
         sale = Sale.objects.create(
             invoice_number='INV-ATOMIC',

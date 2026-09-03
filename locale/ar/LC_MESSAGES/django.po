@@ -273,6 +273,9 @@ msgstr "إلغاء"
 msgid "Supprimer"
 msgstr "حذف"
 
+msgid "Supprimer cette ligne"
+msgstr "حذف هذا السطر"
+
 msgid "Modifier"
 msgstr "تعديل"
 
@@ -560,6 +563,9 @@ msgstr "المخزون غير كافٍ لهذا المنتج: المطلوب %(r
 
 msgid "Produit ajouté avec succès."
 msgstr "تمت إضافة المنتج بنجاح."
+
+msgid "Le produit a été créé, mais ses images QR/code-barres n’ont pas pu être stockées. Vérifiez le stockage média."
+msgstr "تم إنشاء المنتج، ولكن تعذر حفظ صور رمز QR والرمز الشريطي. تحقق من إعدادات تخزين الوسائط."
 
 msgid "Produit mis à jour."
 msgstr "تم تحديث المنتج."
