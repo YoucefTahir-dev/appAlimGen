@@ -7,7 +7,7 @@ from django.db.models import Q, Sum
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
-from apps.inventory.models import Client, Product, StockMovement, Supplier
+from apps.inventory.models import Client, Product, ProductPackaging, StockMovement, Supplier
 from apps.inventory.services import record_stock_movements, stock_change_for_delta
 
 
@@ -146,6 +146,8 @@ class PurchaseLine(models.Model):
 
     @transaction.atomic
     def save(self, *args, **kwargs):
+        self.quantity = int(self.quantity)
+        self.purchase_price = Decimal(str(self.purchase_price))
         user = getattr(self, '_stock_user', None)
         if self._state.adding:
             super().save(*args, **kwargs)
@@ -243,6 +245,10 @@ class Sale(models.Model):
     tax_rate = models.DecimalField('TVA (%)', max_digits=5, decimal_places=2, default=0)
     payment_type = models.CharField('Mode de paiement', max_length=20, choices=PAYMENT_CHOICES, default=CASH, blank=True)
     payment_tracking_initialized = models.BooleanField('Suivi des règlements initialisé', default=True)
+    created_by = models.ForeignKey(
+        'accounts.User', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='created_sales', verbose_name='Caissier',
+    )
     created_at = models.DateTimeField('Date', default=timezone.now, db_index=True)
 
     objects = CommercialDocumentQuerySet.as_manager()
@@ -315,6 +321,13 @@ class SaleLine(models.Model):
     sale = models.ForeignKey(Sale, on_delete=models.CASCADE, related_name='lines')
     product = models.ForeignKey(Product, on_delete=models.PROTECT)
     quantity = models.PositiveIntegerField('Quantité')
+    packaging = models.ForeignKey(
+        ProductPackaging, on_delete=models.PROTECT, null=True, blank=True,
+        related_name='sale_lines', verbose_name='Conditionnement',
+    )
+    packaging_name = models.CharField('Conditionnement historique', max_length=100, blank=True)
+    packaging_factor = models.PositiveIntegerField('Facteur historique', default=1, editable=False)
+    packaging_quantity = models.PositiveIntegerField('Quantité vendue', default=1)
     unit_price = models.DecimalField('Prix unitaire', max_digits=12, decimal_places=2)
     unit_cost = models.DecimalField(
         'Coût unitaire historique',
@@ -331,19 +344,40 @@ class SaleLine(models.Model):
 
     @property
     def minimum_sale_price(self):
-        return self.unit_cost
+        return self.unit_cost * self.packaging_factor
 
     def line_total(self):
-        return self.quantity * self.unit_price
+        return self.packaging_quantity * self.unit_price
 
     @transaction.atomic
     def save(self, *args, **kwargs):
+        self.quantity = int(self.quantity)
+        self.packaging_quantity = int(self.packaging_quantity)
+        self.unit_price = Decimal(str(self.unit_price))
         user = getattr(self, '_stock_user', None)
         if self._state.adding:
             locked_product = Product.objects.select_for_update().only('pk', 'purchase_price').get(
                 pk=self.product_id
             )
+            if self.packaging_id:
+                packaging = ProductPackaging.objects.select_for_update().get(pk=self.packaging_id)
+                if packaging.product_id != self.product_id or not packaging.is_active:
+                    raise ValidationError({'packaging': _('Conditionnement invalide ou inactif.')})
+                self.packaging_factor = packaging.conversion_factor
+                self.packaging_name = packaging.name
+            else:
+                self.packaging_factor = 1
+                self.packaging_name = self.product.unit.name if self.product.unit_id else _('Unité')
+                self.packaging_quantity = self.quantity
+            if self.packaging_quantity < 1:
+                raise ValidationError({'packaging_quantity': _('La quantité doit être strictement positive.')})
+            if self.quantity != self.packaging_quantity * self.packaging_factor:
+                raise ValidationError({'quantity': _('La conversion du conditionnement est incohérente.')})
             self.unit_cost = locked_product.purchase_price
+            if self.unit_price < self.minimum_sale_price:
+                raise ValidationError({'unit_price': _(
+                    "Impossible de vendre un produit à un prix inférieur à son prix d'achat."
+                )})
             super().save(*args, **kwargs)
             _apply_line_stock_changes(
                 stock_change_for_delta(
@@ -374,6 +408,19 @@ class SaleLine(models.Model):
             .filter(pk__in={old.product_id, persisted_product_id})
             .order_by('pk')
         }
+        if self.packaging_id:
+            packaging = ProductPackaging.objects.select_for_update().get(pk=self.packaging_id)
+            if packaging.product_id != persisted_product_id or not packaging.is_active:
+                raise ValidationError({'packaging': _('Conditionnement invalide ou inactif.')})
+            self.packaging_factor = packaging.conversion_factor
+            self.packaging_name = packaging.name
+        else:
+            product_for_label = locked_products[persisted_product_id]
+            self.packaging_factor = 1
+            self.packaging_name = product_for_label.unit.name if product_for_label.unit_id else _('Unité')
+            self.packaging_quantity = persisted_quantity
+        if self.packaging_quantity < 1 or persisted_quantity != self.packaging_quantity * self.packaging_factor:
+            raise ValidationError({'quantity': _('La conversion du conditionnement est incohérente.')})
         if old.product_id != persisted_product_id:
             self.unit_cost = locked_products[persisted_product_id].purchase_price
             if update_fields is not None:
@@ -381,6 +428,10 @@ class SaleLine(models.Model):
                 kwargs['update_fields'] = update_fields
         else:
             self.unit_cost = old.unit_cost
+        if self.unit_price < self.minimum_sale_price:
+            raise ValidationError({'unit_price': _(
+                "Impossible de vendre un produit à un prix inférieur à son prix d'achat."
+            )})
         super().save(*args, **kwargs)
         self.product_id = persisted_product_id
         self.quantity = persisted_quantity

@@ -1,4 +1,5 @@
 import io
+from decimal import Decimal
 
 import qrcode
 from django.conf import settings
@@ -183,6 +184,53 @@ class Product(models.Model):
             buf.seek(0)
             self.qr_code.save(f"{self.reference}.png", ContentFile(buf.getvalue()), save=False)
             super().save(update_fields=['qr_code'])
+
+
+class ProductPackaging(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='packagings')
+    name = models.CharField(_('Nom du conditionnement'), max_length=100)
+    conversion_factor = models.PositiveIntegerField(
+        _('Facteur de conversion'),
+        help_text=_("Nombre d'unités de base contenues dans ce conditionnement."),
+    )
+    default_sale_price = models.DecimalField(
+        _('Prix de vente par défaut'), max_digits=12, decimal_places=2,
+    )
+    barcode = models.CharField(_('Code-barres'), max_length=100, unique=True, blank=True, null=True)
+    is_active = models.BooleanField(_('Actif'), default=True)
+
+    class Meta:
+        ordering = ('product__name', 'conversion_factor', 'name')
+        constraints = [
+            models.UniqueConstraint(fields=('product', 'name'), name='uniq_packaging_name_per_product'),
+            models.CheckConstraint(condition=Q(conversion_factor__gte=1), name='packaging_factor_gte_1'),
+            models.CheckConstraint(condition=Q(default_sale_price__gte=0), name='packaging_price_gte_0'),
+        ]
+
+    @property
+    def minimum_sale_price(self):
+        return Decimal(str(self.product.purchase_price)) * int(self.conversion_factor)
+
+    def clean(self):
+        super().clean()
+        if self.conversion_factor and self.default_sale_price is not None:
+            if self.default_sale_price < self.minimum_sale_price:
+                raise ValidationError({
+                    'default_sale_price': _(
+                        "Le prix du conditionnement ne peut pas être inférieur à son coût d'achat."
+                    )
+                })
+
+    def save(self, *args, **kwargs):
+        self.name = normalize_business_text(self.name)
+        self.barcode = normalize_business_text(self.barcode) or None
+        self.conversion_factor = int(self.conversion_factor)
+        self.default_sale_price = Decimal(str(self.default_sale_price))
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.product.name} — {self.name} (x{self.conversion_factor})'
 
 
 class ImmutableStockMovementQuerySet(models.QuerySet):

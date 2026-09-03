@@ -882,3 +882,100 @@ msgstr "المبيعات حسب الفئة"
 
 msgid "Charges par catégorie"
 msgstr "المصاريف حسب الفئة"
+msgid "Vous ne disposez pas de la permission requise."
+msgstr "ليس لديك الإذن المطلوب."
+
+msgid "Vous devez modifier votre mot de passe avant de continuer."
+msgstr "يجب تغيير كلمة المرور قبل المتابعة."
+
+msgid "Vous devez modifier votre mot de passe depuis l’application Web."
+msgstr "يجب تغيير كلمة المرور من تطبيق الويب."
+
+msgid "Les données envoyées sont invalides."
+msgstr "البيانات المرسلة غير صالحة."
+
+msgid "Le refresh token est obligatoire."
+msgstr "رمز التحديث مطلوب."
+
+msgid "Refresh token invalide."
+msgstr "رمز التحديث غير صالح."
+
+msgid "Déconnexion effectuée."
+msgstr "تم تسجيل الخروج."
+
+msgid "Produit introuvable."
+msgstr "المنتج غير موجود."
+
+msgid "Seule l’unité de base est actuellement disponible."
+msgstr "الوحدة الأساسية فقط متاحة حالياً."
+
+msgid "Une vente ou un achat doit contenir au moins un produit."
+msgstr "يجب أن تحتوي عملية البيع أو الشراء على منتج واحد على الأقل."
+
+msgid "Un produit est introuvable."
+msgstr "تعذر العثور على أحد المنتجات."
+
+msgid "Le prix ne peut pas être négatif."
+msgstr "لا يمكن أن يكون السعر سالباً."
+
+msgid "La remise ne peut pas être négative."
+msgstr "لا يمكن أن يكون الخصم سالباً."
+
+msgid "Impossible de vendre un produit à un prix inférieur à son prix d'achat."
+msgstr "لا يمكن بيع منتج بسعر أقل من سعر شرائه."
+
+msgid "Stock insuffisant : %(available)s unité(s) disponible(s)."
+msgstr "المخزون غير كافٍ: %(available)s وحدة متاحة."
+
+msgid "Suppression impossible : cet élément est utilisé."
+msgstr "لا يمكن الحذف لأن هذا العنصر مستخدم."
+msgid "Conditionnement invalide ou inactif."
+msgstr "وحدة التعبئة غير صالحة أو غير نشطة."
+
+msgid "La conversion du conditionnement est incohérente."
+msgstr "تحويل وحدة التعبئة غير متناسق."
+
+msgid "Impossible de vendre un produit à un prix inférieur à son prix d'achat."
+msgstr "لا يمكن بيع منتج بسعر أقل من تكلفة الشراء."
+
+msgid "Le prix du conditionnement ne peut pas être inférieur à son coût d'achat."
+msgstr "لا يمكن أن يكون سعر العبوة أقل من تكلفة شرائها."
+
+msgid "Aucune imprimante active configurée."
+msgstr "لم يتم إعداد أي طابعة نشطة."
+
+msgid "Langue d’impression invalide."
+msgstr "لغة الطباعة غير صالحة."
+
+msgid "Largeur papier invalide."
+msgstr "عرض الورق غير صالح."
+
+msgid "La largeur papier doit être 58 ou 80 mm."
+msgstr "يجب أن يكون عرض الورق 58 أو 80 مم."
+
+msgid "Ce protocole nécessite un adaptateur local dédié."
+msgstr "يحتاج هذا البروتوكول إلى محول محلي مخصص."
+
+msgid "Test imprimante"
+msgstr "اختبار الطابعة"
+
+msgid "Imprimantes"
+msgstr "الطابعات"
+
+msgid "Paramètres des imprimantes"
+msgstr "إعدادات الطابعات"
+
+msgid "Conditionnements"
+msgstr "وحدات التعبئة"
+
+msgid "Conditionnement"
+msgstr "وحدة التعبئة"
+
+msgid "Facteur"
+msgstr "معامل التحويل"
+
+msgid "Actif"
+msgstr "نشط"
+
+msgid "Inactif"
+msgstr "غير نشط"

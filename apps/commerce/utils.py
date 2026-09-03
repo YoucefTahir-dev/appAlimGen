@@ -133,7 +133,7 @@ def get_company_logo_path(company):
 
 def build_invoice_context(sale):
     company = CompanySettings.objects.first()
-    lines = list(sale.lines.select_related('product').all())
+    lines = list(sale.lines.select_related('product', 'packaging').all())
     tax_rate = Decimal(str(sale.tax_rate or 0))
     discount = Decimal(str(sale.discount or 0))
     total_ht = sum((line.line_total() for line in lines), Decimal('0.00'))
@@ -262,8 +262,8 @@ def generate_invoice_pdf(response, sale):
     for index, line in enumerate(context['lines'], start=1):
         table_data.append([
             str(index),
-            Paragraph(pdf_safe_text(line.product.name), styles['ERPSmall']),
-            str(line.quantity),
+            Paragraph(pdf_safe_text(f'{line.product.name} — {line.packaging_name}'), styles['ERPSmall']),
+            str(line.packaging_quantity),
             money(line.unit_price),
             f"{context['tax_rate']}%",
             money(line.line_total()),

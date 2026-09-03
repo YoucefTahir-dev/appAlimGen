@@ -1,0 +1,40 @@
+{% extends 'base/base.html' %}
+{% load i18n access_tags %}
+{% block title %}{% trans "Imprimantes" %} - El Amine ERP{% endblock %}
+{% block page_title %}{% trans "Paramètres des imprimantes" %}{% endblock %}
+{% block content %}
+{% has_access 'printing.add_printerprofile' as can_add %}
+{% has_access 'printing.change_printerprofile' as can_change %}
+{% has_access 'printing.delete_printerprofile' as can_delete %}
+{% has_access 'printing.test_printerprofile' as can_test %}
+<div class="card card-dashboard p-4 bg-white">
+    <div class="page-toolbar mb-3">
+        <div>
+            <h2 class="h5 mb-1">{% trans "Imprimantes" %}</h2>
+            <p class="text-muted mb-0">{% trans "Configuration logique uniquement : la connexion physique reste sur Android ou Windows." %}</p>
+        </div>
+        {% if can_add %}<a class="btn btn-primary" href="{% url 'printer_create' %}">{% trans "Ajouter" %}</a>{% endif %}
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead><tr><th>{% trans "Nom" %}</th><th>{% trans "Modèle" %}</th><th>{% trans "Connexion" %}</th><th>{% trans "Papier" %}</th><th>{% trans "Statut" %}</th><th>{% trans "Actions" %}</th></tr></thead>
+            <tbody>
+            {% for printer in printers %}
+                <tr>
+                    <td>{{ printer.name }}{% if printer.is_default %} <span class="badge text-bg-primary">{% trans "Par défaut" %}</span>{% endif %}</td>
+                    <td>{{ printer.manufacturer }} {{ printer.model_name }}</td>
+                    <td>{{ printer.get_connection_mode_display }}</td>
+                    <td>{{ printer.paper_width }} mm</td>
+                    <td>{% if printer.is_active %}<span class="badge text-bg-success">{% trans "Active" %}</span>{% else %}<span class="badge text-bg-secondary">{% trans "Inactive" %}</span>{% endif %}</td>
+                    <td><div class="btn-group btn-group-sm">
+                        {% if can_test and printer.is_active %}<a class="btn btn-outline-success" href="{% url 'printer_test' printer.pk %}">{% trans "Tester l’impression" %}</a>{% endif %}
+                        {% if can_change %}<a class="btn btn-outline-primary" href="{% url 'printer_update' printer.pk %}">{% trans "Modifier" %}</a>{% endif %}
+                        {% if can_delete %}<a class="btn btn-outline-danger" href="{% url 'printer_delete' printer.pk %}">{% trans "Supprimer" %}</a>{% endif %}
+                    </div></td>
+                </tr>
+            {% empty %}<tr><td colspan="6" class="text-muted">{% trans "Aucune imprimante configurée." %}</td></tr>{% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

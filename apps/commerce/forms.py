@@ -1,7 +1,10 @@
 from django import forms
 from django.core.exceptions import ValidationError
 from django.forms import BaseInlineFormSet, inlineformset_factory
+from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
+
+from apps.inventory.models import ProductPackaging
 
 from .models import Payment, Purchase, PurchaseLine, Sale, SaleLine
 
@@ -111,16 +114,31 @@ class PaymentForm(forms.ModelForm):
 class SaleLineForm(forms.ModelForm):
     class Meta:
         model = SaleLine
-        fields = ('product', 'quantity', 'unit_price')
+        fields = ('product', 'packaging', 'quantity', 'unit_price')
         widgets = {
             'product': forms.Select(attrs={'class': 'form-select'}),
+            'packaging': forms.Select(attrs={'class': 'form-select'}),
             'quantity': forms.NumberInput(attrs={'class': 'form-control'}),
             'unit_price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        queryset = ProductPackaging.objects.filter(is_active=True).select_related('product').order_by('product__name', 'name')
+        if self.instance and self.instance.pk and self.instance.packaging_id:
+            queryset = ProductPackaging.objects.filter(
+                Q(is_active=True) | Q(pk=self.instance.packaging_id)
+            ).select_related('product').order_by('product__name', 'name')
+        self.fields['packaging'].queryset = queryset
+        self.fields['packaging'].required = False
+        self.fields['packaging'].empty_label = _('Unité de base')
+        if self.instance and self.instance.pk:
+            self.initial['quantity'] = self.instance.packaging_quantity
+
     def clean(self):
         cleaned_data = super().clean()
         product = cleaned_data.get('product')
+        packaging = cleaned_data.get('packaging')
         quantity = cleaned_data.get('quantity')
         unit_price = cleaned_data.get('unit_price')
 
@@ -128,10 +146,29 @@ class SaleLineForm(forms.ModelForm):
             self.add_error('quantity', _('La quantité doit être strictement positive.'))
         if unit_price is not None and unit_price < 0:
             self.add_error('unit_price', _('Le prix unitaire ne peut pas être négatif.'))
-        if product and unit_price is not None and unit_price < product.purchase_price:
+        if packaging and (not product or packaging.product_id != product.pk or not packaging.is_active):
+            self.add_error('packaging', _('Conditionnement invalide ou inactif.'))
+        factor = packaging.conversion_factor if packaging else 1
+        if product and unit_price is not None and unit_price < product.purchase_price * factor:
             raise ValidationError(_("Le prix de vente est inférieur au coût d'achat. Vente refusée."))
 
         return cleaned_data
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        packaging = self.cleaned_data.get('packaging')
+        package_quantity = self.cleaned_data['quantity']
+        factor = packaging.conversion_factor if packaging else 1
+        instance.packaging_quantity = package_quantity
+        instance.packaging_factor = factor
+        instance.packaging_name = packaging.name if packaging else (
+            instance.product.unit.name if instance.product.unit_id else str(_('Unité'))
+        )
+        instance.quantity = package_quantity * factor
+        if commit:
+            instance.save()
+            self.save_m2m()
+        return instance
 
 
 class BaseSaleLineFormSet(BaseInlineFormSet):
@@ -149,11 +186,13 @@ class BaseSaleLineFormSet(BaseInlineFormSet):
                 continue
 
             product = cleaned_data.get('product')
+            packaging = cleaned_data.get('packaging')
             quantity = cleaned_data.get('quantity') or 0
             if not product:
                 continue
 
-            required_by_product[product.pk] = required_by_product.get(product.pk, 0) + quantity
+            factor = packaging.conversion_factor if packaging else 1
+            required_by_product[product.pk] = required_by_product.get(product.pk, 0) + (quantity * factor)
             if product.pk not in available_by_product:
                 available_by_product[product.pk] = product.quantity
 

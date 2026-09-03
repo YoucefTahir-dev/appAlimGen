@@ -22,6 +22,8 @@ apps/
   inventory/  Produits, stock, clients, fournisseurs, imports/exports
   commerce/   Achats, ventes, factures PDF
   expenses/   Charges, catégories de dépenses, exports et rapports
+  api/        API REST v1, JWT, serializers et contrat OpenAPI
+  printing/   Profils et payloads d'impression multi-clients
 gestio_stock/ Configuration Django
 static/       CSS, logo et assets
 templates/    Templates globaux
@@ -69,6 +71,21 @@ Commandes recommandées avant chaque merge :
 Les dépendances directes sont déclarées dans `requirements.in`. Le fichier
 `requirements.lock` est généré avec `pip-compile --generate-hashes` et constitue
 la source reproductible utilisée par Render, Docker et la CI.
+
+## API mobile
+
+Une API REST versionnée est disponible sous `/api/v1/`. Elle utilise JWT sans
+modifier les sessions de l'application Web, et applique les mêmes rôles,
+permissions et refus individuels. La documentation OpenAPI réservée aux
+administrateurs est disponible sous `/api/docs/`.
+
+Voir [ANDROID_API_GUIDE.md](ANDROID_API_GUIDE.md) pour l'authentification, les
+endpoints, la pagination, les erreurs et les exemples Android.
+
+Documents d'architecture : [API_ARCHITECTURE.md](API_ARCHITECTURE.md),
+[PRINTER_ARCHITECTURE.md](PRINTER_ARCHITECTURE.md),
+[THERMAL_PRINTING.md](THERMAL_PRINTING.md), [RPP02N_SETUP.md](RPP02N_SETUP.md) et
+[WINDOWS_CLIENT_ARCHITECTURE.md](WINDOWS_CLIENT_ARCHITECTURE.md).
 
 Pour vérifier les paramètres production :
 

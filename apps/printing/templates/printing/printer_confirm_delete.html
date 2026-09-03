@@ -1,0 +1,6 @@
+{% extends 'base/base.html' %}
+{% load i18n %}
+{% block page_title %}{% trans "Supprimer l’imprimante" %}{% endblock %}
+{% block content %}
+<div class="card card-dashboard p-4 bg-white"><p>{% blocktrans with name=printer.name %}Supprimer l’imprimante « {{ name }} » ?{% endblocktrans %}</p><form method="post">{% csrf_token %}<button class="btn btn-danger">{% trans "Supprimer" %}</button> <a class="btn btn-secondary" href="{% url 'printer_list' %}">{% trans "Annuler" %}</a></form></div>
+{% endblock %}

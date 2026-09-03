@@ -17,6 +17,24 @@
             <p><strong>{% trans "Marque" %} :</strong> {{ product.brand }}</p>
             <p><strong>{% trans "Prix de vente" %} :</strong> {{ product.sale_price }} {% trans "DZD" %}</p>
             <p><strong>{% trans "Quantité" %} :</strong> {{ product.quantity }}</p>
+            <h4 class="h6 mt-4">{% trans "Conditionnements" %}</h4>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead><tr><th>{% trans "Nom" %}</th><th>{% trans "Facteur" %}</th><th>{% trans "Prix de vente" %}</th><th>{% trans "Statut" %}</th></tr></thead>
+                    <tbody>
+                    {% for packaging in product.packagings.all %}
+                        <tr>
+                            <td>{{ packaging.name }}</td>
+                            <td>{{ packaging.conversion_factor }}</td>
+                            <td>{{ packaging.default_sale_price }} {% trans "DZD" %}</td>
+                            <td>{% if packaging.is_active %}{% trans "Actif" %}{% else %}{% trans "Inactif" %}{% endif %}</td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="4" class="text-muted">{% trans "Aucun conditionnement configuré." %}</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
 
         <div class="col-12 col-lg-4 text-lg-center">

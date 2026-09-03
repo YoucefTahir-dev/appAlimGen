@@ -1,0 +1,20 @@
+{% extends 'base/base.html' %}
+{% load i18n %}
+{% block title %}{{ title }} - El Amine ERP{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="card card-dashboard p-4 bg-white">
+    <form method="post">
+        {% csrf_token %}{{ form.non_field_errors }}
+        <div class="row g-3">
+        {% for field in form %}
+            <div class="{% if field.field.widget.input_type == 'checkbox' %}col-12 form-check ms-2{% else %}col-12 col-md-6{% endif %}">
+                {% if field.field.widget.input_type == 'checkbox' %}{{ field }} {{ field.label_tag }}{% else %}{{ field.label_tag }}{{ field }}{% endif %}
+                {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}{{ field.errors }}
+            </div>
+        {% endfor %}
+        </div>
+        <div class="form-actions mt-4"><button class="btn btn-success">{% trans "Enregistrer" %}</button><a class="btn btn-secondary" href="{% url 'printer_list' %}">{% trans "Retour" %}</a></div>
+    </form>
+</div>
+{% endblock %}

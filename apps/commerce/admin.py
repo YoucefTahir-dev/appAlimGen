@@ -61,8 +61,8 @@ class TicketSequenceAdmin(admin.ModelAdmin):
 @admin.register(SaleLine)
 class SaleLineAdmin(admin.ModelAdmin):
     actions = None
-    list_display = ('sale', 'product', 'quantity', 'unit_price', 'unit_cost')
-    readonly_fields = ('unit_cost',)
+    list_display = ('sale', 'product', 'packaging_name', 'packaging_quantity', 'quantity', 'unit_price', 'unit_cost')
+    readonly_fields = ('unit_cost', 'packaging_name', 'packaging_factor')
 
     def save_model(self, request, obj, form, change):
         obj._stock_user = request.user

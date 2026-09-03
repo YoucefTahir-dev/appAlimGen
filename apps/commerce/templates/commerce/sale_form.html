@@ -35,7 +35,8 @@
                 <thead>
                     <tr>
                         <th>{% trans "Produit" %}</th>
-                        <th>Quantité</th>
+                        <th>{% trans "Conditionnement" %}</th>
+                        <th>{% trans "Quantité" %}</th>
                         <th>{% trans "Prix unitaire" %}</th>
                         <th>{% trans "Supprimer" %}</th>
                     </tr>
@@ -44,13 +45,14 @@
                     {% for form_line in formset %}
                         {% if form_line.non_field_errors %}
                             <tr>
-                                <td colspan="4">
+                                <td colspan="5">
                                     <div class="alert alert-danger mb-0">{{ form_line.non_field_errors }}</div>
                                 </td>
                             </tr>
                         {% endif %}
                         <tr>
                             <td>{{ form_line.product }}{{ form_line.product.errors }}</td>
+                            <td>{{ form_line.packaging }}{{ form_line.packaging.errors }}</td>
                             <td>{{ form_line.quantity }}{{ form_line.quantity.errors }}</td>
                             <td>{{ form_line.unit_price }}{{ form_line.unit_price.errors }}</td>
                             <td>{{ form_line.DELETE }}</td>

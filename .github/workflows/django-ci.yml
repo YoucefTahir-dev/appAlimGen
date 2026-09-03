@@ -2,7 +2,7 @@ name: Django CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'feature/**', 'fix/**', 'security/**']
   pull_request:
     branches: [main]
 
@@ -48,6 +48,7 @@ jobs:
           sed -i 's|^DATABASE_URL=.*|DATABASE_URL=postgresql://postgres:postgres@localhost:5432/test_db|' .env
           sed -i 's|^DJANGO_DEBUG=.*|DJANGO_DEBUG=False|' .env
           sed -i 's|^SECRET_KEY=.*|SECRET_KEY=ci-secret-key-for-tests-only-abcdefghijklmnopqrstuvwxyz-1234567890|' .env
+          sed -i 's|^JWT_SIGNING_KEY=.*|JWT_SIGNING_KEY=ci-jwt-signing-key-only-abcdefghijklmnopqrstuvwxyz-1234567890|' .env
           sed -i 's|^MEDIA_FILESYSTEM_PERSISTENT=.*|MEDIA_FILESYSTEM_PERSISTENT=True|' .env
           sed -i 's|^MEDIA_ROOT=.*|MEDIA_ROOT=/tmp/gestio-stock-media|' .env
 
@@ -59,6 +60,12 @@ jobs:
 
       - name: Validate static assets
         run: python manage.py collectstatic --noinput
+
+      - name: Compile Python sources
+        run: python -m compileall -q apps gestio_stock
+
+      - name: Validate OpenAPI contract
+        run: python manage.py spectacular --file /tmp/openapi.yaml --validate
 
       - name: Run migrations
         run: python manage.py migrate --noinput
@@ -73,5 +80,5 @@ jobs:
 
       - name: Audit dependencies
         run: |
-          pip install pip-audit
+          pip install pip-audit==2.9.0
           python -m pip_audit -r requirements.lock

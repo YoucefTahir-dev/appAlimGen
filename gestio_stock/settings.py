@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 from importlib.util import find_spec
 from pathlib import Path
 from urllib.parse import parse_qsl, urlparse, unquote
@@ -48,11 +49,17 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django.contrib.humanize',
     'widget_tweaks',
+    'rest_framework',
+    'rest_framework_simplejwt.token_blacklist',
+    'django_filters',
+    'drf_spectacular',
     'apps.accounts',
     'apps.core',
     'apps.inventory',
     'apps.commerce',
     'apps.expenses',
+    'apps.api',
+    'apps.printing',
 ]
 
 MEDIA_STORAGE_BACKEND = os.getenv('MEDIA_STORAGE_BACKEND', 'filesystem').strip().lower()
@@ -290,6 +297,56 @@ else:
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'accounts.User'
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        'apps.api.permissions.BusinessPermission',
+    ),
+    'DEFAULT_PAGINATION_CLASS': 'apps.api.pagination.StandardResultsSetPagination',
+    'DEFAULT_FILTER_BACKENDS': (
+        'django_filters.rest_framework.DjangoFilterBackend',
+        'rest_framework.filters.SearchFilter',
+        'rest_framework.filters.OrderingFilter',
+    ),
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_RENDERER_CLASSES': (
+        'apps.api.renderers.EnvelopeJSONRenderer',
+    ),
+    'EXCEPTION_HANDLER': 'apps.api.exceptions.api_exception_handler',
+    'DEFAULT_THROTTLE_CLASSES': (
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ),
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': os.getenv('API_ANON_THROTTLE_RATE', '60/minute'),
+        'user': os.getenv('API_USER_THROTTLE_RATE', '1200/hour'),
+        'auth': os.getenv('API_AUTH_THROTTLE_RATE', '10/minute'),
+    },
+}
+
+JWT_SIGNING_KEY = os.getenv('JWT_SIGNING_KEY', '').strip() or SECRET_KEY
+if not DEBUG and len(JWT_SIGNING_KEY) < 32:
+    raise ImproperlyConfigured('JWT_SIGNING_KEY est trop faible pour la production.')
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=env_int('JWT_ACCESS_MINUTES', 10)),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=env_int('JWT_REFRESH_DAYS', 7)),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'UPDATE_LAST_LOGIN': True,
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'SIGNING_KEY': JWT_SIGNING_KEY,
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'El Amine ERP API',
+    'DESCRIPTION': 'API REST versionnée pour les clients mobiles autorisés.',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+}
 
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'dashboard'

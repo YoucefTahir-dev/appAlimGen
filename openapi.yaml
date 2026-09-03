@@ -1,0 +1,3863 @@
+openapi: 3.0.3
+info:
+  title: El Amine ERP API
+  version: 1.0.0
+  description: API REST versionnée pour les clients mobiles autorisés.
+paths:
+  /api/v1/alerts/:
+    get:
+      operationId: api_v1_alerts_retrieve
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/auth/login/:
+    post:
+      operationId: api_v1_auth_login_create
+      description: |-
+        Takes a set of user credentials and returns an access and refresh JSON web
+        token pair to prove the authentication of those credentials.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MobileToken'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MobileToken'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MobileToken'
+        required: true
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MobileToken'
+          description: ''
+  /api/v1/auth/logout/:
+    post:
+      operationId: api_v1_auth_logout_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogoutResponse'
+          description: ''
+  /api/v1/auth/me/:
+    get:
+      operationId: api_v1_auth_me_retrieve
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/auth/refresh/:
+    post:
+      operationId: api_v1_auth_refresh_create
+      description: |-
+        Takes a refresh type JSON web token and returns an access type JSON web
+        token if the refresh token is valid.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+        required: true
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenRefresh'
+          description: ''
+  /api/v1/brands/:
+    get:
+      operationId: api_v1_brands_list
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Quel champ utiliser pour classer les résultats.
+        schema:
+          type: string
+      - name: search
+        required: false
+        in: query
+        description: Un terme de recherche.
+        schema:
+          type: string
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Brand'
+          description: ''
+  /api/v1/brands/{id}/:
+    get:
+      operationId: api_v1_brands_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) brand.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Brand'
+          description: ''
+  /api/v1/categories/:
+    get:
+      operationId: api_v1_categories_list
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Quel champ utiliser pour classer les résultats.
+        schema:
+          type: string
+      - name: search
+        required: false
+        in: query
+        description: Un terme de recherche.
+        schema:
+          type: string
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Category'
+          description: ''
+  /api/v1/categories/{id}/:
+    get:
+      operationId: api_v1_categories_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) category.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+          description: ''
+  /api/v1/clients/:
+    get:
+      operationId: api_v1_clients_list
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Quel champ utiliser pour classer les résultats.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: Un numéro de page de l'ensemble des résultats.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Nombre de résultats à retourner par page.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: Un terme de recherche.
+        schema:
+          type: string
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedClientList'
+          description: ''
+    post:
+      operationId: api_v1_clients_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Client'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Client'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Client'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+          description: ''
+  /api/v1/clients/{id}/:
+    get:
+      operationId: api_v1_clients_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Client.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+          description: ''
+    put:
+      operationId: api_v1_clients_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Client.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Client'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Client'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Client'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+          description: ''
+    patch:
+      operationId: api_v1_clients_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Client.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedClient'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedClient'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedClient'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+          description: ''
+    delete:
+      operationId: api_v1_clients_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Client.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/clients/{id}/history/:
+    get:
+      operationId: api_v1_clients_history_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Client.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+          description: ''
+  /api/v1/dashboard/:
+    get:
+      operationId: api_v1_dashboard_retrieve
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/expense-categories/:
+    get:
+      operationId: api_v1_expense_categories_list
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Quel champ utiliser pour classer les résultats.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: Un numéro de page de l'ensemble des résultats.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Nombre de résultats à retourner par page.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: Un terme de recherche.
+        schema:
+          type: string
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedExpenseCategoryList'
+          description: ''
+    post:
+      operationId: api_v1_expense_categories_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExpenseCategory'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ExpenseCategory'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ExpenseCategory'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpenseCategory'
+          description: ''
+  /api/v1/expense-categories/{id}/:
+    get:
+      operationId: api_v1_expense_categories_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Catégorie
+          de charge.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpenseCategory'
+          description: ''
+    put:
+      operationId: api_v1_expense_categories_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Catégorie
+          de charge.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExpenseCategory'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ExpenseCategory'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ExpenseCategory'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpenseCategory'
+          description: ''
+    patch:
+      operationId: api_v1_expense_categories_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Catégorie
+          de charge.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedExpenseCategory'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedExpenseCategory'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedExpenseCategory'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpenseCategory'
+          description: ''
+    delete:
+      operationId: api_v1_expense_categories_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Catégorie
+          de charge.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/expenses/:
+    get:
+      operationId: api_v1_expenses_list
+      parameters:
+      - in: query
+        name: category
+        schema:
+          type: integer
+      - name: ordering
+        required: false
+        in: query
+        description: Quel champ utiliser pour classer les résultats.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: Un numéro de page de l'ensemble des résultats.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Nombre de résultats à retourner par page.
+        schema:
+          type: integer
+      - in: query
+        name: payment_method
+        schema:
+          type: string
+          title: Moyen de paiement
+          enum:
+          - card
+          - cash
+          - cheque
+          - transfer
+        description: |-
+          * `cash` - Espèces
+          * `cheque` - Chèque
+          * `transfer` - Virement
+          * `card` - Carte
+      - name: search
+        required: false
+        in: query
+        description: Un terme de recherche.
+        schema:
+          type: string
+      - in: query
+        name: supplier
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedExpenseList'
+          description: ''
+    post:
+      operationId: api_v1_expenses_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Expense'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Expense'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Expense'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Expense'
+          description: ''
+  /api/v1/expenses/{id}/:
+    get:
+      operationId: api_v1_expenses_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Charge.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Expense'
+          description: ''
+    put:
+      operationId: api_v1_expenses_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Charge.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Expense'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Expense'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Expense'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Expense'
+          description: ''
+    patch:
+      operationId: api_v1_expenses_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Charge.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedExpense'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedExpense'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedExpense'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Expense'
+          description: ''
+    delete:
+      operationId: api_v1_expenses_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Charge.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/invoices/:
+    get:
+      operationId: api_v1_invoices_list
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Quel champ utiliser pour classer les résultats.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: Un numéro de page de l'ensemble des résultats.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Nombre de résultats à retourner par page.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: Un terme de recherche.
+        schema:
+          type: string
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedSaleList'
+          description: ''
+  /api/v1/invoices/{id}/:
+    get:
+      operationId: api_v1_invoices_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Vente.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Sale'
+          description: ''
+  /api/v1/invoices/{id}/pdf/:
+    get:
+      operationId: api_v1_invoices_pdf_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Vente.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Sale'
+          description: ''
+  /api/v1/invoices/{id}/print-data/:
+    get:
+      operationId: api_v1_invoices_print_data_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Vente.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Sale'
+          description: ''
+  /api/v1/invoices/{id}/ticket/:
+    get:
+      operationId: api_v1_invoices_ticket_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Vente.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Sale'
+          description: ''
+  /api/v1/packagings/:
+    get:
+      operationId: api_v1_packagings_list
+      parameters:
+      - in: query
+        name: is_active
+        schema:
+          type: boolean
+      - name: ordering
+        required: false
+        in: query
+        description: Quel champ utiliser pour classer les résultats.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: Un numéro de page de l'ensemble des résultats.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Nombre de résultats à retourner par page.
+        schema:
+          type: integer
+      - in: query
+        name: product
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: Un terme de recherche.
+        schema:
+          type: string
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProductPackagingList'
+          description: ''
+    post:
+      operationId: api_v1_packagings_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductPackaging'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProductPackaging'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProductPackaging'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductPackaging'
+          description: ''
+  /api/v1/packagings/{id}/:
+    get:
+      operationId: api_v1_packagings_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) product packaging.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductPackaging'
+          description: ''
+    put:
+      operationId: api_v1_packagings_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) product packaging.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductPackaging'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProductPackaging'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProductPackaging'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductPackaging'
+          description: ''
+    patch:
+      operationId: api_v1_packagings_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) product packaging.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedProductPackaging'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedProductPackaging'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedProductPackaging'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductPackaging'
+          description: ''
+    delete:
+      operationId: api_v1_packagings_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) product packaging.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/print-profiles/:
+    get:
+      operationId: api_v1_print_profiles_list
+      parameters:
+      - in: query
+        name: document_type
+        schema:
+          type: string
+          title: Type de document
+          enum:
+          - delivery_note
+          - invoice_a4
+          - product_label
+          - purchase_order
+          - ticket_58
+          - ticket_80
+        description: |-
+          * `ticket_58` - Ticket 58 mm
+          * `ticket_80` - Ticket 80 mm
+          * `invoice_a4` - Facture A4
+          * `purchase_order` - Bon d’achat
+          * `delivery_note` - Bon de livraison
+          * `product_label` - Étiquette produit
+      - in: query
+        name: is_active
+        schema:
+          type: boolean
+      - in: query
+        name: language
+        schema:
+          type: string
+          title: Langue
+          enum:
+          - ar
+          - bilingual
+          - en
+          - fr
+        description: |-
+          * `fr` - Français
+          * `ar` - Arabe
+          * `en` - Anglais
+          * `bilingual` - Bilingue français/arabe
+      - name: ordering
+        required: false
+        in: query
+        description: Quel champ utiliser pour classer les résultats.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: Un numéro de page de l'ensemble des résultats.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Nombre de résultats à retourner par page.
+        schema:
+          type: integer
+      - in: query
+        name: printer
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: Un terme de recherche.
+        schema:
+          type: string
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedPrintProfileList'
+          description: ''
+    post:
+      operationId: api_v1_print_profiles_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PrintProfile'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PrintProfile'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PrintProfile'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrintProfile'
+          description: ''
+  /api/v1/print-profiles/{id}/:
+    get:
+      operationId: api_v1_print_profiles_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) print profile.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrintProfile'
+          description: ''
+    put:
+      operationId: api_v1_print_profiles_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) print profile.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PrintProfile'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PrintProfile'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PrintProfile'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrintProfile'
+          description: ''
+    patch:
+      operationId: api_v1_print_profiles_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) print profile.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedPrintProfile'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedPrintProfile'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedPrintProfile'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrintProfile'
+          description: ''
+    delete:
+      operationId: api_v1_print_profiles_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) print profile.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/printers/:
+    get:
+      operationId: api_v1_printers_list
+      parameters:
+      - in: query
+        name: connection_mode
+        schema:
+          type: string
+          title: Mode de connexion
+          enum:
+          - android
+          - bluetooth
+          - network
+          - other
+          - usb
+          - windows
+        description: |-
+          * `bluetooth` - Bluetooth
+          * `usb` - USB
+          * `network` - Réseau TCP/IP
+          * `windows` - Imprimante système Windows
+          * `android` - Android Print Service
+          * `other` - Autre
+      - in: query
+        name: is_active
+        schema:
+          type: boolean
+      - in: query
+        name: is_default
+        schema:
+          type: boolean
+      - name: ordering
+        required: false
+        in: query
+        description: Quel champ utiliser pour classer les résultats.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: Un numéro de page de l'ensemble des résultats.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Nombre de résultats à retourner par page.
+        schema:
+          type: integer
+      - in: query
+        name: paper_width
+        schema:
+          type: integer
+          title: Largeur papier
+          enum:
+          - 58
+          - 80
+        description: |-
+          * `58` - 58 mm
+          * `80` - 80 mm
+      - in: query
+        name: protocol
+        schema:
+          type: string
+          title: Protocole
+          enum:
+          - custom
+          - epson_escpos
+          - generic_escpos
+          - gp
+          - posiflex
+          - star
+          - sunmi
+          - xprinter
+        description: |-
+          * `generic_escpos` - Generic ESC/POS
+          * `epson_escpos` - Epson compatible ESC/POS
+          * `xprinter` - XPrinter
+          * `sunmi` - Sunmi
+          * `star` - Star
+          * `posiflex` - Posiflex
+          * `gp` - GP
+          * `custom` - Autre protocole
+      - name: search
+        required: false
+        in: query
+        description: Un terme de recherche.
+        schema:
+          type: string
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedPrinterProfileList'
+          description: ''
+    post:
+      operationId: api_v1_printers_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PrinterProfile'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PrinterProfile'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PrinterProfile'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrinterProfile'
+          description: ''
+  /api/v1/printers/{id}/:
+    get:
+      operationId: api_v1_printers_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) printer profile.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrinterProfile'
+          description: ''
+    put:
+      operationId: api_v1_printers_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) printer profile.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PrinterProfile'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PrinterProfile'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PrinterProfile'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrinterProfile'
+          description: ''
+    patch:
+      operationId: api_v1_printers_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) printer profile.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedPrinterProfile'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedPrinterProfile'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedPrinterProfile'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrinterProfile'
+          description: ''
+    delete:
+      operationId: api_v1_printers_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) printer profile.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/printers/{id}/test-payload/:
+    get:
+      operationId: api_v1_printers_test_payload_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) printer profile.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrinterProfile'
+          description: ''
+  /api/v1/printers/default/:
+    get:
+      operationId: api_v1_printers_default_retrieve
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrinterProfile'
+          description: ''
+  /api/v1/printing/:
+    get:
+      operationId: api_v1_printing_retrieve
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/products/:
+    get:
+      operationId: api_v1_products_list
+      parameters:
+      - in: query
+        name: brand
+        schema:
+          type: integer
+      - in: query
+        name: category
+        schema:
+          type: integer
+      - name: ordering
+        required: false
+        in: query
+        description: Quel champ utiliser pour classer les résultats.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: Un numéro de page de l'ensemble des résultats.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Nombre de résultats à retourner par page.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: Un terme de recherche.
+        schema:
+          type: string
+      - in: query
+        name: unit
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProductList'
+          description: ''
+    post:
+      operationId: api_v1_products_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Product'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Product'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Product'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+          description: ''
+  /api/v1/products/{id}/:
+    get:
+      operationId: api_v1_products_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Produit.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+          description: ''
+    put:
+      operationId: api_v1_products_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Produit.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Product'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Product'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Product'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+          description: ''
+    patch:
+      operationId: api_v1_products_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Produit.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedProduct'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedProduct'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedProduct'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+          description: ''
+    delete:
+      operationId: api_v1_products_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Produit.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/products/barcode/{barcode}/:
+    get:
+      operationId: api_v1_products_barcode_retrieve
+      parameters:
+      - in: path
+        name: barcode
+        schema:
+          type: string
+          title: Code-barres
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+          description: ''
+  /api/v1/products/qr/{reference}/:
+    get:
+      operationId: api_v1_products_qr_retrieve
+      parameters:
+      - in: path
+        name: reference
+        schema:
+          type: string
+          title: Référence
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+          description: ''
+  /api/v1/purchases/:
+    get:
+      operationId: api_v1_purchases_list
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Quel champ utiliser pour classer les résultats.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: Un numéro de page de l'ensemble des résultats.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Nombre de résultats à retourner par page.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: Un terme de recherche.
+        schema:
+          type: string
+      - in: query
+        name: supplier
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedPurchaseList'
+          description: ''
+    post:
+      operationId: api_v1_purchases_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Purchase'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Purchase'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Purchase'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Purchase'
+          description: ''
+  /api/v1/purchases/{id}/:
+    get:
+      operationId: api_v1_purchases_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Bon d'achat.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Purchase'
+          description: ''
+    delete:
+      operationId: api_v1_purchases_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Bon d'achat.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/sales/:
+    get:
+      operationId: api_v1_sales_list
+      parameters:
+      - in: query
+        name: client
+        schema:
+          type: integer
+      - name: ordering
+        required: false
+        in: query
+        description: Quel champ utiliser pour classer les résultats.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: Un numéro de page de l'ensemble des résultats.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Nombre de résultats à retourner par page.
+        schema:
+          type: integer
+      - in: query
+        name: payment_type
+        schema:
+          type: string
+          title: Mode de paiement
+          enum:
+          - cash
+          - cheque
+          - transfer
+        description: |-
+          * `cash` - Espèces
+          * `cheque` - Chèque
+          * `transfer` - Virement
+      - name: search
+        required: false
+        in: query
+        description: Un terme de recherche.
+        schema:
+          type: string
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedSaleList'
+          description: ''
+    post:
+      operationId: api_v1_sales_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Sale'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Sale'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Sale'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Sale'
+          description: ''
+  /api/v1/sales/{id}/:
+    get:
+      operationId: api_v1_sales_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Vente.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Sale'
+          description: ''
+    delete:
+      operationId: api_v1_sales_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Vente.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/stock/:
+    get:
+      operationId: api_v1_stock_list
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Quel champ utiliser pour classer les résultats.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: Un numéro de page de l'ensemble des résultats.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Nombre de résultats à retourner par page.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: Un terme de recherche.
+        schema:
+          type: string
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProductList'
+          description: ''
+  /api/v1/stock/{id}/:
+    get:
+      operationId: api_v1_stock_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Produit.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+          description: ''
+  /api/v1/stock/alerts/:
+    get:
+      operationId: api_v1_stock_alerts_retrieve
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+          description: ''
+  /api/v1/stock/movements/:
+    get:
+      operationId: api_v1_stock_movements_retrieve
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+          description: ''
+  /api/v1/suppliers/:
+    get:
+      operationId: api_v1_suppliers_list
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Quel champ utiliser pour classer les résultats.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: Un numéro de page de l'ensemble des résultats.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Nombre de résultats à retourner par page.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: Un terme de recherche.
+        schema:
+          type: string
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedSupplierList'
+          description: ''
+    post:
+      operationId: api_v1_suppliers_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Supplier'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Supplier'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Supplier'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Supplier'
+          description: ''
+  /api/v1/suppliers/{id}/:
+    get:
+      operationId: api_v1_suppliers_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Fournisseur.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Supplier'
+          description: ''
+    put:
+      operationId: api_v1_suppliers_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Fournisseur.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Supplier'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Supplier'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Supplier'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Supplier'
+          description: ''
+    patch:
+      operationId: api_v1_suppliers_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Fournisseur.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSupplier'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSupplier'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSupplier'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Supplier'
+          description: ''
+    delete:
+      operationId: api_v1_suppliers_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Fournisseur.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/suppliers/{id}/history/:
+    get:
+      operationId: api_v1_suppliers_history_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Fournisseur.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Supplier'
+          description: ''
+  /api/v1/units/:
+    get:
+      operationId: api_v1_units_list
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Quel champ utiliser pour classer les résultats.
+        schema:
+          type: string
+      - name: search
+        required: false
+        in: query
+        description: Un terme de recherche.
+        schema:
+          type: string
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Unit'
+          description: ''
+  /api/v1/units/{id}/:
+    get:
+      operationId: api_v1_units_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) unit.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unit'
+          description: ''
+components:
+  schemas:
+    BlankEnum:
+      enum:
+      - ''
+    Brand:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          title: Nom marque
+          maxLength: 120
+      required:
+      - id
+      - name
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          title: Nom catégorie
+          maxLength: 120
+      required:
+      - id
+      - name
+    Client:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          title: Nom
+          maxLength: 200
+        phone:
+          type: string
+          title: Téléphone
+          maxLength: 50
+        address:
+          type: string
+          title: Adresse
+          maxLength: 255
+        wilaya:
+          type: string
+          maxLength: 100
+        email:
+          type: string
+          format: email
+          title: Courriel
+          maxLength: 254
+        tax_number:
+          type: string
+          title: NIF
+          maxLength: 100
+        balance:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          title: Solde
+        notes:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - name
+    ConnectionModeEnum:
+      enum:
+      - bluetooth
+      - usb
+      - network
+      - windows
+      - android
+      - other
+      type: string
+      description: |-
+        * `bluetooth` - Bluetooth
+        * `usb` - USB
+        * `network` - Réseau TCP/IP
+        * `windows` - Imprimante système Windows
+        * `android` - Android Print Service
+        * `other` - Autre
+    DocumentTypeEnum:
+      enum:
+      - ticket_58
+      - ticket_80
+      - invoice_a4
+      - purchase_order
+      - delivery_note
+      - product_label
+      type: string
+      description: |-
+        * `ticket_58` - Ticket 58 mm
+        * `ticket_80` - Ticket 80 mm
+        * `invoice_a4` - Facture A4
+        * `purchase_order` - Bon d’achat
+        * `delivery_note` - Bon de livraison
+        * `product_label` - Étiquette produit
+    Expense:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        number:
+          type: string
+          readOnly: true
+          title: Numéro
+        date:
+          type: string
+          format: date
+        category:
+          type: integer
+        description:
+          type: string
+          maxLength: 255
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          title: Montant
+        payment_method:
+          allOf:
+          - $ref: '#/components/schemas/PaymentMethodEnum'
+          title: Moyen de paiement
+        supplier:
+          type: integer
+          nullable: true
+        receipt:
+          type: string
+          format: uri
+          nullable: true
+          title: Pièce justificative
+        created_by:
+          type: integer
+          readOnly: true
+        created_by_name:
+          type: string
+          readOnly: true
+        observation:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - amount
+      - category
+      - created_at
+      - created_by
+      - created_by_name
+      - description
+      - id
+      - number
+      - updated_at
+    ExpenseCategory:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          title: Nom
+          maxLength: 120
+        is_active:
+          type: boolean
+          title: Active
+      required:
+      - id
+      - name
+    LanguageEnum:
+      enum:
+      - fr
+      - ar
+      - en
+      - bilingual
+      type: string
+      description: |-
+        * `fr` - Français
+        * `ar` - Arabe
+        * `en` - Anglais
+        * `bilingual` - Bilingue français/arabe
+    LogoutRequest:
+      type: object
+      properties:
+        refresh:
+          type: string
+      required:
+      - refresh
+    LogoutResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+      - message
+    MobileToken:
+      type: object
+      properties:
+        username:
+          type: string
+          writeOnly: true
+        password:
+          type: string
+          writeOnly: true
+      required:
+      - password
+      - username
+    NullEnum:
+      enum:
+      - null
+    PaginatedClientList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Client'
+    PaginatedExpenseCategoryList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExpenseCategory'
+    PaginatedExpenseList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Expense'
+    PaginatedPrintProfileList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/PrintProfile'
+    PaginatedPrinterProfileList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/PrinterProfile'
+    PaginatedProductList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Product'
+    PaginatedProductPackagingList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductPackaging'
+    PaginatedPurchaseList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Purchase'
+    PaginatedSaleList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Sale'
+    PaginatedSupplierList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Supplier'
+    PaperWidthEnum:
+      enum:
+      - 58
+      - 80
+      type: integer
+      description: |-
+        * `58` - 58 mm
+        * `80` - 80 mm
+    PatchedClient:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          title: Nom
+          maxLength: 200
+        phone:
+          type: string
+          title: Téléphone
+          maxLength: 50
+        address:
+          type: string
+          title: Adresse
+          maxLength: 255
+        wilaya:
+          type: string
+          maxLength: 100
+        email:
+          type: string
+          format: email
+          title: Courriel
+          maxLength: 254
+        tax_number:
+          type: string
+          title: NIF
+          maxLength: 100
+        balance:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          title: Solde
+        notes:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedExpense:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        number:
+          type: string
+          readOnly: true
+          title: Numéro
+        date:
+          type: string
+          format: date
+        category:
+          type: integer
+        description:
+          type: string
+          maxLength: 255
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          title: Montant
+        payment_method:
+          allOf:
+          - $ref: '#/components/schemas/PaymentMethodEnum'
+          title: Moyen de paiement
+        supplier:
+          type: integer
+          nullable: true
+        receipt:
+          type: string
+          format: uri
+          nullable: true
+          title: Pièce justificative
+        created_by:
+          type: integer
+          readOnly: true
+        created_by_name:
+          type: string
+          readOnly: true
+        observation:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedExpenseCategory:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          title: Nom
+          maxLength: 120
+        is_active:
+          type: boolean
+          title: Active
+    PatchedPrintProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          title: Nom
+          maxLength: 100
+        document_type:
+          allOf:
+          - $ref: '#/components/schemas/DocumentTypeEnum'
+          title: Type de document
+        paper_width:
+          nullable: true
+          title: Largeur papier
+          minimum: 0
+          maximum: 9223372036854775807
+          oneOf:
+          - $ref: '#/components/schemas/PaperWidthEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        copies:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          title: Nombre de copies
+        language:
+          allOf:
+          - $ref: '#/components/schemas/LanguageEnum'
+          title: Langue
+        is_active:
+          type: boolean
+          title: Actif
+        printer:
+          type: integer
+          nullable: true
+    PatchedPrinterProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          title: Nom interne
+          maxLength: 100
+        description:
+          type: string
+        printer_type:
+          type: string
+          title: Type d’imprimante
+          maxLength: 50
+        manufacturer:
+          type: string
+          title: Constructeur
+          maxLength: 100
+        model_name:
+          type: string
+          title: Modèle
+          maxLength: 100
+        connection_mode:
+          allOf:
+          - $ref: '#/components/schemas/ConnectionModeEnum'
+          title: Mode de connexion
+        connection_mode_display:
+          type: string
+          readOnly: true
+        local_identifier:
+          type: string
+          title: Identifiant local facultatif
+          description: Préférence non secrète uniquement. La découverte Bluetooth
+            reste locale au terminal.
+          maxLength: 255
+        ip_address:
+          type: string
+          nullable: true
+          title: Adresse IP
+        network_port:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          nullable: true
+          title: Port réseau
+        paper_width:
+          allOf:
+          - $ref: '#/components/schemas/PaperWidthEnum'
+          title: Largeur papier
+          minimum: 0
+          maximum: 9223372036854775807
+        protocol:
+          allOf:
+          - $ref: '#/components/schemas/ProtocolEnum'
+          title: Protocole
+        protocol_display:
+          type: string
+          readOnly: true
+        characters_per_line:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          title: Caractères par ligne
+        encoding:
+          type: string
+          title: Encodage
+          maxLength: 50
+        auto_print:
+          type: boolean
+          title: Impression automatique
+        is_default:
+          type: boolean
+          title: Imprimante par défaut
+        is_active:
+          type: boolean
+          title: Active
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedProduct:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        reference:
+          type: string
+          readOnly: true
+          title: Référence
+        barcode:
+          type: string
+          readOnly: true
+          title: Code-barres
+        name:
+          type: string
+          title: Nom produit
+          maxLength: 255
+        category:
+          type: integer
+          nullable: true
+        category_name:
+          type: string
+          readOnly: true
+        brand:
+          type: integer
+          nullable: true
+        brand_name:
+          type: string
+          readOnly: true
+        unit:
+          type: integer
+          nullable: true
+        unit_name:
+          type: string
+          readOnly: true
+        sale_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          title: Prix de vente
+        quantity:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          title: Quantité en stock
+        minimum_stock:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          title: Stock minimum
+        description:
+          type: string
+        photo:
+          type: string
+          format: uri
+          nullable: true
+        qr_code:
+          type: string
+          format: uri
+          readOnly: true
+          nullable: true
+        barcode_image:
+          type: string
+          format: uri
+          readOnly: true
+          nullable: true
+          title: Image code-barres
+        stock_status:
+          type: string
+          readOnly: true
+        conditionnements:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductPackaging'
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedProductPackaging:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        product:
+          type: integer
+        name:
+          type: string
+          title: Nom du conditionnement
+          maxLength: 100
+        conversion_factor:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          title: Facteur de conversion
+          description: Nombre d'unités de base contenues dans ce conditionnement.
+        default_sale_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          title: Prix de vente par défaut
+        barcode:
+          type: string
+          nullable: true
+          title: Code-barres
+          maxLength: 100
+        is_active:
+          type: boolean
+          title: Actif
+    PatchedSupplier:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          title: Nom
+          maxLength: 200
+        phone:
+          type: string
+          title: Téléphone
+          maxLength: 50
+        address:
+          type: string
+          title: Adresse
+          maxLength: 255
+        wilaya:
+          type: string
+          maxLength: 100
+        email:
+          type: string
+          format: email
+          title: Courriel
+          maxLength: 254
+        rc_number:
+          type: string
+          title: RC
+          maxLength: 100
+        tax_number:
+          type: string
+          title: NIF
+          maxLength: 100
+        notes:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PaymentMethodEnum:
+      enum:
+      - cash
+      - cheque
+      - transfer
+      - card
+      type: string
+      description: |-
+        * `cash` - Espèces
+        * `cheque` - Chèque
+        * `transfer` - Virement
+        * `card` - Carte
+    PaymentTypeEnum:
+      enum:
+      - cash
+      - cheque
+      - transfer
+      type: string
+      description: |-
+        * `cash` - Espèces
+        * `cheque` - Chèque
+        * `transfer` - Virement
+    PrintProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          title: Nom
+          maxLength: 100
+        document_type:
+          allOf:
+          - $ref: '#/components/schemas/DocumentTypeEnum'
+          title: Type de document
+        paper_width:
+          nullable: true
+          title: Largeur papier
+          minimum: 0
+          maximum: 9223372036854775807
+          oneOf:
+          - $ref: '#/components/schemas/PaperWidthEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        copies:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          title: Nombre de copies
+        language:
+          allOf:
+          - $ref: '#/components/schemas/LanguageEnum'
+          title: Langue
+        is_active:
+          type: boolean
+          title: Actif
+        printer:
+          type: integer
+          nullable: true
+      required:
+      - document_type
+      - id
+      - name
+    PrinterProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          title: Nom interne
+          maxLength: 100
+        description:
+          type: string
+        printer_type:
+          type: string
+          title: Type d’imprimante
+          maxLength: 50
+        manufacturer:
+          type: string
+          title: Constructeur
+          maxLength: 100
+        model_name:
+          type: string
+          title: Modèle
+          maxLength: 100
+        connection_mode:
+          allOf:
+          - $ref: '#/components/schemas/ConnectionModeEnum'
+          title: Mode de connexion
+        connection_mode_display:
+          type: string
+          readOnly: true
+        local_identifier:
+          type: string
+          title: Identifiant local facultatif
+          description: Préférence non secrète uniquement. La découverte Bluetooth
+            reste locale au terminal.
+          maxLength: 255
+        ip_address:
+          type: string
+          nullable: true
+          title: Adresse IP
+        network_port:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          nullable: true
+          title: Port réseau
+        paper_width:
+          allOf:
+          - $ref: '#/components/schemas/PaperWidthEnum'
+          title: Largeur papier
+          minimum: 0
+          maximum: 9223372036854775807
+        protocol:
+          allOf:
+          - $ref: '#/components/schemas/ProtocolEnum'
+          title: Protocole
+        protocol_display:
+          type: string
+          readOnly: true
+        characters_per_line:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          title: Caractères par ligne
+        encoding:
+          type: string
+          title: Encodage
+          maxLength: 50
+        auto_print:
+          type: boolean
+          title: Impression automatique
+        is_default:
+          type: boolean
+          title: Imprimante par défaut
+        is_active:
+          type: boolean
+          title: Active
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - connection_mode
+      - connection_mode_display
+      - created_at
+      - id
+      - name
+      - protocol_display
+      - updated_at
+    Product:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        reference:
+          type: string
+          readOnly: true
+          title: Référence
+        barcode:
+          type: string
+          readOnly: true
+          title: Code-barres
+        name:
+          type: string
+          title: Nom produit
+          maxLength: 255
+        category:
+          type: integer
+          nullable: true
+        category_name:
+          type: string
+          readOnly: true
+        brand:
+          type: integer
+          nullable: true
+        brand_name:
+          type: string
+          readOnly: true
+        unit:
+          type: integer
+          nullable: true
+        unit_name:
+          type: string
+          readOnly: true
+        sale_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          title: Prix de vente
+        quantity:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          title: Quantité en stock
+        minimum_stock:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          title: Stock minimum
+        description:
+          type: string
+        photo:
+          type: string
+          format: uri
+          nullable: true
+        qr_code:
+          type: string
+          format: uri
+          readOnly: true
+          nullable: true
+        barcode_image:
+          type: string
+          format: uri
+          readOnly: true
+          nullable: true
+          title: Image code-barres
+        stock_status:
+          type: string
+          readOnly: true
+        conditionnements:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductPackaging'
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - barcode
+      - barcode_image
+      - brand_name
+      - category_name
+      - conditionnements
+      - created_at
+      - id
+      - name
+      - qr_code
+      - reference
+      - sale_price
+      - stock_status
+      - unit_name
+    ProductPackaging:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        product:
+          type: integer
+        name:
+          type: string
+          title: Nom du conditionnement
+          maxLength: 100
+        conversion_factor:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          title: Facteur de conversion
+          description: Nombre d'unités de base contenues dans ce conditionnement.
+        default_sale_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          title: Prix de vente par défaut
+        barcode:
+          type: string
+          nullable: true
+          title: Code-barres
+          maxLength: 100
+        is_active:
+          type: boolean
+          title: Actif
+      required:
+      - conversion_factor
+      - default_sale_price
+      - id
+      - name
+      - product
+    ProductSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        reference:
+          type: string
+          readOnly: true
+          title: Référence
+        barcode:
+          type: string
+          title: Code-barres
+          maxLength: 100
+        name:
+          type: string
+          title: Nom produit
+          maxLength: 255
+        sale_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          title: Prix de vente
+      required:
+      - id
+      - name
+      - reference
+      - sale_price
+    ProtocolEnum:
+      enum:
+      - generic_escpos
+      - epson_escpos
+      - xprinter
+      - sunmi
+      - star
+      - posiflex
+      - gp
+      - custom
+      type: string
+      description: |-
+        * `generic_escpos` - Generic ESC/POS
+        * `epson_escpos` - Epson compatible ESC/POS
+        * `xprinter` - XPrinter
+        * `sunmi` - Sunmi
+        * `star` - Star
+        * `posiflex` - Posiflex
+        * `gp` - GP
+        * `custom` - Autre protocole
+    Purchase:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        reference:
+          type: string
+          title: Référence achat
+          maxLength: 100
+        supplier:
+          type: integer
+        total:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          readOnly: true
+          title: Total TTC
+        tax_rate:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          title: TVA (%)
+        payment_tracking_initialized:
+          type: boolean
+          readOnly: true
+          title: Suivi des règlements initialisé
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Date
+        amount_paid:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          readOnly: true
+        balance_due:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          readOnly: true
+        payment_status:
+          type: string
+          readOnly: true
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/PurchaseLineRead'
+          readOnly: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PurchaseLineWrite'
+          writeOnly: true
+      required:
+      - amount_paid
+      - balance_due
+      - created_at
+      - id
+      - items
+      - lines
+      - payment_status
+      - payment_tracking_initialized
+      - reference
+      - supplier
+      - total
+    PurchaseLineRead:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        product:
+          allOf:
+          - $ref: '#/components/schemas/ProductSummary'
+          readOnly: true
+        quantity:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          title: Quantité
+        purchase_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          title: Prix d'achat
+        line_total:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          readOnly: true
+      required:
+      - id
+      - line_total
+      - product
+      - purchase_price
+      - quantity
+    PurchaseLineWrite:
+      type: object
+      properties:
+        product:
+          type: integer
+        quantity:
+          type: integer
+          minimum: 1
+        purchase_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+      required:
+      - product
+      - purchase_price
+      - quantity
+    Sale:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        invoice_number:
+          type: string
+          readOnly: true
+          title: Numéro facture
+        ticket_number:
+          type: string
+          readOnly: true
+          nullable: true
+          title: Numéro ticket
+        client:
+          type: integer
+        total:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          readOnly: true
+          title: Total TTC
+        discount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          title: Remise
+        tax_rate:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          title: TVA (%)
+        payment_type:
+          title: Mode de paiement
+          oneOf:
+          - $ref: '#/components/schemas/PaymentTypeEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        payment_tracking_initialized:
+          type: boolean
+          readOnly: true
+          title: Suivi des règlements initialisé
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Date
+        amount_paid:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          readOnly: true
+        balance_due:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          readOnly: true
+        payment_status:
+          type: string
+          readOnly: true
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/SaleLineRead'
+          readOnly: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SaleLineWrite'
+          writeOnly: true
+        pay_full:
+          type: boolean
+          writeOnly: true
+          default: false
+        created_by_name:
+          type: string
+          readOnly: true
+      required:
+      - amount_paid
+      - balance_due
+      - client
+      - created_at
+      - created_by_name
+      - id
+      - invoice_number
+      - items
+      - lines
+      - payment_status
+      - payment_tracking_initialized
+      - ticket_number
+      - total
+    SaleLineRead:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        product:
+          allOf:
+          - $ref: '#/components/schemas/ProductSummary'
+          readOnly: true
+        packaging:
+          type: integer
+          nullable: true
+          title: Conditionnement
+        packaging_name:
+          type: string
+          title: Conditionnement historique
+          maxLength: 100
+        packaging_factor:
+          type: integer
+          readOnly: true
+          title: Facteur historique
+        packaging_quantity:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          title: Quantité vendue
+        quantity:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          title: Quantité
+        unit_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          title: Prix unitaire
+        unit_cost:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          readOnly: true
+          title: Coût unitaire historique
+        line_total:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          readOnly: true
+      required:
+      - id
+      - line_total
+      - packaging_factor
+      - product
+      - quantity
+      - unit_cost
+      - unit_price
+    SaleLineWrite:
+      type: object
+      properties:
+        product:
+          type: integer
+        product_id:
+          type: integer
+          writeOnly: true
+        packaging_id:
+          type: integer
+          nullable: true
+        quantity:
+          type: integer
+          minimum: 1
+        unit_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+      required:
+      - quantity
+    Supplier:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          title: Nom
+          maxLength: 200
+        phone:
+          type: string
+          title: Téléphone
+          maxLength: 50
+        address:
+          type: string
+          title: Adresse
+          maxLength: 255
+        wilaya:
+          type: string
+          maxLength: 100
+        email:
+          type: string
+          format: email
+          title: Courriel
+          maxLength: 254
+        rc_number:
+          type: string
+          title: RC
+          maxLength: 100
+        tax_number:
+          type: string
+          title: NIF
+          maxLength: 100
+        notes:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - name
+    TokenRefresh:
+      type: object
+      properties:
+        access:
+          type: string
+          readOnly: true
+        refresh:
+          type: string
+      required:
+      - access
+      - refresh
+    Unit:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          title: Unité
+          maxLength: 50
+      required:
+      - id
+      - name
+  securitySchemes:
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

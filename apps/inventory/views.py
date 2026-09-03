@@ -11,7 +11,14 @@ from django.shortcuts import render, get_object_or_404, redirect
 from apps.accounts.permissions import manager_required, seller_required
 from apps.core.export_security import excel_safe_text
 from apps.core.pagination import paginate_queryset
-from .forms import ProductForm, ClientForm, SupplierForm, StockMovementForm, ImportExcelForm
+from .forms import (
+    ClientForm,
+    ImportExcelForm,
+    ProductForm,
+    ProductPackagingFormSet,
+    StockMovementForm,
+    SupplierForm,
+)
 from .models import Brand, Category, Client, Product, StockMovement, Supplier, Unit
 from .services import record_stock_movement, reverse_stock_movement
 from django.http import FileResponse
@@ -37,13 +44,18 @@ def product_list(request):
 @manager_required
 def product_create(request):
     form = ProductForm(request.POST or None, request.FILES or None)
-    if form.is_valid():
+    packaging_data = request.POST if 'packagings-TOTAL_FORMS' in request.POST else None
+    packaging_formset = ProductPackagingFormSet(packaging_data, prefix='packagings')
+    if form.is_valid() and (not packaging_formset.is_bound or packaging_formset.is_valid()):
         try:
             with transaction.atomic():
                 initial_quantity = form.cleaned_data['quantity']
                 product = form.save(commit=False)
                 product.quantity = 0
                 product.save()
+                if packaging_formset.is_bound:
+                    packaging_formset.instance = product
+                    packaging_formset.save()
                 if initial_quantity:
                     record_stock_movement(
                         product=product,
@@ -60,19 +72,26 @@ def product_create(request):
         else:
             messages.success(request, _('Produit ajouté avec succès.'))
             return redirect('product_list')
-    return render(request, 'inventory/product_form.html', {'form': form, 'title': _('Ajouter un produit')})
+    return render(request, 'inventory/product_form.html', {
+        'form': form, 'packaging_formset': packaging_formset, 'title': _('Ajouter un produit'),
+    })
 
 @manager_required
 def product_update(request, pk):
     product = get_object_or_404(Product, pk=pk)
     form = ProductForm(request.POST or None, request.FILES or None, instance=product)
-    if form.is_valid():
+    packaging_data = request.POST if 'packagings-TOTAL_FORMS' in request.POST else None
+    packaging_formset = ProductPackagingFormSet(packaging_data, instance=product, prefix='packagings')
+    if form.is_valid() and (not packaging_formset.is_bound or packaging_formset.is_valid()):
         try:
             with transaction.atomic():
                 target_quantity = form.cleaned_data['quantity']
                 locked_product = Product.objects.select_for_update().get(pk=product.pk)
                 form.instance.quantity = locked_product.quantity
                 saved_product = form.save()
+                if packaging_formset.is_bound:
+                    packaging_formset.instance = saved_product
+                    packaging_formset.save()
                 if target_quantity != locked_product.quantity:
                     record_stock_movement(
                         product=saved_product,
@@ -89,7 +108,9 @@ def product_update(request, pk):
         else:
             messages.success(request, _('Produit mis à jour.'))
             return redirect('product_list')
-    return render(request, 'inventory/product_form.html', {'form': form, 'title': _('Modifier le produit')})
+    return render(request, 'inventory/product_form.html', {
+        'form': form, 'packaging_formset': packaging_formset, 'title': _('Modifier le produit'),
+    })
 
 @manager_required
 def product_delete(request, pk):
@@ -379,7 +400,7 @@ def stock_movement_delete(request, pk):
 
 @seller_required
 def product_detail(request, pk):
-    product = get_object_or_404(Product, pk=pk)
+    product = get_object_or_404(Product.objects.prefetch_related('packagings'), pk=pk)
     if not product.barcode or not product.barcode_image or not product.qr_code:
         product.save()
         product.refresh_from_db()

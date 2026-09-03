@@ -1,8 +1,9 @@
 from django import forms
 from django.core.exceptions import ValidationError
+from django.forms import inlineformset_factory
 from django.utils.translation import gettext_lazy as _
 from apps.core.security import validate_excel_upload
-from .models import Product, Client, Supplier, StockMovement, Brand
+from .models import Product, ProductPackaging, Client, Supplier, StockMovement, Brand
 
 class ProductForm(forms.ModelForm):
     barcode_display = forms.CharField(
@@ -54,6 +55,28 @@ class ProductForm(forms.ModelForm):
         if sale_price < 0:
             raise ValidationError(_('Le prix de vente ne peut pas être négatif.'))
         return sale_price
+
+
+class ProductPackagingForm(forms.ModelForm):
+    class Meta:
+        model = ProductPackaging
+        fields = ('name', 'conversion_factor', 'default_sale_price', 'barcode', 'is_active')
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'conversion_factor': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
+            'default_sale_price': forms.NumberInput(attrs={'class': 'form-control', 'min': 0, 'step': '0.01'}),
+            'barcode': forms.TextInput(attrs={'class': 'form-control'}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+
+
+ProductPackagingFormSet = inlineformset_factory(
+    Product,
+    ProductPackaging,
+    form=ProductPackagingForm,
+    extra=1,
+    can_delete=True,
+)
 
 class ClientForm(forms.ModelForm):
     class Meta:
