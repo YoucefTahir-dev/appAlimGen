@@ -273,6 +273,9 @@ msgstr "إلغاء"
 msgid "Supprimer"
 msgstr "حذف"
 
+msgid "Supprimer cette ligne"
+msgstr "حذف هذا السطر"
+
 msgid "Modifier"
 msgstr "تعديل"
 

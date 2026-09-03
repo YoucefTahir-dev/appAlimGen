@@ -1,5 +1,5 @@
 {% extends 'base/base.html' %}
-{% load i18n %}
+{% load i18n static %}
 
 {% block title %}{{ title }} - El Amine ERP{% endblock %}
 
@@ -7,7 +7,7 @@
 
 {% block content %}
 <div class="card card-dashboard p-4 bg-white">
-    <form method="post">
+    <form method="post" id="sale-form">
         {% csrf_token %}
         {{ form.non_field_errors }}
         <div class="row g-3">
@@ -40,7 +40,7 @@
                         <th>{% trans "Supprimer" %}</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="sale-lines-body">
                     {% for form_line in formset %}
                         {% if form_line.non_field_errors %}
                             <tr>
@@ -49,19 +49,55 @@
                                 </td>
                             </tr>
                         {% endif %}
-                        <tr>
-                            <td>{{ form_line.product }}{{ form_line.product.errors }}</td>
+                        <tr class="sale-line-row">
+                            <td>
+                                {% for hidden in form_line.hidden_fields %}{{ hidden }}{% endfor %}
+                                {{ form_line.product }}{{ form_line.product.errors }}
+                            </td>
                             <td>{{ form_line.quantity }}{{ form_line.quantity.errors }}</td>
                             <td>{{ form_line.unit_price }}{{ form_line.unit_price.errors }}</td>
-                            <td>{{ form_line.DELETE }}</td>
+                            <td>
+                                <span class="d-none">{{ form_line.DELETE }}</span>
+                                <button type="button" class="btn btn-sm btn-outline-danger remove-sale-line">
+                                    <i class="bi bi-trash" aria-hidden="true"></i>
+                                    <span class="visually-hidden">{% trans "Supprimer cette ligne" %}</span>
+                                </button>
+                            </td>
                         </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
-        <div class="form-actions">
+        <template id="sale-line-template">
+            {% with form_line=formset.empty_form %}
+                <tr class="sale-line-row">
+                    <td>
+                        {% for hidden in form_line.hidden_fields %}{{ hidden }}{% endfor %}
+                        {{ form_line.product }}
+                    </td>
+                    <td>{{ form_line.quantity }}</td>
+                    <td>{{ form_line.unit_price }}</td>
+                    <td>
+                        <span class="d-none">{{ form_line.DELETE }}</span>
+                        <button type="button" class="btn btn-sm btn-outline-danger remove-sale-line">
+                            <i class="bi bi-trash" aria-hidden="true"></i>
+                            <span class="visually-hidden">{% trans "Supprimer cette ligne" %}</span>
+                        </button>
+                    </td>
+                </tr>
+            {% endwith %}
+        </template>
+        <div class="form-actions justify-content-between">
+            <button type="button" class="btn btn-outline-primary" id="add-sale-line">
+                <i class="bi bi-plus-circle me-1" aria-hidden="true"></i>
+                {% trans "Ajouter un produit" %}
+            </button>
             <button class="btn btn-success">{% trans "Enregistrer" %}</button>
         </div>
     </form>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/sale-formset.js' %}" defer></script>
 {% endblock %}

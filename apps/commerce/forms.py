@@ -114,9 +114,13 @@ class SaleLineForm(forms.ModelForm):
         fields = ('product', 'quantity', 'unit_price')
         widgets = {
             'product': forms.Select(attrs={'class': 'form-select'}),
-            'quantity': forms.NumberInput(attrs={'class': 'form-control'}),
-            'unit_price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
+            'unit_price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': 0}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['quantity'].widget.attrs['min'] = 1
 
     def clean(self):
         cleaned_data = super().clean()
