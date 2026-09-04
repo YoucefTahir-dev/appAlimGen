@@ -4,6 +4,7 @@ from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
+from django.utils.translation import gettext, override
 from openpyxl import load_workbook
 
 from apps.inventory.forms import ClientForm, ProductForm
@@ -120,6 +121,35 @@ class CustomerPricingTests(TestCase):
         seller = User.objects.create_user(
             username='pricing-seller', password='StrongPass123!', role=User.SELLER
         )
+        self.client.force_login(seller)
+
+        cases = (
+            (Client.CustomerType.SUPER_WHOLESALE, '110.00'),
+            (Client.CustomerType.WHOLESALE, '120.00'),
+            (Client.CustomerType.RETAIL, '135.00'),
+        )
+        for customer_type, expected_price in cases:
+            with self.subTest(customer_type=customer_type):
+                customer = Client.objects.create(
+                    name=f'Client {customer_type}', customer_type=customer_type
+                )
+                response = self.client.get(
+                    reverse('sale_price_lookup'),
+                    {'product_id': self.product.pk, 'client_id': customer.pk},
+                )
+
+                self.assertEqual(response.status_code, 200)
+                payload = response.json()
+                self.assertEqual(payload['product_id'], self.product.pk)
+                self.assertEqual(payload['product_name'], self.product.name)
+                self.assertEqual(payload['reference'], self.product.reference)
+                self.assertEqual(payload['stock'], self.product.quantity)
+                self.assertEqual(payload['customer_type'], customer_type)
+                self.assertEqual(payload['price'], expected_price)
+                self.assertNotIn('purchase_price', payload)
+                self.assertNotIn('super_wholesale_price', payload)
+                self.assertNotIn('wholesale_price', payload)
+                self.assertNotIn('retail_price', payload)
 
     def test_web_price_endpoint_applies_packaging_factor(self):
         User = get_user_model()
@@ -146,26 +176,31 @@ class CustomerPricingTests(TestCase):
         })
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()['price'], '720.00')
-        customer = Client.objects.create(
-            name='Client gros', customer_type=Client.CustomerType.WHOLESALE
-        )
-        self.client.force_login(seller)
-
-        response = self.client.get(
-            reverse('sale_price_lookup'),
-            {'product_id': self.product.pk, 'client_id': customer.pk},
-        )
-
-        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload['price'], '720.00')
+        self.assertEqual(payload['packaging_id'], packaging.pk)
         self.assertEqual(
-            response.json(),
-            {
-                'customer_type': Client.CustomerType.WHOLESALE,
-                'customer_type_label': 'Gros',
-                'price': '120.00',
-            },
+            payload['packagings'],
+            [{
+                'id': packaging.pk,
+                'name': 'Carton de 6',
+                'conversion_factor': 6,
+                'price': '720.00',
+            }],
         )
+
+    def test_sale_price_feedback_is_translated(self):
+        translations = {
+            'fr': 'Impossible de récupérer le prix du produit.',
+            'en': 'Unable to retrieve the product price.',
+            'ar': 'تعذر استرجاع سعر المنتج.',
+        }
+        for language, expected in translations.items():
+            with self.subTest(language=language), override(language):
+                self.assertEqual(
+                    gettext('Impossible de récupérer le prix du produit.'),
+                    expected,
+                )
 
     def test_customer_type_is_exported_without_email(self):
         User = get_user_model()

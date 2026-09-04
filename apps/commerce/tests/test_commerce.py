@@ -128,6 +128,9 @@ class CommerceTests(TestCase):
         self.assertContains(response, 'id="sale-line-template"')
         self.assertContains(response, 'id="id_lines-TOTAL_FORMS"')
         self.assertContains(response, 'sale-formset.')
+        self.assertContains(response, 'id="sale-client-type"')
+        self.assertContains(response, 'sale-product-meta')
+        self.assertContains(response, 'sale-price-feedback')
         self.assertContains(response, 'min="1"')
 
     def test_sale_create_accepts_multiple_products_on_one_invoice(self):

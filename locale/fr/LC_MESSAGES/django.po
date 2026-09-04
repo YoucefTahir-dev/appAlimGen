@@ -66,3 +66,15 @@ msgstr "Le client est obligatoire."
 
 msgid "Client invalide."
 msgstr "Client invalide."
+
+msgid "Chargement…"
+msgstr "Chargement…"
+
+msgid "Impossible de récupérer le prix du produit."
+msgstr "Impossible de récupérer le prix du produit."
+
+msgid "Sélectionnez d’abord un client."
+msgstr "Sélectionnez d’abord un client."
+
+msgid "Unité de base"
+msgstr "Unité de base"

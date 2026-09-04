@@ -14,7 +14,7 @@ from django.utils.translation import gettext as _
 from apps.accounts.permissions import manager_required, permission_required, seller_required
 from apps.core.pagination import paginate_queryset
 from apps.inventory.models import Client, Product, ProductPackaging
-from apps.inventory.pricing import get_sale_price
+from apps.inventory.pricing import get_sale_price_context
 
 from .forms import PaymentForm, PurchaseForm, PurchaseLineFormSet, SaleForm, SaleLineFormSet
 from .models import Payment, Purchase, Sale
@@ -159,7 +159,7 @@ def sale_price_lookup(request):
     client_id = request.GET.get('client_id')
     if not product_id or not client_id:
         return JsonResponse({'error': _('Produit et client obligatoires.')}, status=400)
-    product = get_object_or_404(Product, pk=product_id)
+    product = get_object_or_404(Product.objects.prefetch_related('packagings'), pk=product_id)
     customer = get_object_or_404(Client, pk=client_id)
     packaging = None
     packaging_id = request.GET.get('packaging_id')
@@ -170,14 +170,7 @@ def sale_price_lookup(request):
             product=product,
             is_active=True,
         )
-    price = get_sale_price(product, customer, packaging)
-    return JsonResponse(
-        {
-            'customer_type': customer.customer_type,
-            'customer_type_label': customer.get_customer_type_display(),
-            'price': f'{price:.2f}',
-        }
-    )
+    return JsonResponse(get_sale_price_context(product, customer, packaging))
 
 
 @manager_required

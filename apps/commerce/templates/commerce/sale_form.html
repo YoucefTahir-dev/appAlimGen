@@ -7,7 +7,13 @@
 
 {% block content %}
 <div class="card card-dashboard p-4 bg-white">
-    <form method="post" id="sale-form" data-price-url="{% url 'sale_price_lookup' %}" data-auto-pricing="{% if form.instance.pk %}false{% else %}true{% endif %}">
+    <form method="post" id="sale-form"
+          data-price-url="{% url 'sale_price_lookup' %}"
+          data-auto-pricing="{% if form.instance.pk %}false{% else %}true{% endif %}"
+          data-loading-label="{% trans 'Chargement…' %}"
+          data-price-error-label="{% trans 'Impossible de récupérer le prix du produit.' %}"
+          data-select-client-label="{% trans 'Sélectionnez d’abord un client.' %}"
+          data-base-unit-label="{% trans 'Unité de base' %}">
         {% csrf_token %}
         {{ form.non_field_errors }}
         <div class="row g-3">
@@ -17,7 +23,10 @@
                     <input type="text" class="form-control" value="{{ form.instance.invoice_number }}" readonly>
                 </div>
             {% endif %}
-            <div class="col-md-6">{{ form.client.label_tag }}{{ form.client }}{{ form.client.errors }}</div>
+            <div class="col-md-6">
+                {{ form.client.label_tag }}{{ form.client }}{{ form.client.errors }}
+                <div id="sale-client-type" class="form-text" aria-live="polite"></div>
+            </div>
             <div class="col-md-6">{{ form.discount.label_tag }}{{ form.discount }}{{ form.discount.errors }}</div>
             <div class="col-md-6">{{ form.tax_rate.label_tag }}{{ form.tax_rate }}{{ form.tax_rate.errors }}</div>
             <div class="col-md-6">{{ form.payment_type.label_tag }}{{ form.payment_type }}{{ form.payment_type.errors }}</div>
@@ -54,10 +63,14 @@
                             <td>
                                 {% for hidden in form_line.hidden_fields %}{{ hidden }}{% endfor %}
                                 {{ form_line.product }}{{ form_line.product.errors }}
+                                <div class="sale-product-meta form-text" aria-live="polite"></div>
                             </td>
                             <td>{{ form_line.packaging }}{{ form_line.packaging.errors }}</td>
                             <td>{{ form_line.quantity }}{{ form_line.quantity.errors }}</td>
-                            <td>{{ form_line.unit_price }}{{ form_line.unit_price.errors }}</td>
+                            <td>
+                                {{ form_line.unit_price }}{{ form_line.unit_price.errors }}
+                                <div class="sale-price-feedback form-text" aria-live="polite"></div>
+                            </td>
                             <td>
                                 <span class="d-none">{{ form_line.DELETE }}</span>
                                 <button type="button" class="btn btn-sm btn-outline-danger remove-sale-line">
@@ -76,10 +89,14 @@
                     <td>
                         {% for hidden in form_line.hidden_fields %}{{ hidden }}{% endfor %}
                         {{ form_line.product }}
+                        <div class="sale-product-meta form-text" aria-live="polite"></div>
                     </td>
                     <td>{{ form_line.packaging }}</td>
                     <td>{{ form_line.quantity }}</td>
-                    <td>{{ form_line.unit_price }}</td>
+                    <td>
+                        {{ form_line.unit_price }}
+                        <div class="sale-price-feedback form-text" aria-live="polite"></div>
+                    </td>
                     <td>
                         <span class="d-none">{{ form_line.DELETE }}</span>
                         <button type="button" class="btn btn-sm btn-outline-danger remove-sale-line">

@@ -1041,3 +1041,15 @@ msgstr "العميل مطلوب."
 
 msgid "Client invalide."
 msgstr "عميل غير صالح."
+
+msgid "Chargement…"
+msgstr "جاري التحميل…"
+
+msgid "Impossible de récupérer le prix du produit."
+msgstr "تعذر استرجاع سعر المنتج."
+
+msgid "Sélectionnez d’abord un client."
+msgstr "يرجى اختيار العميل أولاً."
+
+msgid "Unité de base"
+msgstr "الوحدة الأساسية"

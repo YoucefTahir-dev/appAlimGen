@@ -28,6 +28,33 @@ def get_sale_price(product, customer=None, packaging=None):
     return selected_price
 
 
+def get_sale_price_context(product, customer, packaging=None):
+    """Build the shared, non-sensitive pricing payload used by Web and API."""
+    active_packagings = sorted(
+        (item for item in product.packagings.all() if item.is_active),
+        key=lambda item: (item.name, item.pk),
+    )
+    return {
+        'product_id': product.pk,
+        'product_name': product.name,
+        'reference': product.reference,
+        'stock': product.quantity,
+        'customer_type': customer.customer_type,
+        'customer_type_label': customer.get_customer_type_display(),
+        'packaging_id': packaging.pk if packaging else None,
+        'price': f'{get_sale_price(product, customer, packaging):.2f}',
+        'packagings': [
+            {
+                'id': item.pk,
+                'name': item.name,
+                'conversion_factor': item.conversion_factor,
+                'price': f'{get_sale_price(product, customer, item):.2f}',
+            }
+            for item in active_packagings
+        ],
+    }
+
+
 def validate_product_prices(product):
     prices = (
         ('super_wholesale_price', _('Le prix Super Gros ne peut pas être inférieur au prix d’achat.')),
