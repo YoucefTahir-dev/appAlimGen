@@ -17,7 +17,7 @@ from apps.core.dashboard import DashboardPeriodError, dashboard_context
 from apps.core.security import log_security_event
 from apps.expenses.models import Expense, ExpenseCategory
 from apps.inventory.models import Brand, Category, Client, Product, ProductPackaging, StockMovement, Supplier, Unit
-from apps.inventory.pricing import get_sale_price
+from apps.inventory.pricing import get_sale_price_context
 from apps.printing.models import PrinterProfile, PrintProfile
 from apps.printing.services import encode_payload, invoice_print_data, printer_test_payload, select_printer_for_user
 
@@ -122,12 +122,7 @@ class ProductViewSet(AuditMutationMixin, viewsets.ModelViewSet):
                 )
             except (ProductPackaging.DoesNotExist, TypeError, ValueError) as exc:
                 raise ValidationError({'packaging_id': _('Conditionnement invalide ou inactif.')}) from exc
-        price = get_sale_price(product, customer, packaging)
-        return Response({
-            'customer_type': customer.customer_type,
-            'customer_type_label': customer.get_customer_type_display(),
-            'price': f'{price:.2f}',
-        })
+        return Response(get_sale_price_context(product, customer, packaging))
 
 
 class ProductPackagingViewSet(AuditMutationMixin, viewsets.ModelViewSet):

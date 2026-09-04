@@ -214,6 +214,10 @@ class MobileApiTests(APITestCase):
         payload = response.data.get('data', response.data)
         self.assertEqual(payload['customer_type'], Client.CustomerType.WHOLESALE)
         self.assertEqual(payload['price'], '420.00')
+        self.assertEqual(payload['product_id'], self.product.pk)
+        self.assertEqual(payload['stock'], self.product.quantity)
+        self.assertEqual(payload['packaging_id'], packaging.pk)
+        self.assertEqual(payload['packagings'][0]['id'], packaging.pk)
 
     def test_api_sale_uses_server_tariff_when_price_is_omitted(self):
         wholesale = Client.objects.create(

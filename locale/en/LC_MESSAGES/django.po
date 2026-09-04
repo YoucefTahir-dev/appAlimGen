@@ -107,3 +107,15 @@ msgstr "Active"
 
 msgid "Inactif"
 msgstr "Inactive"
+
+msgid "Chargement…"
+msgstr "Loading…"
+
+msgid "Impossible de récupérer le prix du produit."
+msgstr "Unable to retrieve the product price."
+
+msgid "Sélectionnez d’abord un client."
+msgstr "Select a customer first."
+
+msgid "Unité de base"
+msgstr "Base unit"
