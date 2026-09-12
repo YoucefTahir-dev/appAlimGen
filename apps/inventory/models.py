@@ -15,6 +15,8 @@ from reportlab.graphics import renderSVG
 from reportlab.graphics.barcode import createBarcodeDrawing
 
 from apps.core.security import product_photo_upload_to, validate_image_upload
+from django.core.validators import MinValueValidator, MaxValueValidator
+from .location import validate_finite, validate_location
 
 
 logger = logging.getLogger(__name__)
@@ -450,6 +452,11 @@ class Client(models.Model):
     name = models.CharField(_('Nom'), max_length=200)
     phone = models.CharField(_('Téléphone'), max_length=50, blank=True)
     address = models.CharField(_('Adresse'), max_length=255, blank=True)
+    latitude = models.FloatField(_('Latitude'), null=True, blank=True, validators=[validate_finite, MinValueValidator(-90), MaxValueValidator(90)])
+    longitude = models.FloatField(_('Longitude'), null=True, blank=True, validators=[validate_finite, MinValueValidator(-180), MaxValueValidator(180)])
+    location_accuracy = models.FloatField(_('Précision GPS (m)'), null=True, blank=True, validators=[validate_finite, MinValueValidator(0)])
+    formatted_address = models.CharField(_('Adresse détectée'), max_length=1000, null=True, blank=True)
+    place_id = models.CharField(_('Identifiant Maps'), max_length=255, null=True, blank=True)
     wilaya = models.CharField(_('Wilaya'), max_length=100, blank=True)
     customer_type = models.CharField(
         _('Type de client'),
@@ -479,7 +486,18 @@ class Client(models.Model):
             ),
         ]
 
+    def clean(self):
+        super().clean()
+        validate_location(self.latitude, self.longitude, self.location_accuracy)
+
+    @property
+    def maps_url(self):
+        if self.latitude is None or self.longitude is None:
+            return ''
+        return f'https://www.google.com/maps/search/?api=1&query={self.latitude},{self.longitude}'
+
     def save(self, *args, **kwargs):
+        validate_location(self.latitude, self.longitude, self.location_accuracy)
         self.name = normalize_business_text(self.name)
         self.phone = normalize_business_text(self.phone)
         self.email = normalize_business_text(self.email).lower()

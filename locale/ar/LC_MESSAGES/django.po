@@ -1083,3 +1083,93 @@ msgstr "إنشاء منتج من المشتريات"
 
 msgid "Nouvel achat"
 msgstr "شراء جديد"
+
+msgid "Latitude"
+msgstr "خط العرض"
+
+msgid "Longitude"
+msgstr "خط الطول"
+
+msgid "Précision GPS (m)"
+msgstr "دقة الموقع (م)"
+
+msgid "Précision GPS"
+msgstr "دقة الموقع"
+
+msgid "Adresse détectée"
+msgstr "العنوان المكتشف"
+
+msgid "Identifiant Maps"
+msgstr "معرّف الخرائط"
+
+msgid "Voir sur Maps"
+msgstr "عرض على الخرائط"
+
+msgid "La valeur doit être un nombre fini."
+msgstr "أدخل عددًا محدودًا."
+
+msgid "Coordonnée ou précision GPS invalide."
+msgstr "الإحداثيات أو دقة الموقع غير صالحة."
+
+msgid "Renseignez ensemble la latitude et la longitude."
+msgstr "أدخل خط العرض وخط الطول معًا."
+
+msgid "La précision nécessite une position GPS."
+msgstr "تتطلب الدقة موقعًا جغرافيًا."
+
+msgid "Trop de demandes. Veuillez patienter."
+msgstr "طلبات كثيرة. يرجى الانتظار."
+
+msgid "Adresse indisponible. Vous pouvez conserver le GPS et saisir l’adresse manuellement."
+msgstr "العنوان غير متاح. يمكنك الاحتفاظ بالموقع وإدخال العنوان يدويًا."
+
+msgid "L’accès à votre position a été refusé."
+msgstr "تم رفض الوصول إلى موقعك."
+
+msgid "Impossible de déterminer votre position."
+msgstr "تعذر تحديد موقعك."
+
+msgid "La localisation a expiré. Veuillez réessayer."
+msgstr "انتهت مهلة تحديد الموقع. يرجى المحاولة مجددًا."
+
+msgid "La géolocalisation nécessite HTTPS et un navigateur compatible."
+msgstr "يتطلب تحديد الموقع HTTPS ومتصفحًا متوافقًا."
+
+msgid "Recherche de votre position…"
+msgstr "جارٍ تحديد موقعك…"
+
+msgid "Confirmez ou annulez la position proposée avant d’enregistrer."
+msgstr "أكد الموقع المقترح أو ألغِه قبل الحفظ."
+
+msgid "La position GPS semble imprécise."
+msgstr "يبدو أن الموقع غير دقيق."
+
+msgid "Position confirmée. Enregistrez le formulaire pour la sauvegarder."
+msgstr "تم تأكيد الموقع. احفظ النموذج لتسجيله."
+
+msgid "Adresse détectée trop longue : conservez le GPS et adaptez l’adresse manuellement."
+msgstr "العنوان المكتشف طويل جدًا: احتفظ بالموقع وعدّل العنوان يدويًا."
+
+msgid "Localisation du client (facultative)"
+msgstr "موقع العميل (اختياري)"
+
+msgid "Votre position est demandée uniquement au clic. Elle ne sera enregistrée qu’après confirmation et enregistrement du client."
+msgstr "يُطلب موقعك عند النقر فقط. لا يُحفظ إلا بعد التأكيد وحفظ العميل."
+
+msgid "Utiliser ma position actuelle"
+msgstr "استخدام موقعي الحالي"
+
+msgid "Confirmer cette adresse"
+msgstr "تأكيد هذا العنوان"
+
+msgid "Conserver le GPS et modifier manuellement"
+msgstr "الاحتفاظ بالموقع والتعديل يدويًا"
+
+msgid "Notes"
+msgstr "ملاحظات"
+
+msgid "Ajouter un client"
+msgstr "إضافة عميل"
+
+msgid "Modifier le client"
+msgstr "تعديل العميل"

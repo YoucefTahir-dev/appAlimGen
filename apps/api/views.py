@@ -18,6 +18,7 @@ from apps.core.security import log_security_event
 from apps.expenses.models import Expense, ExpenseCategory
 from apps.inventory.models import Brand, Category, Client, Product, ProductPackaging, StockMovement, Supplier, Unit
 from apps.inventory.pricing import get_sale_price_context
+from apps.inventory.location import audit_location, location_snapshot
 from apps.printing.models import PrinterProfile, PrintProfile
 from apps.printing.services import encode_payload, invoice_print_data, printer_test_payload, select_printer_for_user
 
@@ -162,6 +163,15 @@ class UnitViewSet(ReferenceReadOnlyViewSet):
 
 
 class ClientViewSet(AuditMutationMixin, viewsets.ModelViewSet):
+    def perform_create(self, serializer):
+        super().perform_create(serializer)
+        audit_location(self.request, serializer.instance, None)
+
+    def perform_update(self, serializer):
+        before = location_snapshot(serializer.instance)
+        super().perform_update(serializer)
+        audit_location(self.request, serializer.instance, before)
+
     queryset = Client.objects.order_by('name')
     serializer_class = ClientSerializer
     search_fields = ('name', 'phone', 'email', 'tax_number')

@@ -1,4 +1,6 @@
 from django.db import transaction
+from django.core.exceptions import ValidationError as DjangoValidationError
+from apps.inventory.location import validate_location
 from django.utils.translation import gettext as _
 from rest_framework import serializers
 
@@ -198,6 +200,20 @@ class ProductSerializer(serializers.ModelSerializer):
 
 
 class ClientSerializer(serializers.ModelSerializer):
+    def validate(self, attrs):
+        instance = self.instance
+        latitude = attrs.get('latitude', getattr(instance, 'latitude', None))
+        longitude = attrs.get('longitude', getattr(instance, 'longitude', None))
+        if instance and (latitude, longitude) != (instance.latitude, instance.longitude):
+            for field in ('location_accuracy', 'formatted_address', 'place_id'):
+                attrs.setdefault(field, None)
+        accuracy = attrs.get('location_accuracy', getattr(instance, 'location_accuracy', None))
+        try:
+            validate_location(latitude, longitude, accuracy)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.message_dict)
+        return attrs
+
     class Meta:
         model = Client
         fields = '__all__'

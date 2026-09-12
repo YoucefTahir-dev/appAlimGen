@@ -4,6 +4,18 @@ Toutes les modifications notables de ce projet seront documentées ici.
 
 ## [Non publié]
 
+### Clients : localisation GPS facultative (phase 1, locale)
+
+- Coordonnées, précision, adresse détectée et identifiant Maps optionnels,
+  sans suppression de l'adresse manuelle des clients existants.
+- Proposition GPS avec confirmation, conservation de l'adresse manuelle,
+  avertissement de précision et lien Maps ; interface FR/AR/EN.
+- Service de géocodage serveur facultatif, erreurs sans perte des coordonnées,
+  CSRF, RBAC et journal d'audit existant pour les changements de localisation.
+- Champs optionnels dans l'API Android ; validations communes aux formulaires
+  et API. Migration additive `inventory.0014_client_location`.
+- Géolocalisation limitée à l'origine courante dans Permissions-Policy.
+
 ### Achats : création rapide de produit
 
 - Modale de création produit depuis chaque ligne d'achat, avec ajout de lignes

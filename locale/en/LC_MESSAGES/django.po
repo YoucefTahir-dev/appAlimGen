@@ -203,3 +203,93 @@ msgstr "Add a product"
 
 msgid "Annuler"
 msgstr "Cancel"
+
+msgid "Latitude"
+msgstr "Latitude"
+
+msgid "Longitude"
+msgstr "Longitude"
+
+msgid "Précision GPS (m)"
+msgstr "GPS accuracy (m)"
+
+msgid "Précision GPS"
+msgstr "GPS accuracy"
+
+msgid "Adresse détectée"
+msgstr "Detected address"
+
+msgid "Identifiant Maps"
+msgstr "Maps identifier"
+
+msgid "Voir sur Maps"
+msgstr "View on Maps"
+
+msgid "La valeur doit être un nombre fini."
+msgstr "Enter a finite number."
+
+msgid "Coordonnée ou précision GPS invalide."
+msgstr "Invalid coordinates or GPS accuracy."
+
+msgid "Renseignez ensemble la latitude et la longitude."
+msgstr "Enter both latitude and longitude."
+
+msgid "La précision nécessite une position GPS."
+msgstr "Accuracy requires a GPS position."
+
+msgid "Trop de demandes. Veuillez patienter."
+msgstr "Too many requests. Please wait."
+
+msgid "Adresse indisponible. Vous pouvez conserver le GPS et saisir l’adresse manuellement."
+msgstr "Address unavailable. Keep the GPS position and enter the address manually."
+
+msgid "L’accès à votre position a été refusé."
+msgstr "Access to your location was denied."
+
+msgid "Impossible de déterminer votre position."
+msgstr "Unable to determine your location."
+
+msgid "La localisation a expiré. Veuillez réessayer."
+msgstr "Location request timed out. Please try again."
+
+msgid "La géolocalisation nécessite HTTPS et un navigateur compatible."
+msgstr "Geolocation requires HTTPS and a compatible browser."
+
+msgid "Recherche de votre position…"
+msgstr "Finding your location…"
+
+msgid "Confirmez ou annulez la position proposée avant d’enregistrer."
+msgstr "Confirm or cancel the proposed location before saving."
+
+msgid "La position GPS semble imprécise."
+msgstr "The GPS position appears inaccurate."
+
+msgid "Position confirmée. Enregistrez le formulaire pour la sauvegarder."
+msgstr "Location confirmed. Save the form to store it."
+
+msgid "Adresse détectée trop longue : conservez le GPS et adaptez l’adresse manuellement."
+msgstr "The detected address is too long: keep the GPS position and edit the address manually."
+
+msgid "Localisation du client (facultative)"
+msgstr "Customer location (optional)"
+
+msgid "Votre position est demandée uniquement au clic. Elle ne sera enregistrée qu’après confirmation et enregistrement du client."
+msgstr "Your location is requested only when clicked. It is stored only after confirmation and saving the customer."
+
+msgid "Utiliser ma position actuelle"
+msgstr "Use my current location"
+
+msgid "Confirmer cette adresse"
+msgstr "Confirm this address"
+
+msgid "Conserver le GPS et modifier manuellement"
+msgstr "Keep GPS and edit manually"
+
+msgid "Notes"
+msgstr "Notes"
+
+msgid "Ajouter un client"
+msgstr "Add a customer"
+
+msgid "Modifier le client"
+msgstr "Edit customer"

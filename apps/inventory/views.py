@@ -24,6 +24,12 @@ from .forms import (
 )
 from .models import Brand, Category, Client, Product, StockMovement, Supplier, Unit
 from .services import create_product_from_form, record_stock_movement, reverse_stock_movement
+from .location import audit_location, location_snapshot
+from .geocoding import GeocodingService, GeocodingUnavailable
+from django import forms
+from django.core.cache import cache
+from django.views.decorators.cache import never_cache
+import time
 from django.http import FileResponse
 from django.utils.translation import gettext as _
 
@@ -362,7 +368,8 @@ def client_export(request):
 def client_create(request):
     form = ClientForm(request.POST or None)
     if form.is_valid():
-        form.save()
+        client_obj = form.save()
+        audit_location(request, client_obj, None)
         messages.success(request, _('Client ajouté avec succès.'))
         return redirect('client_list')
     return render(request, 'inventory/client_form.html', {'form': form, 'title': _('Ajouter un client')})
@@ -382,9 +389,11 @@ def client_detail(request, pk):
 @manager_required
 def client_update(request, pk):
     client_obj = get_object_or_404(Client, pk=pk)
+    before = location_snapshot(client_obj)
     form = ClientForm(request.POST or None, instance=client_obj)
     if form.is_valid():
         form.save()
+        audit_location(request, client_obj, before)
         messages.success(request, _('Client mis à jour.'))
         return redirect('client_list')
     return render(request, 'inventory/client_form.html', {'form': form, 'title': _('Modifier le client')})
@@ -397,6 +406,33 @@ def client_delete(request, pk):
         messages.success(request, _('Client supprimé.'))
         return redirect('client_list')
     return render(request, 'inventory/client_confirm_delete.html', {'client': client_obj})
+
+
+@never_cache
+@require_POST
+@permission_required('inventory.add_client', 'inventory.change_client', any_permission=True)
+def client_reverse_geocode(request):
+    # This endpoint proposes an address only; it never writes a client.
+    from .location import validate_finite
+    coordinates = {}
+    try:
+        for name, bound in (('latitude', 90), ('longitude', 180)):
+            coordinates[name] = forms.FloatField(min_value=-bound, max_value=bound, validators=[validate_finite]).clean(request.POST.get(name))
+    except ValidationError:
+        return JsonResponse({'error': _('Coordonnée ou précision GPS invalide.')}, status=400)
+    key = f'client-geocode:{request.user.pk}:{int(time.time()) // 60}'
+    if not cache.add(key, 1, timeout=65):
+        try:
+            count = cache.incr(key)
+        except ValueError:
+            count = 1
+            cache.set(key, count, timeout=65)
+        if count > 30:
+            return JsonResponse({'error': _('Trop de demandes. Veuillez patienter.')}, status=429)
+    try:
+        return JsonResponse(GeocodingService().reverse_geocode(**coordinates))
+    except GeocodingUnavailable:
+        return JsonResponse({'error': _('Adresse indisponible. Vous pouvez conserver le GPS et saisir l’adresse manuellement.')}, status=503)
 
 @manager_required
 def supplier_list(request):

@@ -17,6 +17,14 @@
         <div class="col-12 col-md-6"><strong>{% trans "Type de client" %} :</strong> {{ client_obj.get_customer_type_display }}</div>
         <div class="col-12 col-md-6"><strong>{% trans "Téléphone" %} :</strong> {{ client_obj.phone|default:"-" }}</div>
         <div class="col-12 col-md-6"><strong>{% trans "Adresse" %} :</strong> {{ client_obj.address|default:"-" }}</div>
+        {% if client_obj.maps_url %}
+        <div class="col-12">
+            <p>{% trans "Latitude" %} : {{ client_obj.latitude }} / {% trans "Longitude" %} : {{ client_obj.longitude }}</p>
+            {% if client_obj.location_accuracy != None %}<p>{% trans "Précision GPS" %} : ± {{ client_obj.location_accuracy }} m</p>{% endif %}
+            {% if client_obj.formatted_address %}<p>{% trans "Adresse détectée" %} : {{ client_obj.formatted_address }}</p>{% endif %}
+            <a class="btn btn-outline-primary" href="{{ client_obj.maps_url }}" target="_blank" rel="noopener noreferrer">{% trans "Voir sur Maps" %}</a>
+        </div>
+        {% endif %}
         <div class="col-12 col-md-6"><strong>{% trans "Wilaya" %} :</strong> {{ client_obj.wilaya|default:"-" }}</div>
         <div class="col-12 col-md-6"><strong>{% trans "NIF" %} :</strong> {{ client_obj.tax_number|default:"-" }}</div>
         <div class="col-12 col-md-6"><strong>{% trans "Solde" %} :</strong> {{ client_obj.balance|floatformat:2 }} DZD</div>

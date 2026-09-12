@@ -9,6 +9,7 @@ from django.utils.translation import gettext_lazy as _
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / '.env')
+GOOGLE_MAPS_API_KEY = os.getenv('GOOGLE_MAPS_API_KEY', '')
 
 def env_bool(name, default=False):
     value = os.getenv(name)
@@ -130,7 +131,7 @@ SECURITY_RESPONSE_HEADERS = {
         "form-action 'self'; "
         "frame-ancestors 'none';"
     ),
-    'Permissions-Policy': os.getenv('PERMISSIONS_POLICY', 'camera=(), microphone=(), geolocation=(), payment=()'),
+    'Permissions-Policy': os.getenv('PERMISSIONS_POLICY', 'camera=(), microphone=(), geolocation=(self), payment=()'),
     'Cross-Origin-Opener-Policy': os.getenv('CROSS_ORIGIN_OPENER_POLICY', 'same-origin'),
     'Cross-Origin-Resource-Policy': os.getenv('CROSS_ORIGIN_RESOURCE_POLICY', 'same-origin'),
 }
