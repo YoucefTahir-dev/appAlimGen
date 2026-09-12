@@ -1053,3 +1053,33 @@ msgstr "يرجى اختيار العميل أولاً."
 
 msgid "Unité de base"
 msgstr "الوحدة الأساسية"
+
+msgid "Nom produit"
+msgstr "اسم المنتج"
+
+msgid "Référence achat"
+msgstr "مرجع الشراء"
+
+msgid "TVA (%)"
+msgstr "ضريبة القيمة المضافة (%)"
+
+msgid "Nouveau produit"
+msgstr "منتج جديد"
+
+msgid "Créer le produit"
+msgstr "إنشاء المنتج"
+
+msgid "Produit créé avec succès"
+msgstr "تم إنشاء المنتج بنجاح"
+
+msgid "Ce produit existe déjà."
+msgstr "هذا المنتج موجود بالفعل."
+
+msgid "Erreur lors de la création"
+msgstr "خطأ أثناء إنشاء المنتج"
+
+msgid "Création produit depuis achat"
+msgstr "إنشاء منتج من المشتريات"
+
+msgid "Nouvel achat"
+msgstr "شراء جديد"

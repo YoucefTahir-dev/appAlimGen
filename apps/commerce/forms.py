@@ -13,6 +13,11 @@ class PurchaseForm(forms.ModelForm):
     class Meta:
         model = Purchase
         fields = ['reference', 'supplier', 'tax_rate']
+        labels = {
+            'reference': _('Référence achat'),
+            'supplier': _('Fournisseur'),
+            'tax_rate': _('TVA (%)'),
+        }
         widgets = {
             'reference': forms.TextInput(attrs={'class': 'form-control'}),
             'supplier': forms.Select(attrs={'class': 'form-select'}),

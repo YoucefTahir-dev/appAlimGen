@@ -2,6 +2,7 @@ from django.urls import path
 from .views import (
     product_list,
     product_create,
+    product_quick_create,
     product_update,
     product_delete,
     product_import,
@@ -27,6 +28,7 @@ from .views import (
 urlpatterns = [
     path('products/', product_list, name='product_list'),
     path('products/new/', product_create, name='product_create'),
+    path('products/quick-create/', product_quick_create, name='product_quick_create'),
     path('products/<int:pk>/edit/', product_update, name='product_update'),
     path('products/<int:pk>/delete/', product_delete, name='product_delete'),
     path('products/<int:pk>/', product_detail, name='product_detail'),

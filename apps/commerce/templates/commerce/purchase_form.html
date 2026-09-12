@@ -1,13 +1,15 @@
 {% extends 'base/base.html' %}
-{% load i18n %}
+{% load i18n static access_tags %}
 
 {% block title %}{{ title }} - El Amine ERP{% endblock %}
 
 {% block page_title %}{{ title }}{% endblock %}
 
 {% block content %}
+{% has_access 'inventory.add_product' as can_quick_create %}
+{% has_access 'commerce.add_purchase' as can_add_purchase %}
 <div class="card card-dashboard p-4 bg-white">
-    <form method="post">
+    <form method="post" id="purchase-form">
         {% csrf_token %}
         {{ form.non_field_errors }}
         <div class="row g-3">
@@ -23,26 +25,62 @@
                 <thead>
                     <tr>
                         <th>{% trans "Produit" %}</th>
-                        <th>Quantité</th>
+                        <th>{% trans "Quantité" %}</th>
                         <th>{% trans "Prix d'achat" %}</th>
                         <th>{% trans "Supprimer" %}</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="purchase-lines">
                     {% for form_line in formset %}
-                        <tr>
-                            <td>{{ form_line.product }}{{ form_line.product.errors }}</td>
-                            <td>{{ form_line.quantity }}{{ form_line.quantity.errors }}</td>
-                            <td>{{ form_line.purchase_price }}{{ form_line.purchase_price.errors }}</td>
-                            <td>{{ form_line.DELETE }}</td>
-                        </tr>
+                        {% include 'commerce/_purchase_line.html' %}
                     {% endfor %}
                 </tbody>
             </table>
         </div>
+        <template id="purchase-line-template">
+            {% include 'commerce/_purchase_line.html' with form_line=formset.empty_form %}
+        </template>
         <div class="form-actions">
+            <button type="button" id="add-purchase-line" class="btn btn-outline-primary">{% trans "Ajouter un produit" %}</button>
             <button class="btn btn-success">{% trans "Enregistrer" %}</button>
         </div>
     </form>
 </div>
+<div id="purchase-product-status" role="status" aria-live="polite"></div>
+{% if can_quick_create and can_add_purchase %}
+<div class="modal fade" id="quick-product-modal" tabindex="-1" aria-labelledby="quick-product-title" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <form id="quick-product-form" action="{% url 'product_quick_create' %}" method="post"
+                  data-success="{% trans 'Produit créé avec succès' %}"
+                  data-error="{% trans 'Erreur lors de la création' %}">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h2 class="modal-title fs-5" id="quick-product-title">{% trans "Ajouter un produit" %}</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans 'Annuler' %}"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="text-danger mb-2" data-errors="__all__" role="alert"></div>
+                    <div class="row g-3">
+                    {% for field in quick_product_form %}
+                        <div class="col-12 col-md-6">
+                            {{ field.label_tag }}{{ field }}
+                            <div class="text-danger small" id="{{ field.auto_id }}_errors" data-errors="{{ field.name }}" aria-live="polite"></div>
+                        </div>
+                    {% endfor %}
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{% trans "Annuler" %}</button>
+                    <button type="submit" class="btn btn-success">{% trans "Créer le produit" %}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/purchase-form.js' %}" defer></script>
 {% endblock %}

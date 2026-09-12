@@ -3,24 +3,27 @@ from decimal import Decimal, InvalidOperation
 import openpyxl
 from django.contrib import messages
 from django.core.exceptions import ValidationError
-from django.db import DatabaseError, transaction
+from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models import Exists, OuterRef, Q
 from django.db.models.deletion import ProtectedError
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
+from django.views.decorators.http import require_POST
 from django.shortcuts import render, get_object_or_404, redirect
-from apps.accounts.permissions import manager_required, seller_required
+from apps.accounts.permissions import manager_required, seller_required, permission_required
+from apps.core.security import log_security_event
 from apps.core.export_security import excel_safe_text
 from apps.core.pagination import paginate_queryset
 from .forms import (
     ClientForm,
     ImportExcelForm,
     ProductForm,
+    QuickProductForm,
     ProductPackagingFormSet,
     StockMovementForm,
     SupplierForm,
 )
 from .models import Brand, Category, Client, Product, StockMovement, Supplier, Unit
-from .services import record_stock_movement, reverse_stock_movement
+from .services import create_product_from_form, record_stock_movement, reverse_stock_movement
 from django.http import FileResponse
 from django.utils.translation import gettext as _
 
@@ -48,24 +51,9 @@ def product_create(request):
     packaging_formset = ProductPackagingFormSet(packaging_data, prefix='packagings')
     if form.is_valid() and (not packaging_formset.is_bound or packaging_formset.is_valid()):
         try:
-            with transaction.atomic():
-                initial_quantity = form.cleaned_data['quantity']
-                product = form.save(commit=False)
-                product.quantity = 0
-                product.save()
-                if packaging_formset.is_bound:
-                    packaging_formset.instance = product
-                    packaging_formset.save()
-                if initial_quantity:
-                    record_stock_movement(
-                        product=product,
-                        movement_type=StockMovement.ENTRY,
-                        quantity=initial_quantity,
-                        reason=_('Stock initial du produit'),
-                        user=request.user,
-                        source_type=StockMovement.SOURCE_PRODUCT,
-                        source_reference=product.reference,
-                    )
+            product = create_product_from_form(
+                form, user=request.user, packaging_formset=packaging_formset,
+            )
         except ValidationError as exc:
             for error in exc.messages:
                 form.add_error('quantity', error)
@@ -83,6 +71,29 @@ def product_create(request):
     return render(request, 'inventory/product_form.html', {
         'form': form, 'packaging_formset': packaging_formset, 'title': _('Ajouter un produit'),
     })
+
+@require_POST
+@permission_required('inventory.add_product', 'commerce.add_purchase')
+def product_quick_create(request):
+    form = QuickProductForm(request.POST, prefix='quick')
+    if form.is_valid():
+        try:
+            product = create_product_from_form(form, user=request.user)
+        except ValidationError as exc:
+            form.add_error(None, exc)
+        except IntegrityError:
+            form.add_error(None, _('Ce produit existe déjà.'))
+        else:
+            log_security_event(request, _('Création produit depuis achat'), status_code=201)
+            return JsonResponse({
+                'success': True,
+                'product': {
+                    'id': product.pk, 'reference': product.reference,
+                    'name': product.name, 'purchase_price': f'{product.purchase_price:.2f}',
+                },
+            }, status=201)
+    return JsonResponse({'success': False, 'errors': form.errors.get_json_data()}, status=400)
+
 
 @manager_required
 def product_update(request, pk):

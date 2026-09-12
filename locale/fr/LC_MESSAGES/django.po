@@ -78,3 +78,30 @@ msgstr "Sélectionnez d’abord un client."
 
 msgid "Unité de base"
 msgstr "Unité de base"
+
+msgid "Nouveau produit"
+msgstr "Nouveau produit"
+
+msgid "Créer le produit"
+msgstr "Créer le produit"
+
+msgid "Produit créé avec succès"
+msgstr "Produit créé avec succès"
+
+msgid "Ce produit existe déjà."
+msgstr "Ce produit existe déjà."
+
+msgid "Erreur lors de la création"
+msgstr "Erreur lors de la création"
+
+msgid "Création produit depuis achat"
+msgstr "Création produit depuis achat"
+
+msgid "Nouvel achat"
+msgstr "Nouvel achat"
+
+msgid "Ajouter un produit"
+msgstr "Ajouter un produit"
+
+msgid "Annuler"
+msgstr "Annuler"

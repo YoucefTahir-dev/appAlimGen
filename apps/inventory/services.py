@@ -7,6 +7,26 @@ from django.utils.translation import gettext as _
 from .models import Product, StockMovement
 
 
+@transaction.atomic
+def create_product_from_form(form, *, user, packaging_formset=None):
+    """Persist a validated product form and its initial stock through the ledger."""
+    initial_quantity = form.cleaned_data.get('quantity', 0)
+    product = form.save(commit=False)
+    product.quantity = 0
+    product.save()
+    if packaging_formset is not None and packaging_formset.is_bound:
+        packaging_formset.instance = product
+        packaging_formset.save()
+    if initial_quantity:
+        record_stock_movement(
+            product=product, movement_type=StockMovement.ENTRY,
+            quantity=initial_quantity, reason=_('Stock initial du produit'),
+            user=user, source_type=StockMovement.SOURCE_PRODUCT,
+            source_reference=product.reference,
+        )
+    return product
+
+
 def _movement_delta(movement_type, quantity, current_balance):
     if movement_type == StockMovement.ENTRY:
         return quantity

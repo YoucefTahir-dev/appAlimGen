@@ -14,6 +14,7 @@ from django.utils.translation import gettext as _
 from apps.accounts.permissions import manager_required, permission_required, seller_required
 from apps.core.pagination import paginate_queryset
 from apps.inventory.models import Client, Product, ProductPackaging
+from apps.inventory.forms import QuickProductForm
 from apps.inventory.pricing import get_sale_price_context
 
 from .forms import PaymentForm, PurchaseForm, PurchaseLineFormSet, SaleForm, SaleLineFormSet
@@ -193,7 +194,7 @@ def purchase_create(request):
         else:
             messages.success(request, "Bon d'achat enregistré avec succès.")
             return redirect('purchase_list')
-    return render(request, 'commerce/purchase_form.html', {'form': form, 'formset': formset, 'title': 'Nouvel achat'})
+    return render(request, 'commerce/purchase_form.html', {'form': form, 'formset': formset, 'title': _('Nouvel achat'), 'quick_product_form': QuickProductForm(prefix='quick')})
 
 
 @manager_required
@@ -264,7 +265,7 @@ def purchase_update(request, pk):
         else:
             messages.success(request, "Bon d'achat mis à jour avec succès.")
             return redirect('purchase_list')
-    return render(request, 'commerce/purchase_form.html', {'form': form, 'formset': formset, 'title': "Modifier l'achat"})
+    return render(request, 'commerce/purchase_form.html', {'form': form, 'formset': formset, 'title': _("Modifier l'achat"), 'quick_product_form': QuickProductForm(prefix='quick')})
 
 
 @manager_required

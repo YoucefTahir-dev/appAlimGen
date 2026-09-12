@@ -4,6 +4,15 @@ Toutes les modifications notables de ce projet seront documentées ici.
 
 ## [Non publié]
 
+### Achats : création rapide de produit
+
+- Modale de création produit depuis chaque ligne d'achat, avec ajout de lignes
+  dynamique, conservation de la saisie et sélection sur la ligne d'origine.
+- Réutilisation de la création catalogue et de ses validations ; stock initial
+  nul et mouvement de stock uniquement lors de l'enregistrement de l'achat.
+- Contrôles RBAC et CSRF, audit, erreurs par champ et traductions FR/AR/EN.
+- Tests serveur et parcours navigateur local à plusieurs lignes.
+
 ### Paiements et coûts historiques
 
 - Suivi transactionnel des règlements clients et fournisseurs avec paiements partiels, soldes et statuts.

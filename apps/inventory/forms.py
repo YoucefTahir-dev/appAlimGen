@@ -74,6 +74,16 @@ class ProductForm(forms.ModelForm):
             raise ValidationError(_("Le prix d'achat ne peut pas être négatif."))
         return purchase_price
 
+class QuickProductForm(ProductForm):
+    """Reuse catalogue validation; purchases provide the stock separately."""
+
+    class Meta(ProductForm.Meta):
+        fields = [
+            'name', 'purchase_price', 'super_wholesale_price',
+            'wholesale_price', 'retail_price',
+        ]
+
+
 class ProductPackagingForm(forms.ModelForm):
     class Meta:
         model = ProductPackaging

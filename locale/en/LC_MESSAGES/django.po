@@ -119,3 +119,87 @@ msgstr "Select a customer first."
 
 msgid "Unité de base"
 msgstr "Base unit"
+
+msgid "Le prix Super Gros ne peut pas être inférieur au prix d’achat."
+msgstr "The super wholesale price cannot be lower than the purchase price."
+
+msgid "Le prix Gros ne peut pas être inférieur au prix d’achat."
+msgstr "The wholesale price cannot be lower than the purchase price."
+
+msgid "Le prix Détail ne peut pas être inférieur au prix d’achat."
+msgstr "The retail price cannot be lower than the purchase price."
+
+msgid "Les tarifs doivent respecter l’ordre : Super Gros ≤ Gros ≤ Détail."
+msgstr "Prices must follow this order: super wholesale ≤ wholesale ≤ retail."
+
+msgid "Le prix d'achat ne peut pas être négatif."
+msgstr "The purchase price cannot be negative."
+
+msgid "Nom produit"
+msgstr "Product name"
+
+msgid "Marque"
+msgstr "Brand"
+
+msgid "Prix d'achat"
+msgstr "Purchase price"
+
+msgid "Prix Super Gros"
+msgstr "Super wholesale price"
+
+msgid "Prix Gros"
+msgstr "Wholesale price"
+
+msgid "Prix Détail"
+msgstr "Retail price"
+
+msgid "Référence achat"
+msgstr "Purchase reference"
+
+msgid "Fournisseur"
+msgstr "Supplier"
+
+msgid "TVA (%)"
+msgstr "VAT (%)"
+
+msgid "Quantité"
+msgstr "Quantity"
+
+msgid "Supprimer"
+msgstr "Delete"
+
+msgid "Enregistrer"
+msgstr "Save"
+
+msgid "Code-barres"
+msgstr "Barcode"
+
+msgid "Généré automatiquement"
+msgstr "Automatically generated"
+
+msgid "Nouveau produit"
+msgstr "New product"
+
+msgid "Créer le produit"
+msgstr "Create product"
+
+msgid "Produit créé avec succès"
+msgstr "Product created successfully"
+
+msgid "Ce produit existe déjà."
+msgstr "This product already exists."
+
+msgid "Erreur lors de la création"
+msgstr "Error creating product"
+
+msgid "Création produit depuis achat"
+msgstr "Product created from purchase"
+
+msgid "Nouvel achat"
+msgstr "New purchase"
+
+msgid "Ajouter un produit"
+msgstr "Add a product"
+
+msgid "Annuler"
+msgstr "Cancel"

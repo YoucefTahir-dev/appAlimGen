@@ -1,0 +1,14 @@
+{% load i18n %}
+<tr class="purchase-line-row">
+    <td>
+        {% for hidden in form_line.hidden_fields %}{{ hidden }}{% endfor %}
+        {{ form_line.non_field_errors }}
+        {{ form_line.product }}{{ form_line.product.errors }}
+        {% if can_quick_create and can_add_purchase %}
+        <button type="button" class="btn btn-sm btn-outline-primary mt-2 quick-product-open">+ {% trans "Nouveau produit" %}</button>
+        {% endif %}
+    </td>
+    <td>{{ form_line.quantity }}{{ form_line.quantity.errors }}</td>
+    <td>{{ form_line.purchase_price }}{{ form_line.purchase_price.errors }}</td>
+    <td>{{ form_line.DELETE }}</td>
+</tr>

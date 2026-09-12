@@ -409,3 +409,8 @@ body.rtl .text-end {
         padding: 1.5rem !important;
     }
 }
+/* Keep the quick-create close button on the trailing side in LTR and RTL. */
+#quick-product-modal .modal-header .btn-close {
+    margin: 0;
+    margin-inline-start: auto;
+}
