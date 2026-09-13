@@ -8,6 +8,7 @@ from django.db.models.functions import Coalesce, ExtractMonth, ExtractYear, Trun
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
+from apps.accounts.permissions import is_manager
 from apps.commerce.models import Purchase, PurchaseLine, Sale, SaleLine
 from apps.expenses.models import Expense
 from apps.inventory.models import Client, Product, Supplier
@@ -72,10 +73,19 @@ def _form_error_messages(form):
     return [str(message) for errors in form.errors.values() for message in errors]
 
 
-def get_period_bounds(request, strict=False):
+def get_period_bounds(request, strict=False, dashboard_user=None):
     today = timezone.localdate()
-    form_data = request.GET if request.GET else {"period": "today"}
-    period_form = DashboardPeriodForm(form_data)
+    request_user = getattr(request, 'user', None)
+    can_filter_users = is_manager(request_user)
+    dashboard_user = dashboard_user if dashboard_user is not None else request_user
+    form_data = request.GET.copy() if request.GET else {"period": "today"}
+    if form_data.get('user') == 'all':
+        form_data['user'] = ''
+    period_form = DashboardPeriodForm(
+        form_data,
+        dashboard_user=dashboard_user,
+        can_filter_users=can_filter_users,
+    )
     period_is_valid = period_form.is_valid()
 
     if not period_is_valid:
@@ -104,6 +114,11 @@ def get_period_bounds(request, strict=False):
         else:
             start_date = end_date = today
 
+    if can_filter_users:
+        selected_user = period_form.cleaned_data.get('user') if period_is_valid else None
+    else:
+        selected_user = dashboard_user if getattr(dashboard_user, 'is_authenticated', False) else None
+
     start_dt, _ = local_day_bounds(start_date)
     _, end_dt = local_day_bounds(end_date)
     previous_start_date, previous_end_date = _previous_period_dates(period, start_date, end_date)
@@ -111,6 +126,8 @@ def get_period_bounds(request, strict=False):
     _, previous_end_dt = local_day_bounds(previous_end_date)
 
     export_params = {"period": period}
+    if selected_user is not None:
+        export_params['user'] = selected_user.pk
     if period == "custom":
         export_params.update({"start_date": start_date.isoformat(), "end_date": end_date.isoformat()})
 
@@ -128,6 +145,9 @@ def get_period_bounds(request, strict=False):
         "previous_end_date": previous_end_date,
         "previous_start_dt": previous_start_dt,
         "previous_end_dt": previous_end_dt,
+        "selected_user": selected_user,
+        "can_filter_users": can_filter_users,
+        "available_users": period_form.fields['user'].queryset,
     }
 
 
@@ -163,8 +183,10 @@ def datetime_window(queryset, field_name, start_dt, end_dt):
     )
 
 
-def sales_total_between(start_dt, end_dt):
+def sales_total_between(start_dt, end_dt, selected_user=None):
     queryset = datetime_window(Sale.objects.all(), "created_at", start_dt, end_dt)
+    if selected_user is not None:
+        queryset = queryset.filter(created_by=selected_user)
     return money_value(queryset.aggregate(total=Sum("total"))["total"])
 
 
@@ -184,8 +206,10 @@ def _cost_expression():
     )
 
 
-def cogs_between(start_dt, end_dt):
+def cogs_between(start_dt, end_dt, selected_user=None):
     queryset = datetime_window(SaleLine.objects.all(), "sale__created_at", start_dt, end_dt)
+    if selected_user is not None:
+        queryset = queryset.filter(sale__created_by=selected_user)
     return money_value(queryset.aggregate(total=Sum(_cost_expression()))["total"])
 
 
@@ -255,8 +279,10 @@ def series_from_queryset(queryset, granularity, total_field="total", date_field=
     return {bucket_key(row["bucket"]): float(row["total"] or 0) for row in rows}
 
 
-def expense_series(start_date, end_date, granularity):
+def expense_series(start_date, end_date, granularity, selected_user=None):
     queryset = Expense.objects.filter(date__range=(start_date, end_date))
+    if selected_user is not None:
+        queryset = queryset.filter(created_by=selected_user)
     if granularity == "day":
         rows = queryset.values("date").annotate(total=Sum("amount")).order_by("date")
         return {row["date"].isoformat(): float(row["total"] or 0) for row in rows}
@@ -273,18 +299,22 @@ def expense_series(start_date, end_date, granularity):
     }
 
 
-def build_chart_data(bounds, expense_category_rows):
+def build_chart_data(bounds, expense_category_rows, selected_user=None):
     granularity = trend_granularity(bounds["start_date"], bounds["end_date"])
     sales_qs = datetime_window(Sale.objects.all(), "created_at", bounds["start_dt"], bounds["end_dt"])
+    if selected_user is not None:
+        sales_qs = sales_qs.filter(created_by=selected_user)
     purchases_qs = datetime_window(Purchase.objects.all(), "created_at", bounds["start_dt"], bounds["end_dt"])
     sold_lines_qs = datetime_window(
         SaleLine.objects.all(), "sale__created_at", bounds["start_dt"], bounds["end_dt"]
     ).annotate(line_cost=_cost_expression())
+    if selected_user is not None:
+        sold_lines_qs = sold_lines_qs.filter(sale__created_by=selected_user)
 
     sales = series_from_queryset(sales_qs, granularity)
     purchases = series_from_queryset(purchases_qs, granularity)
     sold_costs = series_from_queryset(sold_lines_qs, granularity, "line_cost", "sale__created_at")
-    expenses = expense_series(bounds["start_date"], bounds["end_date"], granularity)
+    expenses = expense_series(bounds["start_date"], bounds["end_date"], granularity, selected_user)
     labels = chart_labels(bounds["start_date"], bounds["end_date"], granularity)
     revenue_values = [sales.get(label, 0) for label in labels]
     purchase_values = [purchases.get(label, 0) for label in labels]
@@ -301,6 +331,8 @@ def build_chart_data(bounds, expense_category_rows):
             output_field=DecimalField(max_digits=18, decimal_places=2),
         )
     )
+    if selected_user is not None:
+        sale_lines_with_totals = sale_lines_with_totals.filter(sale__created_by=selected_user)
     sales_by_category = list(
         sale_lines_with_totals.values("product__category__name")
         .annotate(total=Sum("line_total"))
@@ -329,10 +361,13 @@ def build_chart_data(bounds, expense_category_rows):
 
 def dashboard_context(request, strict_period=False):
     bounds = get_period_bounds(request, strict=strict_period)
+    selected_user = bounds['selected_user']
     today = timezone.localdate()
     today_start, today_end = local_day_bounds(today)
 
     sales_qs = datetime_window(Sale.objects.all(), "created_at", bounds["start_dt"], bounds["end_dt"])
+    if selected_user is not None:
+        sales_qs = sales_qs.filter(created_by=selected_user)
     purchases_qs = datetime_window(Purchase.objects.all(), "created_at", bounds["start_dt"], bounds["end_dt"])
     sale_lines_qs = datetime_window(
         SaleLine.objects.all(), "sale__created_at", bounds["start_dt"], bounds["end_dt"]
@@ -347,10 +382,14 @@ def dashboard_context(request, strict_period=False):
             output_field=DecimalField(max_digits=18, decimal_places=2),
         ),
     )
+    if selected_user is not None:
+        sale_lines_qs = sale_lines_qs.filter(sale__created_by=selected_user)
     purchase_lines_qs = datetime_window(
         PurchaseLine.objects.all(), "purchase__created_at", bounds["start_dt"], bounds["end_dt"]
     )
     expenses_qs = Expense.objects.filter(date__range=(bounds["start_date"], bounds["end_date"]))
+    if selected_user is not None:
+        expenses_qs = expenses_qs.filter(created_by=selected_user)
 
     sales_metrics = sales_qs.aggregate(total=Sum("total"), count=Count("pk"))
     period_revenue = money_value(sales_metrics["total"])
@@ -368,9 +407,12 @@ def dashboard_context(request, strict_period=False):
     gross_profit = period_revenue - money_value(line_metrics["cogs"])
     net_profit = gross_profit - expenses_total
 
-    previous_revenue = sales_total_between(bounds["previous_start_dt"], bounds["previous_end_dt"])
-    previous_gross = previous_revenue - cogs_between(bounds["previous_start_dt"], bounds["previous_end_dt"])
-    previous_expenses = expenses_total_between(bounds["previous_start_date"], bounds["previous_end_date"])
+    previous_revenue = sales_total_between(bounds["previous_start_dt"], bounds["previous_end_dt"], selected_user)
+    previous_gross = previous_revenue - cogs_between(bounds["previous_start_dt"], bounds["previous_end_dt"], selected_user)
+    previous_expenses_qs = Expense.objects.filter(date__range=(bounds["previous_start_date"], bounds["previous_end_date"]))
+    if selected_user is not None:
+        previous_expenses_qs = previous_expenses_qs.filter(created_by=selected_user)
+    previous_expenses = money_value(previous_expenses_qs.aggregate(total=Sum('amount'))['total'])
     previous_net = previous_gross - previous_expenses
 
     stock_expression = ExpressionWrapper(
@@ -429,6 +471,7 @@ def dashboard_context(request, strict_period=False):
                     filter=Q(
                         saleline__sale__created_at__gte=bounds["start_dt"],
                         saleline__sale__created_at__lt=bounds["end_dt"],
+                        **({"saleline__sale__created_by": selected_user} if selected_user is not None else {}),
                     ),
                 ),
                 Value(0),
@@ -441,12 +484,12 @@ def dashboard_context(request, strict_period=False):
         .annotate(total=Sum("amount"))
         .order_by("-total", "category__name")[:10]
     )
-    chart_data = build_chart_data(bounds, expense_category_rows)
+    chart_data = build_chart_data(bounds, expense_category_rows, selected_user)
 
     sales_today = (
         period_revenue
         if bounds["start_date"] == today and bounds["end_date"] == today
-        else sales_total_between(today_start, today_end)
+        else sales_total_between(today_start, today_end, selected_user)
     )
 
     return {

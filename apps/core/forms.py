@@ -1,4 +1,6 @@
 from django import forms
+from django.contrib.auth import get_user_model
+from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
 
@@ -31,6 +33,28 @@ class DashboardPeriodForm(forms.Form):
         input_formats=["%Y-%m-%d"],
         widget=forms.DateInput(attrs={"class": "form-control", "type": "date"}),
     )
+
+    user = forms.ModelChoiceField(
+        label=_("Utilisateur"),
+        required=False,
+        empty_label=_("Tous les utilisateurs"),
+        queryset=get_user_model().objects.none(),
+        widget=forms.Select(attrs={"class": "form-select", "id": "dashboardUser"}),
+    )
+
+    def __init__(self, *args, dashboard_user=None, can_filter_users=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        User = get_user_model()
+        if can_filter_users:
+            self.fields['user'].queryset = User.objects.filter(
+                Q(is_active=True),
+            ).filter(
+                Q(created_sales__isnull=False) | Q(pk=getattr(dashboard_user, 'pk', None))
+            ).distinct().order_by('username')
+        elif getattr(dashboard_user, 'is_authenticated', False):
+            self.fields['user'].queryset = User.objects.filter(pk=dashboard_user.pk)
+            self.fields['user'].initial = dashboard_user.pk
+            self.fields['user'].disabled = True
 
     def clean(self):
         cleaned_data = super().clean()

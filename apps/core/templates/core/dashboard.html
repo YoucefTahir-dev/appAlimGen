@@ -19,20 +19,25 @@
 {% endif %}
 <form method="get" class="card card-dashboard p-3 p-lg-4 bg-white mb-4">
     <div class="row g-3 align-items-end">
-        <div class="col-12 col-md-4 col-xl-3">
+        <div class="col-12 col-md-4 col-xl-2">
             {{ period_form.period.label_tag }}
             {{ period_form.period }}
             {{ period_form.period.errors }}
         </div>
-        <div class="col-12 col-md-4 col-xl-3 custom-period-field">
+        <div class="col-12 col-md-4 col-xl-2 custom-period-field">
             {{ period_form.start_date.label_tag }}
             {{ period_form.start_date }}
             {{ period_form.start_date.errors }}
         </div>
-        <div class="col-12 col-md-4 col-xl-3 custom-period-field">
+        <div class="col-12 col-md-4 col-xl-2 custom-period-field">
             {{ period_form.end_date.label_tag }}
             {{ period_form.end_date }}
             {{ period_form.end_date.errors }}
+        </div>
+        <div class="col-12 col-md-4 col-xl-3">
+            {{ period_form.user.label_tag }}
+            {{ period_form.user }}
+            {{ period_form.user.errors }}
         </div>
         <div class="col-12 col-xl-3">
             <div class="toolbar-actions justify-content-xl-end">
@@ -45,6 +50,13 @@
         </div>
     </div>
 </form>
+
+{% if selected_user %}
+<div class="alert alert-secondary py-2">
+    <i class="bi bi-person me-2"></i>{% trans "Utilisateur analysé" %} :
+    <strong>{{ selected_user.get_full_name|default:selected_user.username }}</strong>
+</div>
+{% endif %}
 
 <div class="alert alert-info d-flex flex-wrap align-items-center justify-content-between gap-2">
     <div>

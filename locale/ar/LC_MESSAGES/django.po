@@ -1223,5 +1223,17 @@ msgstr "يرجى اختيار منتج من النتائج المقترحة."
 msgid "Rechercher un produit"
 msgstr "البحث عن منتج"
 
+msgid "Utilisateur"
+msgstr "Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…"
+
+msgid "Tous les utilisateurs"
+msgstr "Ø¬Ù…ÙŠØ¹ Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…ÙŠÙ†"
+
+msgid "Mon compte"
+msgstr "Ø­Ø³Ø§Ø¨ÙŠ"
+
+msgid "Utilisateur analysé"
+msgstr "Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù… Ø§Ù„Ù…Ø­Ù„Ù„"
+
 msgid "Recherche trop longue."
 msgstr "نص البحث طويل جدًا."

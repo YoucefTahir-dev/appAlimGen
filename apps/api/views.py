@@ -456,7 +456,7 @@ class DashboardView(APIView):
             context = dashboard_context(request, strict_period=True)
         except DashboardPeriodError as exc:
             raise ValidationError({'period': exc.args[0]}) from exc
-        return Response({
+        payload = {
             key: context[key]
             for key in (
                 'period', 'start_date', 'end_date', 'sales_today', 'period_revenue',
@@ -468,7 +468,13 @@ class DashboardView(APIView):
                 'comparisons', 'top_products', 'top_clients', 'top_suppliers',
                 'profitable_products', 'expense_categories', 'chart_data',
             )
+        }
+        payload.update({
+            'selected_user_id': context['selected_user'].pk if context['selected_user'] else None,
+            'selected_user': context['selected_user'].get_username() if context['selected_user'] else None,
+            'can_filter_users': context['can_filter_users'],
         })
+        return Response(payload)
 
 
 class AlertsView(APIView):
