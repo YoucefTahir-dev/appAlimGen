@@ -247,3 +247,15 @@ msgstr "Rechercher un produit"
 
 msgid "Recherche trop longue."
 msgstr "Recherche trop longue."
+
+msgid "Utilisateur"
+msgstr "Utilisateur"
+
+msgid "Tous les utilisateurs"
+msgstr "Tous les utilisateurs"
+
+msgid "Mon compte"
+msgstr "Mon compte"
+
+msgid "Utilisateur analysé"
+msgstr "Utilisateur analysé"

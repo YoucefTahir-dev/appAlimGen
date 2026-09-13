@@ -148,6 +148,48 @@ class DashboardTests(TestCase):
         self.assertEqual(pdf_response.status_code, 200)
         self.assertEqual(pdf_response['Content-Type'], 'application/pdf')
 
+    def test_dashboard_user_filter_applies_to_sales_profit_tops_and_exports(self):
+        seller_a = get_user_model().objects.create_user(username='amine', role=get_user_model().SELLER)
+        seller_b = get_user_model().objects.create_user(username='mohamed', role=get_user_model().SELLER)
+        Sale.objects.filter(pk=self.sale.pk).update(created_by=seller_a)
+        other = Sale.objects.create(
+            invoice_number='INV-B', client=self.client_obj, total='250.00', discount='0',
+            tax_rate='0', created_by=seller_b,
+        )
+        SaleLine.objects.create(sale=other, product=self.product, quantity=1, unit_price='250.00')
+
+        response = self.client.get(reverse('dashboard'), {'period': 'today', 'user': seller_a.pk})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['selected_user'], seller_a)
+        self.assertEqual(response.context['period_revenue'], Decimal('100.00'))
+        self.assertEqual(response.context['sales_count'], 1)
+        self.assertEqual(response.context['gross_profit'], Decimal('80.00'))
+        self.assertEqual(response.context['top_clients'][0]['total'], Decimal('100.00'))
+        self.assertContains(response, 'Utilisateur analysé')
+
+        excel = self.client.get(reverse('dashboard_export_excel'), {'period': 'today', 'user': seller_a.pk})
+        workbook = openpyxl.load_workbook(io.BytesIO(excel.content))
+        self.assertEqual(workbook['Tableau de bord'].cell(row=2, column=2).value, 'amine')
+
+    def test_seller_dashboard_is_forced_to_own_sales(self):
+        seller_a = get_user_model().objects.create_user(username='seller-a', role=get_user_model().SELLER)
+        seller_b = get_user_model().objects.create_user(username='seller-b', role=get_user_model().SELLER)
+        Sale.objects.filter(pk=self.sale.pk).update(created_by=seller_a)
+        other = Sale.objects.create(
+            invoice_number='INV-SELLER-B', client=self.client_obj, total='250.00', discount='0',
+            tax_rate='0', created_by=seller_b,
+        )
+        SaleLine.objects.create(sale=other, product=self.product, quantity=1, unit_price='250.00')
+        self.client.force_login(seller_a)
+
+        response = self.client.get(reverse('dashboard'), {'period': 'today', 'user': seller_b.pk})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['selected_user'], seller_a)
+        self.assertEqual(response.context['period_revenue'], Decimal('100.00'))
+        self.assertNotContains(response, 'seller-b')
+
     def test_predefined_periods_use_matching_calendar_comparisons(self):
         request_factory = RequestFactory()
         frozen_today = date(2026, 8, 15)

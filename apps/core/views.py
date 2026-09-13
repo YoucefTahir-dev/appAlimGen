@@ -126,6 +126,7 @@ def dashboard_export_excel(request):
     sheet = workbook.active
     sheet.title = str(_("Tableau de bord"))[:31]
     sheet.append([_("Période"), context["start_date"].isoformat(), context["end_date"].isoformat()])
+    sheet.append([_("Utilisateur analysé"), context["selected_user"].get_username() if context["selected_user"] else _("Tous les utilisateurs")])
     sheet.append([])
     sheet.append([_("Indicateur"), _("Valeur")])
     for label, value in [
@@ -236,6 +237,13 @@ def dashboard_export_pdf(request):
     story = [
         Paragraph(_("Tableau de bord décisionnel"), styles["Title"]),
         Paragraph(f"{context['start_date']:%d/%m/%Y} - {context['end_date']:%d/%m/%Y}", styles["Normal"]),
+        Paragraph(
+            _("Utilisateur analysé") + ": " + (
+                context["selected_user"].get_username()
+                if context["selected_user"] else str(_("Tous les utilisateurs"))
+            ),
+            styles["Normal"],
+        ),
         Spacer(1, 12),
     ]
     indicators = [
