@@ -1,11 +1,11 @@
 {% load i18n %}
 <div id="client-location" data-url="{% url 'client_reverse_geocode' %}"
-    data-denied="{% trans 'L’accès à votre position a été refusé.' %}"
-    data-unavailable="{% trans 'Impossible de déterminer votre position.' %}"
+    data-denied="{% trans 'Veuillez autoriser l’accès à votre position pour récupérer automatiquement l’adresse.' %}"
+    data-unavailable="{% trans 'Impossible de récupérer votre position actuelle.' %}"
     data-timeout="{% trans 'La localisation a expiré. Veuillez réessayer.' %}"
     data-unsupported="{% trans 'La géolocalisation nécessite HTTPS et un navigateur compatible.' %}"
     data-pending="{% trans 'Localisation en cours…' %}"
-    data-fallback="{% trans 'Adresse automatique indisponible. Saisissez l’adresse manuellement.' %}"
+    data-fallback="{% trans 'Votre position a été détectée, mais l’adresse n’a pas pu être récupérée.' %}"
     data-weak="{% trans 'Position GPS peu précise. Vérifiez l’adresse proposée.' %}"
     data-found="{% trans 'Adresse trouvée.' %}">
     {{ form.address.label_tag }}

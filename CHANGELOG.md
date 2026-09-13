@@ -4,6 +4,15 @@ Toutes les modifications notables de ce projet seront documentées ici.
 
 ## [Non publié]
 
+### Clients : diagnostic du géocodage et position fraîche
+
+- Position navigateur demandée sans réutilisation du cache GPS (maximumAge=0).
+- Causes de panne Google identifiées dans les logs sans clé, URL, coordonnées
+  ni corps de réponse sensible : clé absente, refus, quotas, JSON, réseau, timeout.
+- Réponse JSON d'erreur avec code sûr ; champs de succès existants conservés.
+- Tests prouvant que le nom client n'intervient jamais dans le géocodage,
+  y compris avec un nom vide ; messages GPS/échec géocodage FR/AR/EN distincts.
+
 ### Clients : simplification de l'adresse GPS
 
 - Champ Adresse avec bouton GPS intégré, spinner et message discret ; suppression

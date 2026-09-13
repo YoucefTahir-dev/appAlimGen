@@ -308,3 +308,12 @@ msgstr "Address found."
 
 msgid "Localisation invalide. Réessayez le bouton de localisation."
 msgstr "Invalid location. Try the location button again."
+
+msgid "Veuillez autoriser l’accès à votre position pour récupérer automatiquement l’adresse."
+msgstr "Please allow access to your location to retrieve the address automatically."
+
+msgid "Impossible de récupérer votre position actuelle."
+msgstr "Unable to retrieve your current location."
+
+msgid "Votre position a été détectée, mais l’adresse n’a pas pu être récupérée."
+msgstr "Your location was detected, but the address could not be retrieved."

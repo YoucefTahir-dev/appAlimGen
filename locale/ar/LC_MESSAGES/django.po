@@ -1188,3 +1188,12 @@ msgstr "تم العثور على العنوان."
 
 msgid "Localisation invalide. Réessayez le bouton de localisation."
 msgstr "الموقع غير صالح. أعد المحاولة باستخدام زر تحديد الموقع."
+
+msgid "Veuillez autoriser l’accès à votre position pour récupérer automatiquement l’adresse."
+msgstr "يرجى السماح بالوصول إلى موقعك لاسترجاع العنوان تلقائيًا."
+
+msgid "Impossible de récupérer votre position actuelle."
+msgstr "تعذر الحصول على موقعك الحالي."
+
+msgid "Votre position a été détectée, mais l’adresse n’a pas pu être récupérée."
+msgstr "تم تحديد موقعك، لكن تعذر استرجاع العنوان."

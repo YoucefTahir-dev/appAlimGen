@@ -119,9 +119,10 @@ class ClientLocationTests(TestCase):
     def test_reverse_geocoding_no_write_and_csrf(self):
         url = reverse('client_reverse_geocode')
         with patch('apps.inventory.views.GeocodingService.reverse_geocode', return_value={'formatted_address': 'Bouira', 'place_id': 'abc'}) as provider:
-            response = self.client.post(url, self.gps)
+            response = self.client.post(url, {**self.gps, 'name': 'Must never reach Google', 'address': 'Old address'})
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.json()['formatted_address'], 'Bouira')
+            provider.assert_called_once_with(latitude=36.3745, longitude=3.9012)
             self.assertEqual(Client.objects.count(), 0)
             self.assertEqual(self.client.post(url, {'latitude': 500, 'longitude': 1}).status_code, 400)
             self.assertEqual(provider.call_count, 1)
@@ -131,6 +132,15 @@ class ClientLocationTests(TestCase):
         self.assertEqual(self.client.get(url).status_code, 405)
         with patch('apps.inventory.views.GeocodingService.reverse_geocode', side_effect=GeocodingUnavailable):
             self.assertEqual(self.client.post(url, self.gps).status_code, 503)
+
+    @override_settings(GOOGLE_MAPS_API_KEY='')
+    def test_endpoint_missing_key_reports_safe_code_without_client_name(self):
+        with self.assertLogs('apps.inventory.geocoding') as logs:
+            response = self.client.post(reverse('client_reverse_geocode'), {'latitude': 36, 'longitude': 3})
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()['code'], 'missing_key')
+        self.assertFalse(response.json()['success'])
+        self.assertIn('code=missing_key', logs.output[0])
 
     def test_rbac_cannot_update_through_alternative_endpoint(self):
         group = Group.objects.create(name='Client creator')

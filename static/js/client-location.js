@@ -88,7 +88,7 @@
                 if (detected) address.value = detected;
                 status.textContent = detected ? (accuracy > 100 ? panel.dataset.weak : panel.dataset.found) : panel.dataset.fallback;
                 finish();
-            }, failure, {enableHighAccuracy: true, timeout: 15000, maximumAge: 30000});
+            }, failure, {enableHighAccuracy: true, timeout: 15000, maximumAge: 0});
         } catch (_error) {
             failure({code: 2});
         }

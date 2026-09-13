@@ -2,6 +2,7 @@
 import os
 from pathlib import Path
 from unittest.mock import patch
+from urllib.parse import parse_qs
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -30,7 +31,7 @@ class ClientLocationBrowserTests(StaticLiveServerTestCase):
                 context.add_init_script("""
                     window.gpsCalls = 0;
                     Object.defineProperty(navigator, 'geolocation', {value: {
-                        getCurrentPosition: (ok) => { window.gpsCalls++; window.delayedGPS = ok; }
+                        getCurrentPosition: (ok, fail, options) => { window.gpsCalls++; window.gpsOptions = options; window.delayedGPS = ok; }
                     }});
                 """)
                 page = context.new_page()
@@ -38,6 +39,7 @@ class ClientLocationBrowserTests(StaticLiveServerTestCase):
                 self.assertEqual(page.evaluate('gpsCalls'), 0)
                 page.locator('#id_name').fill('Manual while GPS pending')
                 page.locator('#detect-location').click()
+                self.assertEqual(page.evaluate('gpsOptions.maximumAge'), 0)
                 expect(page.locator('#location-spinner')).to_be_visible()
                 expect(page.locator('#detect-location')).to_be_disabled()
                 page.locator('#id_address').fill('Adresse tapée pendant GPS')
@@ -83,11 +85,14 @@ class ClientLocationBrowserTests(StaticLiveServerTestCase):
                     page = context.new_page()
                     errors = []
                     writes = []
+                    lookups = []
                     page.on('pageerror', lambda error: errors.append(str(error)))
                     page.on('request', lambda request: writes.append(request.url) if request.method == 'POST' and '/reverse-geocode/' not in request.url else None)
+                    page.on('request', lambda request: lookups.append(request.post_data) if '/reverse-geocode/' in request.url else None)
                     page.goto(self.live_server_url + '/inventory/clients/new/')
                     expect(page.locator('html')).to_have_attribute('dir', 'rtl' if language == 'ar' else 'ltr')
-                    page.locator('#id_name').fill('GPS ' + language)
+                    if language != 'fr':
+                        page.locator('#id_name').fill('GPS ' + language)
                     page.locator('#id_address').fill('Adresse manuelle')
                     for field in ('latitude', 'longitude', 'location_accuracy', 'formatted_address', 'place_id'):
                         expect(page.locator('#id_' + field)).to_have_attribute('type', 'hidden')
@@ -100,6 +105,8 @@ class ClientLocationBrowserTests(StaticLiveServerTestCase):
                         expect(page.locator('#location-status')).to_have_text(page.locator('#client-location').get_attribute('data-weak'))
                         expect(page.locator('#location-status')).not_to_contain_text('180')
                     self.assertEqual(writes, [])
+                    self.assertEqual(parse_qs(lookups[-1]), {'latitude': ['36.3745'], 'longitude': ['3.9012']})
+                    page.locator('#id_name').fill('GPS ' + language)
                     path = Path(settings.BASE_DIR) / 'tmp' / 'client-location'
                     path.mkdir(parents=True, exist_ok=True)
                     page.screenshot(path=str(path / f'simple-{language}.png'), full_page=True)

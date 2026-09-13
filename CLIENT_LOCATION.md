@@ -33,7 +33,7 @@ du service de géocodage, des permissions ou du contrat API. Aucune nouvelle mig
 
 1. À l'ouverture : aucun GPS ni appel fournisseur ; l'adresse existante reste intacte.
 2. Clic sur 📍 : spinner et message « Localisation en cours… », bouton désactivé.
-3. GPS navigateur : haute précision, timeout 15 s, maximumAge 30 s.
+3. GPS navigateur : haute précision, timeout 15 s, maximumAge 0 (position fraîche).
 4. POST vers l'endpoint interne avec CSRF.
 5. Succès : adresse automatiquement placée dans le champ, coordonnées et
    métadonnées dans les champs cachés, spinner arrêté.
@@ -145,8 +145,74 @@ local ne les remplace pas. Pas de carte interactive ni d'autocomplete dans cette
 
 ## Publication
 
-Branche fix/client-location-simple-ux. Aucune fusion vers main, aucun push,
+### Diagnostic complémentaire du géocodage — 13 septembre 2026
+
+Constat réel local : GOOGLE_MAPS_API_KEY absente à la fois du processus et du
+fichier .env (contrôle de présence uniquement, aucune valeur affichée). Sans
+clé, aucun appel Google n'est effectué : le service échoue avant la requête.
+La cause locale est donc missing_key. La configuration Render et les APIs/restrictions
+du projet Google ne sont pas accessibles ici : la cause de production reste
+non confirmée. Le message générique seul ne permettait pas de la déterminer.
+
+Le frontend n'utilisait déjà pas le nom client. Son POST contient uniquement
+latitude/longitude du navigateur. Le changement maximumAge=0 demande une nouvelle
+mesure au lieu d'autoriser une position vieille de 30 secondes. La précision
+réelle dépend toujours du navigateur et de l'appareil, pas du nom client.
+
+Le fournisseur conserve le même endpoint Google, et l'endpoint Django reste
+POST /inventory/clients/reverse-geocode/ avec CSRF et permissions existantes.
+Les réponses de succès gardent formatted_address/place_id et ajoutent success
+et address. Les erreurs fournisseur ajoutent success=false et code, avec HTTP 503.
+Les autres codes HTTP (validation, permissions, quota local) restent inchangés.
+
+Les logs geocoding.failed incluent un code sûr, le statut HTTP et le statut JSON
+Google reconnu, sans journaliser la clé, l'URL, les coordonnées ou error_message
+brut. Les explications connues de REQUEST_DENIED sont classées par motif sûr.
+
+| Code | Vérification à effectuer |
+| --- | --- |
+| missing_key | Renseigner GOOGLE_MAPS_API_KEY dans l'environnement serveur |
+| api_not_enabled | Vérifier Geocoding API dans le projet associé à la clé |
+| invalid_key | Vérifier validité de la clé |
+| referrer_restriction / ip_restriction | Vérifier restrictions adaptées à l'appel serveur |
+| billing | Vérifier facturation Google du projet |
+| request_denied | Refus non catégorisé : consulter la configuration Google |
+| over_query_limit / over_daily_limit | Vérifier quotas et facturation |
+| zero_results | Google n'a pas trouvé d'adresse pour la position |
+| invalid_request | Vérifier la requête fournisseur |
+| network_error / timeout | Vérifier connectivité du serveur |
+| invalid_json / invalid_response / invalid_results / unexpected_status / empty_address | Réponse fournisseur invalide ou inexploitable |
+
+Pour Google côté serveur, utiliser les restrictions API et IP adaptées, pas une
+restriction de référent destinée au navigateur. Sources officielles :
+[statuts du géocodage inverse](https://developers.google.com/maps/documentation/geocoding/guides-v3/requests-reverse-geocoding),
+[sécurité des clés](https://developers.google.com/maps/api-security-best-practices).
+Ne jamais copier une vraie clé dans le chat ou Git. Aucun appel Google réel,
+aucune modification de variable Render et aucun accès à Neon production ici.
+
+Fichiers complémentaires modifiés : apps/inventory/geocoding.py, views.py,
+static/js/client-location.js, template _client_location.html, traductions FR/AR/EN,
+tests/test_client_location.py, nouveau tests/test_geocoding_diagnostics.py,
+browser_tests/client_location.py, CHANGELOG.md et ce rapport.
+
+Le test physique Android HTTPS et la vérification du fournisseur avec une clé
+réelle restent nécessaires. Un commit local du correctif ne configure pas Google
+et ne résout pas à lui seul une variable absente sur Render.
+
+Branche fix/gps-geocoding-diagnostics. Aucune fusion vers main, aucun push,
 déploiement ou migration de production dans cette intervention.
-Commit local autorisé après une nouvelle vérification : 13 tests ciblés réussis
-et trois tests navigateur réussis en 102,5 secondes. Le test Android physique
-sur staging HTTPS reste à réaliser ; il n'est pas remplacé par ces simulations.
+
+Vérifications du correctif : 18 tests ciblés réussis ; suite complète de 232 tests
+en 193,413 secondes, sans échec (un test réservé à PostgreSQL ignoré sous SQLite) ;
+trois tests navigateur réussis en 101,307 secondes avec serveur Django local.
+FR/AR/EN, nom vide ou arbitraire, coordonnées seules envoyées, adresse modifiable,
+enregistrement et erreurs simulées sont couverts. Capture mobile française
+inspectée dans tmp/client-location/simple-fr.png : adresse et bouton alignés,
+coordonnées masquées et formulaire lisible.
+
+manage.py check, compilation Python, collectstatic, validation OpenAPI et
+git diff --check réussis ; makemigrations --check --dry-run ne détecte aucun
+changement de modèle. Aucune migration nécessaire. Les logs de géocodage des
+tests ne contiennent ni clé ni réponse fournisseur brute.
+Le test Android physique sur staging HTTPS reste à réaliser ; il n'est pas
+remplacé par ces simulations. La configuration Google réelle reste à valider.

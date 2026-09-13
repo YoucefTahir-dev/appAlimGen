@@ -430,9 +430,13 @@ def client_reverse_geocode(request):
         if count > 30:
             return JsonResponse({'error': _('Trop de demandes. Veuillez patienter.')}, status=429)
     try:
-        return JsonResponse(GeocodingService().reverse_geocode(**coordinates))
-    except GeocodingUnavailable:
-        return JsonResponse({'error': _('Adresse indisponible. Vous pouvez conserver le GPS et saisir l’adresse manuellement.')}, status=503)
+        result = GeocodingService().reverse_geocode(**coordinates)
+        return JsonResponse({'success': True, 'address': result.get('formatted_address', ''), **result})
+    except GeocodingUnavailable as exc:
+        return JsonResponse({
+            'success': False, 'code': exc.code,
+            'error': _('Votre position a été détectée, mais l’adresse n’a pas pu être récupérée.'),
+        }, status=503)
 
 @manager_required
 def supplier_list(request):

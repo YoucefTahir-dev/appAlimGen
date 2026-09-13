@@ -210,3 +210,12 @@ msgstr "Adresse trouvée."
 
 msgid "Localisation invalide. Réessayez le bouton de localisation."
 msgstr "Localisation invalide. Réessayez le bouton de localisation."
+
+msgid "Veuillez autoriser l’accès à votre position pour récupérer automatiquement l’adresse."
+msgstr "Veuillez autoriser l’accès à votre position pour récupérer automatiquement l’adresse."
+
+msgid "Impossible de récupérer votre position actuelle."
+msgstr "Impossible de récupérer votre position actuelle."
+
+msgid "Votre position a été détectée, mais l’adresse n’a pas pu être récupérée."
+msgstr "Votre position a été détectée, mais l’adresse n’a pas pu être récupérée."
