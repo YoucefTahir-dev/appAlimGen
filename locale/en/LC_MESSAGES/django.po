@@ -346,6 +346,42 @@ msgstr "Search for a product"
 msgid "Recherche trop longue."
 msgstr "Search query is too long."
 
+msgid "Chargements"
+msgstr "Loadings"
+
+msgid "Chargements opérateurs"
+msgstr "Operator loadings"
+
+msgid "Mon stock courant"
+msgstr "My current stock"
+
+msgid "Bons de chargement"
+msgstr "Loading orders"
+
+msgid "Nouveau chargement"
+msgstr "New loading order"
+
+msgid "Modifier le chargement"
+msgstr "Edit loading order"
+
+msgid "Enregistrer le brouillon"
+msgstr "Save draft"
+
+msgid "Aucun chargement."
+msgstr "No loading order."
+
+msgid "retour"
+msgstr "returned"
+
+msgid "Clôturer"
+msgstr "Close"
+
+msgid "Opérateur"
+msgstr "Operator"
+
+msgid "Statut"
+msgstr "Status"
+
 msgid "Utilisateur"
 msgstr "User"
 

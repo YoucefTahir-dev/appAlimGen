@@ -5,22 +5,27 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from apps.inventory.location import validate_location
 from django.utils.translation import gettext as _
 from rest_framework import serializers
+from rest_framework.exceptions import PermissionDenied
 
 from apps.accounts.permissions import has_permission
-from apps.commerce.models import Purchase, PurchaseLine, Sale, SaleLine
+from apps.commerce.models import Payment, Purchase, PurchaseLine, Sale, SaleLine
 from apps.commerce.services import create_purchase, create_sale
 from apps.expenses.models import Expense, ExpenseCategory
 from apps.inventory.models import (
     Brand,
     Category,
     Client,
+    LoadingOrder,
+    LoadingOrderLine,
+    OperatorStock,
+    OperatorStockMovement,
     Product,
     ProductPackaging,
     StockMovement,
     Supplier,
     Unit,
 )
-from apps.inventory.services import record_stock_movement
+from apps.inventory.services import generate_loading_number, record_stock_movement
 from apps.inventory.pricing import validate_product_prices
 from apps.printing.models import PrinterProfile, PrintProfile, UserPrinterPreference
 
@@ -155,13 +160,38 @@ class ProductSerializer(serializers.ModelSerializer):
         return attrs
 
     def get_stock_status(self, product) -> str:
-        if product.quantity == 0:
+        quantity = self._effective_quantity(product)
+        if quantity == 0:
             return 'out_of_stock'
-        if product.quantity <= product.minimum_stock:
+        if quantity <= product.minimum_stock:
             return 'critical'
-        if product.quantity <= product.minimum_stock + 5:
+        if quantity <= product.minimum_stock + 5:
             return 'low'
         return 'normal'
+
+    def _effective_quantity(self, product):
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        if not getattr(user, 'is_authenticated', False):
+            return product.quantity
+        has_active_loading = getattr(request, '_has_active_operator_loading', None)
+        if has_active_loading is None:
+            has_active_loading = LoadingOrder.objects.filter(
+                operator=user, status__in=(LoadingOrder.VALIDATED, LoadingOrder.IN_PROGRESS),
+            ).exists()
+            request._has_active_operator_loading = has_active_loading
+        if not has_active_loading:
+            return product.quantity
+        cache = getattr(request, '_operator_stock_quantities', None)
+        if cache is None:
+            cache = dict(OperatorStock.objects.filter(operator=user).values_list('product_id', 'quantity'))
+            request._operator_stock_quantities = cache
+        return cache.get(product.pk, 0)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data['quantity'] = self._effective_quantity(instance)
+        return data
 
     @transaction.atomic
     def create(self, validated_data):
@@ -295,9 +325,10 @@ class SaleSerializer(serializers.ModelSerializer):
             'tax_rate', 'payment_type', 'payment_tracking_initialized', 'created_at',
             'amount_paid', 'balance_due', 'payment_status', 'lines', 'items', 'pay_full',
             'created_by_name',
+            'loading_order',
         )
         read_only_fields = (
-            'invoice_number', 'ticket_number', 'total', 'payment_tracking_initialized', 'created_at',
+            'invoice_number', 'ticket_number', 'total', 'payment_tracking_initialized', 'created_at', 'loading_order',
         )
 
     def create(self, validated_data):
@@ -368,6 +399,111 @@ class PurchaseSerializer(serializers.ModelSerializer):
             details = exc.message_dict if hasattr(exc, 'message_dict') else {'non_field_errors': exc.messages}
             message = ' '.join(str(item) for messages in details.values() for item in messages)
             raise BusinessAPIException('PURCHASE_VALIDATION_ERROR', message, details) from exc
+
+
+class PaymentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Payment
+        fields = ('id', 'reference', 'sale', 'purchase', 'amount', 'payment_type', 'created_by', 'created_at')
+        read_only_fields = ('reference', 'created_by', 'created_at')
+
+    def validate(self, attrs):
+        if bool(attrs.get('sale')) == bool(attrs.get('purchase')):
+            raise serializers.ValidationError(_('Indiquez exactement une vente ou un achat.'))
+        request = self.context['request']
+        permission = 'commerce.change_sale' if attrs.get('sale') else 'commerce.change_purchase'
+        if not has_permission(request.user, permission):
+            raise PermissionDenied(_('Vous ne disposez pas de la permission requise.'))
+        sale = attrs.get('sale')
+        if sale and LoadingOrder.objects.filter(operator=request.user).exists() and not has_permission(
+            request.user, 'inventory.view_all_loadingorders'
+        ) and sale.created_by_id != request.user.pk:
+            raise PermissionDenied(_('Cette vente appartient à un autre opérateur.'))
+        return attrs
+
+    def create(self, validated_data):
+        try:
+            return Payment.objects.create(created_by=self.context['request'].user, **validated_data)
+        except DjangoValidationError as exc:
+            details = exc.message_dict if hasattr(exc, 'message_dict') else {'non_field_errors': exc.messages}
+            raise BusinessAPIException('PAYMENT_VALIDATION_ERROR', ' '.join(str(v) for values in details.values() for v in values), details) from exc
+
+
+class LoadingOrderLineSerializer(serializers.ModelSerializer):
+    quantity = serializers.IntegerField(min_value=1)
+    product_name = serializers.CharField(source='product.name', read_only=True)
+    sold_quantity = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = LoadingOrderLine
+        fields = ('id', 'product', 'product_name', 'quantity', 'returned_quantity', 'sold_quantity')
+        read_only_fields = ('returned_quantity', 'sold_quantity')
+
+
+class LoadingOrderSerializer(serializers.ModelSerializer):
+    lines = LoadingOrderLineSerializer(many=True)
+    operator_name = serializers.CharField(source='operator.username', read_only=True)
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True)
+
+    class Meta:
+        model = LoadingOrder
+        fields = (
+            'id', 'number', 'operator', 'operator_name', 'status', 'notes', 'lines',
+            'created_by_name', 'created_at', 'validated_at', 'closed_at',
+        )
+        read_only_fields = ('number', 'status', 'created_by_name', 'created_at', 'validated_at', 'closed_at')
+
+    def validate_lines(self, lines):
+        product_ids = [line['product'].pk for line in lines]
+        if not lines:
+            raise serializers.ValidationError(_('Ajoutez au moins un produit.'))
+        if len(product_ids) != len(set(product_ids)):
+            raise serializers.ValidationError(_('Un produit ne peut apparaître qu’une fois.'))
+        return lines
+
+    @transaction.atomic
+    def create(self, validated_data):
+        lines = validated_data.pop('lines')
+        order = LoadingOrder.objects.create(
+            number=generate_loading_number(), created_by=self.context['request'].user, **validated_data,
+        )
+        LoadingOrderLine.objects.bulk_create([LoadingOrderLine(loading_order=order, **line) for line in lines])
+        return order
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        instance = LoadingOrder.objects.select_for_update().get(pk=instance.pk)
+        if instance.status != LoadingOrder.DRAFT:
+            raise BusinessAPIException('LOADING_NOT_DRAFT', _('Seul un brouillon peut être modifié.'))
+        lines = validated_data.pop('lines', None)
+        for field, value in validated_data.items():
+            setattr(instance, field, value)
+        instance.save()
+        if lines is not None:
+            instance.lines.all().delete()
+            LoadingOrderLine.objects.bulk_create([LoadingOrderLine(loading_order=instance, **line) for line in lines])
+        return instance
+
+
+class OperatorStockSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source='product.name', read_only=True)
+
+    class Meta:
+        model = OperatorStock
+        fields = ('id', 'product', 'product_name', 'quantity', 'updated_at')
+        read_only_fields = fields
+
+
+class OperatorStockMovementSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source='product.name', read_only=True)
+
+    class Meta:
+        model = OperatorStockMovement
+        fields = (
+            'id', 'product', 'product_name', 'loading_order', 'movement_type', 'quantity',
+            'applied_delta', 'balance_before', 'balance_after', 'source_reference', 'created_at',
+        )
+        read_only_fields = fields
 
 
 class StockMovementSerializer(serializers.ModelSerializer):

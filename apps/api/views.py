@@ -3,7 +3,7 @@ from django.db.models.deletion import ProtectedError
 from django.http import HttpResponse
 from django.template.loader import render_to_string
 from django.utils.translation import gettext as _
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from drf_spectacular.types import OpenApiTypes
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
@@ -13,13 +13,17 @@ from rest_framework.views import APIView
 from rest_framework import serializers
 from apps.accounts.permissions import has_permission
 
-from apps.commerce.models import Purchase, Sale
+from apps.commerce.models import Payment, Purchase, Sale
 from apps.commerce.services import ensure_ticket_number
 from apps.commerce.utils import build_invoice_context, generate_invoice_pdf, qr_code_data_uri
 from apps.core.dashboard import DashboardPeriodError, dashboard_context
 from apps.core.security import log_security_event
 from apps.expenses.models import Expense, ExpenseCategory
-from apps.inventory.models import Brand, Category, Client, Product, ProductPackaging, StockMovement, Supplier, Unit
+from apps.inventory.models import (
+    Brand, Category, Client, LoadingOrder, OperatorStock, OperatorStockMovement,
+    Product, ProductPackaging, StockMovement, Supplier, Unit,
+)
+from apps.inventory.services import cancel_loading_order, close_loading_order, validate_loading_order
 from apps.inventory.pricing import get_sale_price_context
 from apps.inventory.location import audit_location, location_snapshot
 from apps.printing.models import PrinterProfile, PrintProfile
@@ -31,6 +35,10 @@ from .serializers import (
     ClientSerializer,
     ExpenseCategorySerializer,
     ExpenseSerializer,
+    LoadingOrderSerializer,
+    OperatorStockMovementSerializer,
+    OperatorStockSerializer,
+    PaymentSerializer,
     ProductSerializer,
     ProductPackagingSerializer,
     PrinterProfileSerializer,
@@ -40,6 +48,13 @@ from .serializers import (
     StockMovementSerializer,
     SupplierSerializer,
     UnitSerializer,
+)
+from .idempotency import idempotent
+
+
+IDEMPOTENCY_PARAMETER = OpenApiParameter(
+    name='Idempotency-Key', type=str, location=OpenApiParameter.HEADER,
+    required=False, description='Clé unique recommandée pour rejouer une écriture sans la dupliquer.',
 )
 
 
@@ -98,6 +113,15 @@ class ProductViewSet(AuditMutationMixin, viewsets.ModelViewSet):
         'create': 'inventory.add_product', 'update': 'inventory.change_product',
         'partial_update': 'inventory.change_product', 'destroy': 'inventory.delete_product',
     }
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        user = self.request.user
+        if LoadingOrder.objects.filter(
+            operator=user, status__in=(LoadingOrder.VALIDATED, LoadingOrder.IN_PROGRESS),
+        ).exists() and not has_permission(user, 'inventory.view_all_loadingorders'):
+            queryset = queryset.filter(operator_stocks__operator=user, operator_stocks__quantity__gt=0)
+        return queryset
 
     @action(detail=False, methods=('get',), url_path=r'barcode/(?P<barcode>[^/.]+)')
     def barcode(self, request, barcode=None):
@@ -205,6 +229,10 @@ class ClientViewSet(AuditMutationMixin, viewsets.ModelViewSet):
     @action(detail=True, methods=('get',))
     def history(self, request, pk=None):
         sales = self.get_object().sales.select_related('created_by').prefetch_related('lines__product', 'payments').order_by('-created_at')
+        if LoadingOrder.objects.filter(operator=request.user).exists() and not has_permission(
+            request.user, 'inventory.view_all_loadingorders'
+        ):
+            sales = sales.filter(created_by=request.user)
         page = self.paginate_queryset(sales)
         serializer = SaleSerializer(page if page is not None else sales, many=True, context={'request': request})
         return self.get_paginated_response(serializer.data) if page is not None else Response(serializer.data)
@@ -246,8 +274,16 @@ class SaleViewSet(AuditMutationMixin, mixins.CreateModelMixin, mixins.ListModelM
         'create': 'commerce.add_sale', 'destroy': 'commerce.delete_sale',
     }
 
+    @extend_schema(parameters=[IDEMPOTENCY_PARAMETER])
+    def create(self, request, *args, **kwargs):
+        return idempotent(request, 'sale.create', lambda: super(SaleViewSet, self).create(request, *args, **kwargs), required=False)
+
     def get_queryset(self):
         queryset = super().get_queryset()
+        if LoadingOrder.objects.filter(operator=self.request.user).exists() and not has_permission(
+            self.request.user, 'inventory.view_all_loadingorders'
+        ):
+            queryset = queryset.filter(created_by=self.request.user)
         start, end = date_filters(self.request)
         if start:
             queryset = queryset.filter(created_at__date__gte=start)
@@ -273,6 +309,10 @@ class PurchaseViewSet(AuditMutationMixin, mixins.CreateModelMixin, mixins.ListMo
         'create': 'commerce.add_purchase', 'destroy': 'commerce.delete_purchase',
     }
 
+    @extend_schema(parameters=[IDEMPOTENCY_PARAMETER])
+    def create(self, request, *args, **kwargs):
+        return idempotent(request, 'purchase.create', lambda: super(PurchaseViewSet, self).create(request, *args, **kwargs), required=False)
+
     def get_queryset(self):
         queryset = super().get_queryset()
         start, end = date_filters(self.request)
@@ -287,6 +327,131 @@ class PurchaseViewSet(AuditMutationMixin, mixins.CreateModelMixin, mixins.ListMo
         super().perform_destroy(instance)
 
 
+class PaymentViewSet(AuditMutationMixin, mixins.CreateModelMixin, mixins.ListModelMixin,
+                     mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+    queryset = Payment.objects.select_related('sale', 'purchase', 'created_by').order_by('-created_at', '-pk')
+    serializer_class = PaymentSerializer
+    filterset_fields = ('sale', 'purchase', 'payment_type')
+    ordering_fields = ('created_at', 'amount')
+    audit_name = 'payment'
+    required_permissions = {}
+
+    def get_queryset(self):
+        can_sales = has_permission(self.request.user, 'commerce.view_sale')
+        can_purchases = has_permission(self.request.user, 'commerce.view_purchase')
+        queryset = super().get_queryset()
+        if LoadingOrder.objects.filter(operator=self.request.user).exists() and not has_permission(
+            self.request.user, 'inventory.view_all_loadingorders'
+        ):
+            queryset = queryset.filter(Q(sale__created_by=self.request.user) | Q(purchase__isnull=False))
+        if can_sales and can_purchases:
+            return queryset
+        if can_sales:
+            return queryset.filter(sale__isnull=False)
+        if can_purchases:
+            return queryset.filter(purchase__isnull=False)
+        return queryset.none()
+
+    @extend_schema(parameters=[IDEMPOTENCY_PARAMETER])
+    def create(self, request, *args, **kwargs):
+        return idempotent(request, 'payment.create', lambda: super(PaymentViewSet, self).create(request, *args, **kwargs), required=False)
+
+
+class LoadingOrderViewSet(AuditMutationMixin, viewsets.ModelViewSet):
+    queryset = LoadingOrder.objects.select_related('operator', 'created_by').prefetch_related('lines__product')
+    serializer_class = LoadingOrderSerializer
+    filterset_fields = ('operator', 'status')
+    search_fields = ('number', 'operator__username')
+    ordering_fields = ('created_at', 'number', 'status')
+    audit_name = 'loading_order'
+    required_permissions = {
+        'create': 'inventory.add_loadingorder',
+        'update': 'inventory.change_loadingorder',
+        'partial_update': 'inventory.change_loadingorder',
+        'destroy': 'inventory.delete_loadingorder',
+        'validate': 'inventory.validate_loadingorder',
+        'close': 'inventory.close_loadingorder',
+        'cancel': 'inventory.delete_loadingorder',
+    }
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if not has_permission(self.request.user, 'inventory.view_all_loadingorders'):
+            queryset = queryset.filter(operator=self.request.user)
+        return queryset
+
+    @extend_schema(parameters=[IDEMPOTENCY_PARAMETER])
+    def create(self, request, *args, **kwargs):
+        return idempotent(request, 'loading.create', lambda: super(LoadingOrderViewSet, self).create(request, *args, **kwargs), required=False)
+
+    def perform_destroy(self, instance):
+        if instance.status != LoadingOrder.DRAFT:
+            raise ValidationError(_('Seul un chargement brouillon peut être supprimé.'))
+        cancel_loading_order(instance)
+        self._audit('cancel', 204)
+
+    @action(detail=False, methods=('get',))
+    def current(self, request):
+        order = self.get_queryset().filter(status__in=(LoadingOrder.VALIDATED, LoadingOrder.IN_PROGRESS)).order_by('pk').first()
+        if not order:
+            return Response(None)
+        return Response(self.get_serializer(order).data)
+
+    @extend_schema(request=None, responses=LoadingOrderSerializer, parameters=[IDEMPOTENCY_PARAMETER])
+    @action(detail=True, methods=('post'))
+    def validate(self, request, pk=None):
+        def operation():
+            order = validate_loading_order(self.get_object(), user=request.user)
+            self._audit('validate')
+            return Response(self.get_serializer(order).data)
+        return idempotent(request, f'loading.{pk}.validate', operation, required=False)
+
+    @extend_schema(request=None, responses=LoadingOrderSerializer, parameters=[IDEMPOTENCY_PARAMETER])
+    @action(detail=True, methods=('post'))
+    def close(self, request, pk=None):
+        def operation():
+            order = close_loading_order(self.get_object(), user=request.user)
+            self._audit('close')
+            return Response(self.get_serializer(order).data)
+        return idempotent(request, f'loading.{pk}.close', operation, required=False)
+
+    @action(detail=True, methods=('post'))
+    def cancel(self, request, pk=None):
+        order = cancel_loading_order(self.get_object())
+        self._audit('cancel')
+        return Response(self.get_serializer(order).data)
+
+
+class OperatorStockViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = OperatorStock.objects.select_related('operator', 'product')
+    serializer_class = OperatorStockSerializer
+    filterset_fields = ('product',)
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if has_permission(self.request.user, 'inventory.view_all_loadingorders'):
+            operator = self.request.query_params.get('operator')
+            if operator:
+                operator = serializers.IntegerField(min_value=1).run_validation(operator)
+                return queryset.filter(operator_id=operator)
+            return queryset
+        return queryset.filter(operator=self.request.user)
+
+    @action(detail=False, methods=('get'))
+    def movements(self, request):
+        queryset = OperatorStockMovement.objects.select_related('product', 'loading_order', 'operator')
+        if has_permission(request.user, 'inventory.view_all_loadingorders'):
+            operator = request.query_params.get('operator')
+            if operator:
+                operator = serializers.IntegerField(min_value=1).run_validation(operator)
+                queryset = queryset.filter(operator_id=operator)
+        else:
+            queryset = queryset.filter(operator=request.user)
+        page = self.paginate_queryset(queryset)
+        serializer = OperatorStockMovementSerializer(page if page is not None else queryset, many=True)
+        return self.get_paginated_response(serializer.data) if page is not None else Response(serializer.data)
+
+
 class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Sale.objects.select_related('client', 'created_by').prefetch_related(
         'lines__product', 'lines__packaging', 'payments',
@@ -298,6 +463,14 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
         'pdf': 'accounts.download_invoice_pdf', 'ticket': 'accounts.print_invoice',
         'print_data': 'accounts.print_invoice',
     }
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if LoadingOrder.objects.filter(operator=self.request.user).exists() and not has_permission(
+            self.request.user, 'inventory.view_all_loadingorders'
+        ):
+            queryset = queryset.filter(created_by=self.request.user)
+        return queryset
 
     @extend_schema(responses={(200, 'application/pdf'): OpenApiTypes.BINARY})
     @action(detail=True, methods=('get',))
@@ -425,6 +598,15 @@ class StockViewSet(viewsets.ReadOnlyModelViewSet):
     search_fields = ('name', 'reference', 'barcode')
     ordering_fields = ('name', 'quantity', 'minimum_stock')
     required_permissions = {'*': 'accounts.view_stock'}
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        user = self.request.user
+        if LoadingOrder.objects.filter(
+            operator=user, status__in=(LoadingOrder.VALIDATED, LoadingOrder.IN_PROGRESS),
+        ).exists() and not has_permission(user, 'inventory.view_all_loadingorders'):
+            queryset = queryset.filter(operator_stocks__operator=user, operator_stocks__quantity__gt=0)
+        return queryset
 
     @action(detail=False, methods=('get',))
     def movements(self, request):

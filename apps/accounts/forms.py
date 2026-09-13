@@ -293,6 +293,7 @@ class StyledPasswordChangeForm(PasswordChangeForm):
         user.force_password_change = False
         if commit:
             user.save()
+            user.revoke_api_tokens()
         return user
 
 
@@ -335,6 +336,12 @@ class StyledSetPasswordForm(SetPasswordForm):
         ),
     )
 
+    def save(self, commit=True):
+        user = super().save(commit=commit)
+        if commit:
+            user.revoke_api_tokens()
+        return user
+
 
 class AdminPasswordResetForm(forms.Form):
     password1 = forms.CharField(
@@ -374,4 +381,5 @@ class AdminPasswordResetForm(forms.Form):
         user.set_password(password)
         user.force_password_change = self.cleaned_data['force_password_change']
         user.save()
+        user.revoke_api_tokens()
         return user

@@ -7,7 +7,6 @@ from django.db import connection
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from rest_framework.test import APITestCase
-from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 
 from apps.accounts.models import User
 from apps.commerce.models import Sale, Purchase, Payment
@@ -16,6 +15,7 @@ from apps.expenses.models import ExpenseCategory
 from apps.inventory.models import Client, Product, Supplier, StockMovement
 from apps.inventory.services import record_stock_movement
 from apps.api.serializers import ProductSerializer
+from apps.api.authentication import MobileTokenSerializer
 
 
 class AndroidReadinessTests(APITestCase):
@@ -44,7 +44,12 @@ class AndroidReadinessTests(APITestCase):
         self.auth(self.admin)
 
     def auth(self, user):
-        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {AccessToken.for_user(user)}')
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f'Bearer {MobileTokenSerializer.get_token(user).access_token}'
+        )
+
+    def refresh_for(self, user):
+        return str(MobileTokenSerializer.get_token(user))
 
     def grant(self, *names):
         for name in names:
@@ -108,7 +113,7 @@ class AndroidReadinessTests(APITestCase):
         self.assertEqual(StockMovement.objects.filter(product=self.product).count(), 2)
 
     def test_refresh_deleted_and_force_change_accounts_rejected(self):
-        refresh = str(RefreshToken.for_user(self.reader))
+        refresh = self.refresh_for(self.reader)
         self.reader.force_password_change = True
         self.reader.save(update_fields=['force_password_change'])
         self.assertEqual(self.client.post(reverse('api-refresh'), {'refresh': refresh}).status_code, 401)
@@ -116,9 +121,53 @@ class AndroidReadinessTests(APITestCase):
         self.assertEqual(self.client.post(reverse('api-refresh'), {'refresh': refresh}).status_code, 401)
 
     def test_logout_cannot_blacklist_another_users_token(self):
-        refresh = str(RefreshToken.for_user(self.reader))
+        refresh = self.refresh_for(self.reader)
         self.assertEqual(self.client.post(reverse('api-logout'), {'refresh': refresh}).status_code, 400)
         self.assertEqual(self.client.post(reverse('api-refresh'), {'refresh': refresh}).status_code, 200)
+
+    def test_password_change_revokes_old_access_and_refresh_tokens(self):
+        login = self.client.post(
+            reverse('api-login'),
+            {'username': self.admin.username, 'password': 'StrongPass123!'},
+            format='json',
+        ).json()['data']
+        old_access = login['access']
+        old_refresh = login['refresh']
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {old_access}')
+
+        changed = self.client.post(
+            reverse('api-password-change'),
+            {
+                'current_password': 'StrongPass123!',
+                'new_password': 'NewStrongPass456!',
+                'new_password_confirm': 'NewStrongPass456!',
+            },
+            format='json',
+        )
+        self.assertEqual(changed.status_code, 200, changed.data)
+
+        rejected_access = self.client.get(reverse('api-me'))
+        self.assertEqual(rejected_access.status_code, 401)
+        self.assertEqual(rejected_access.json()['error']['code'], 'TOKEN_REVOKED')
+        self.client.credentials()
+        rejected_refresh = self.client.post(reverse('api-refresh'), {'refresh': old_refresh}, format='json')
+        self.assertEqual(rejected_refresh.status_code, 401)
+        self.assertEqual(rejected_refresh.json()['error']['code'], 'TOKEN_REVOKED')
+
+        login_again = self.client.post(
+            reverse('api-login'),
+            {'username': self.admin.username, 'password': 'NewStrongPass456!'},
+            format='json',
+        )
+        self.assertEqual(login_again.status_code, 200, login_again.data)
+        new_tokens = login_again.json()['data']
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {new_tokens['access']}")
+        self.assertEqual(self.client.get(reverse('api-me')).status_code, 200)
+        self.client.credentials()
+        self.assertEqual(
+            self.client.post(reverse('api-refresh'), {'refresh': new_tokens['refresh']}, format='json').status_code,
+            200,
+        )
 
     def test_invalid_filters_return_structured_400(self):
         for route in ('api-sale-list', 'api-purchase-list', 'api-expense-list'):

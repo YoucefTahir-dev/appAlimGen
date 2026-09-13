@@ -1324,3 +1324,39 @@ msgstr "نشطة"
 
 msgid "Recherche trop longue."
 msgstr "نص البحث طويل جدًا."
+
+msgid "Chargements"
+msgstr "عمليات التحميل"
+
+msgid "Chargements opérateurs"
+msgstr "تحميلات المشغلين"
+
+msgid "Mon stock courant"
+msgstr "مخزوني الحالي"
+
+msgid "Bons de chargement"
+msgstr "أوامر التحميل"
+
+msgid "Nouveau chargement"
+msgstr "تحميل جديد"
+
+msgid "Modifier le chargement"
+msgstr "تعديل التحميل"
+
+msgid "Enregistrer le brouillon"
+msgstr "حفظ المسودة"
+
+msgid "Aucun chargement."
+msgstr "لا توجد عمليات تحميل."
+
+msgid "retour"
+msgstr "مرتجع"
+
+msgid "Clôturer"
+msgstr "إغلاق"
+
+msgid "Opérateur"
+msgstr "المشغل"
+
+msgid "Statut"
+msgstr "الحالة"

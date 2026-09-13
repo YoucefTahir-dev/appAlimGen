@@ -2,9 +2,13 @@ from dataclasses import dataclass
 
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import transaction
+from django.utils import timezone
 from django.utils.translation import gettext as _
 
-from .models import Product, StockMovement
+from .models import (
+    LoadingOrder, LoadingOrderLine, LoadingOrderSequence, OperatorStock,
+    OperatorStockMovement, Product, StockMovement,
+)
 
 
 @transaction.atomic
@@ -205,3 +209,134 @@ def reverse_stock_movement(movement, *, user=None, reason=''):
         source_reference=str(original.pk),
         reversal_of=original,
     )
+
+
+def generate_loading_number():
+    year = timezone.now().year
+    sequence, _ = LoadingOrderSequence.objects.select_for_update().get_or_create(year=year)
+    sequence.last_number += 1
+    sequence.save(update_fields=('last_number',))
+    return f'CHG-{year}-{sequence.last_number:06d}'
+
+
+def active_loading_for_operator(operator, *, lock=False):
+    queryset = LoadingOrder.objects.filter(
+        operator=operator, status__in=(LoadingOrder.VALIDATED, LoadingOrder.IN_PROGRESS),
+    )
+    if lock:
+        queryset = queryset.select_for_update()
+    return queryset.order_by('pk').first()
+
+
+@transaction.atomic
+def adjust_operator_stock(*, loading_order, product, delta, movement_type, user=None, source_reference=''):
+    if not delta:
+        return None
+    order = LoadingOrder.objects.select_for_update().get(pk=loading_order.pk if hasattr(loading_order, 'pk') else loading_order)
+    product_id = product.pk if hasattr(product, 'pk') else product
+    stock, _ = OperatorStock.objects.get_or_create(operator_id=order.operator_id, product_id=product_id)
+    stock = OperatorStock.objects.select_for_update().get(pk=stock.pk)
+    before = stock.quantity
+    after = before + int(delta)
+    if after < 0:
+        raise ValidationError(
+            {'quantity': ValidationError(
+                _('Stock opérateur insuffisant : %(available)s unité(s) disponible(s).') % {'available': before},
+                code='insufficient_operator_stock',
+            )}
+        )
+    updated = OperatorStock.objects.filter(pk=stock.pk, quantity=before).update(quantity=after)
+    if updated != 1:
+        raise ValidationError(_('Le stock opérateur a été modifié simultanément. Veuillez recommencer.'))
+    movement = OperatorStockMovement(
+        operator_id=order.operator_id, product_id=product_id, loading_order=order,
+        movement_type=movement_type, quantity=abs(int(delta)), applied_delta=int(delta),
+        balance_before=before, balance_after=after,
+        source_reference=str(source_reference or '')[:100],
+        created_by=user if getattr(user, 'is_authenticated', False) else None,
+    )
+    movement._ledger_write_allowed = True
+    movement.save(force_insert=True)
+    return movement
+
+
+@transaction.atomic
+def validate_loading_order(loading_order, *, user=None):
+    order_id = loading_order.pk if hasattr(loading_order, 'pk') else loading_order
+    order = LoadingOrder.objects.select_for_update().select_related('operator').get(pk=order_id)
+    if order.status != LoadingOrder.DRAFT:
+        raise ValidationError({'status': _('Seul un chargement brouillon peut être validé.')})
+    if LoadingOrder.objects.select_for_update().filter(
+        operator=order.operator, status__in=(LoadingOrder.VALIDATED, LoadingOrder.IN_PROGRESS),
+    ).exclude(pk=order.pk).exists():
+        raise ValidationError({'operator': _('Cet opérateur possède déjà un chargement actif.')})
+    lines = list(order.lines.select_related('product').order_by('product_id'))
+    if not lines:
+        raise ValidationError({'lines': _('Le chargement doit contenir au moins un produit.')})
+    if any(line.quantity <= 0 for line in lines):
+        raise ValidationError({'lines': _('Toutes les quantités doivent être strictement positives.')})
+    changes = [
+        StockChange(
+            product=line.product_id, movement_type=StockMovement.EXIT, quantity=line.quantity,
+            reason=_('Validation du chargement %(number)s') % {'number': order.number},
+            user=user, source_type=StockMovement.SOURCE_LOADING, source_reference=order.number,
+        ) for line in lines
+    ]
+    record_stock_movements(changes)
+    for line in lines:
+        adjust_operator_stock(
+            loading_order=order, product=line.product_id, delta=line.quantity,
+            movement_type=OperatorStockMovement.LOAD, user=user, source_reference=order.number,
+        )
+    order.status = LoadingOrder.IN_PROGRESS
+    order.validated_at = timezone.now()
+    order.save(update_fields=('status', 'validated_at'))
+    return order
+
+
+@transaction.atomic
+def close_loading_order(loading_order, *, user=None):
+    order_id = loading_order.pk if hasattr(loading_order, 'pk') else loading_order
+    order = LoadingOrder.objects.select_for_update().get(pk=order_id)
+    if order.status not in (LoadingOrder.VALIDATED, LoadingOrder.IN_PROGRESS):
+        raise ValidationError({'status': _('Seul un chargement actif peut être clôturé.')})
+    lines = list(order.lines.select_for_update().order_by('product_id'))
+    stocks = {
+        stock.product_id: stock
+        for stock in OperatorStock.objects.select_for_update().filter(
+            operator_id=order.operator_id, product_id__in=[line.product_id for line in lines],
+        ).order_by('product_id')
+    }
+    depot_returns = []
+    for line in lines:
+        remaining = stocks.get(line.product_id).quantity if line.product_id in stocks else 0
+        if remaining > line.quantity:
+            raise ValidationError({'quantity': _('Le solde opérateur est incohérent avec ce chargement.')})
+        if remaining:
+            depot_returns.append(StockChange(
+                product=line.product_id, movement_type=StockMovement.ENTRY, quantity=remaining,
+                reason=_('Retour du chargement %(number)s') % {'number': order.number},
+                user=user, source_type=StockMovement.SOURCE_LOADING, source_reference=order.number,
+            ))
+            adjust_operator_stock(
+                loading_order=order, product=line.product_id, delta=-remaining,
+                movement_type=OperatorStockMovement.RETURN, user=user, source_reference=order.number,
+            )
+        line.returned_quantity = remaining
+        line.save(update_fields=('returned_quantity',))
+    record_stock_movements(depot_returns)
+    order.status = LoadingOrder.CLOSED
+    order.closed_at = timezone.now()
+    order.save(update_fields=('status', 'closed_at'))
+    return order
+
+
+@transaction.atomic
+def cancel_loading_order(loading_order):
+    order_id = loading_order.pk if hasattr(loading_order, 'pk') else loading_order
+    order = LoadingOrder.objects.select_for_update().get(pk=order_id)
+    if order.status != LoadingOrder.DRAFT:
+        raise ValidationError({'status': _('Seul un brouillon peut être annulé.')})
+    order.status = LoadingOrder.CANCELLED
+    order.save(update_fields=('status',))
+    return order

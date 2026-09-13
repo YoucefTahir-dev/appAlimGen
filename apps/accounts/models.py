@@ -3,6 +3,7 @@ from pathlib import Path
 
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.db.models import F
 from django.utils.translation import gettext_lazy as _
 
 from apps.core.security import validate_image_upload
@@ -29,6 +30,7 @@ class User(AbstractUser):
 
     role = models.CharField(max_length=16, choices=ROLE_CHOICES, default=SELLER)
     force_password_change = models.BooleanField(default=False)
+    auth_token_version = models.PositiveBigIntegerField(default=1, editable=False)
     phone = models.CharField(_('Téléphone'), max_length=30, blank=True)
     photo = models.ImageField(
         _('Photo de profil'),
@@ -110,3 +112,10 @@ class User(AbstractUser):
         return self.is_manager() or self.groups.filter(name='Vendeur').exists() or (
             not self.groups.exists() and self.role == self.SELLER
         )
+
+    def revoke_api_tokens(self):
+        """Invalidate every JWT previously issued for this user."""
+        if not self.pk:
+            return
+        type(self).objects.filter(pk=self.pk).update(auth_token_version=F('auth_token_version') + 1)
+        self.refresh_from_db(fields=['auth_token_version'])

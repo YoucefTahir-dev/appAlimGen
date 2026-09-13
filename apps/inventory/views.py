@@ -2,6 +2,7 @@ from decimal import Decimal, InvalidOperation
 
 import openpyxl
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models import Exists, OuterRef, Q
@@ -19,11 +20,16 @@ from .forms import (
     ProductForm,
     QuickProductForm,
     ProductPackagingFormSet,
+    LoadingOrderForm,
+    LoadingOrderLineFormSet,
     StockMovementForm,
     SupplierForm,
 )
-from .models import Brand, Category, Client, Product, StockMovement, Supplier, Unit
-from .services import create_product_from_form, record_stock_movement, reverse_stock_movement
+from .models import Brand, Category, Client, LoadingOrder, OperatorStock, Product, StockMovement, Supplier, Unit
+from .services import (
+    cancel_loading_order, close_loading_order, create_product_from_form, generate_loading_number,
+    record_stock_movement, reverse_stock_movement, validate_loading_order,
+)
 from .location import audit_location, location_snapshot
 from .geocoding import GeocodingService, GeocodingUnavailable
 from django import forms
@@ -32,6 +38,88 @@ from django.views.decorators.cache import never_cache
 import time
 from django.http import FileResponse
 from django.utils.translation import gettext as _
+
+
+@login_required
+def loading_order_list(request):
+    orders = LoadingOrder.objects.select_related('operator', 'created_by').prefetch_related('lines__product')
+    if not has_permission(request.user, 'inventory.view_all_loadingorders'):
+        orders = orders.filter(operator=request.user)
+    stocks = OperatorStock.objects.select_related('product').filter(operator=request.user, quantity__gt=0)
+    return render(request, 'inventory/loading_order_list.html', {'orders': orders, 'operator_stocks': stocks})
+
+
+@permission_required('inventory.add_loadingorder')
+@transaction.atomic
+def loading_order_create(request):
+    form = LoadingOrderForm(request.POST or None)
+    order = LoadingOrder(created_by=request.user)
+    formset = LoadingOrderLineFormSet(request.POST or None, instance=order, prefix='lines')
+    if form.is_valid() and formset.is_valid():
+        order = form.save(commit=False)
+        order.number = generate_loading_number()
+        order.created_by = request.user
+        order.save()
+        formset.instance = order
+        formset.save()
+        log_security_event(request, 'web.loading_order.create', status_code=201)
+        messages.success(request, _('Bon de chargement créé.'))
+        return redirect('loading_order_list')
+    return render(request, 'inventory/loading_order_form.html', {'form': form, 'formset': formset, 'title': _('Nouveau chargement')})
+
+
+@permission_required('inventory.change_loadingorder')
+@transaction.atomic
+def loading_order_update(request, pk):
+    order = get_object_or_404(LoadingOrder.objects.select_for_update(), pk=pk)
+    if order.status != LoadingOrder.DRAFT:
+        messages.error(request, _('Seul un chargement brouillon peut être modifié.'))
+        return redirect('loading_order_list')
+    form = LoadingOrderForm(request.POST or None, instance=order)
+    formset = LoadingOrderLineFormSet(request.POST or None, instance=order, prefix='lines')
+    if form.is_valid() and formset.is_valid():
+        form.save()
+        formset.save()
+        log_security_event(request, 'web.loading_order.update')
+        messages.success(request, _('Bon de chargement modifié.'))
+        return redirect('loading_order_list')
+    return render(request, 'inventory/loading_order_form.html', {'form': form, 'formset': formset, 'title': _('Modifier le chargement')})
+
+
+@permission_required('inventory.validate_loadingorder')
+@require_POST
+def loading_order_validate(request, pk):
+    try:
+        validate_loading_order(get_object_or_404(LoadingOrder, pk=pk), user=request.user)
+        log_security_event(request, 'web.loading_order.validate')
+        messages.success(request, _('Chargement validé et stock transféré à l’opérateur.'))
+    except ValidationError as exc:
+        messages.error(request, ' '.join(exc.messages))
+    return redirect('loading_order_list')
+
+
+@permission_required('inventory.close_loadingorder')
+@require_POST
+def loading_order_close(request, pk):
+    try:
+        close_loading_order(get_object_or_404(LoadingOrder, pk=pk), user=request.user)
+        log_security_event(request, 'web.loading_order.close')
+        messages.success(request, _('Chargement clôturé et reliquat retourné au dépôt.'))
+    except ValidationError as exc:
+        messages.error(request, ' '.join(exc.messages))
+    return redirect('loading_order_list')
+
+
+@permission_required('inventory.delete_loadingorder')
+@require_POST
+def loading_order_cancel(request, pk):
+    try:
+        cancel_loading_order(get_object_or_404(LoadingOrder, pk=pk))
+        log_security_event(request, 'web.loading_order.cancel')
+        messages.success(request, _('Chargement annulé.'))
+    except ValidationError as exc:
+        messages.error(request, ' '.join(exc.messages))
+    return redirect('loading_order_list')
 
 @seller_required
 def product_list(request):

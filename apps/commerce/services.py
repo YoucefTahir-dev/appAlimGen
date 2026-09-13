@@ -5,8 +5,9 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
-from apps.inventory.models import Product, ProductPackaging
+from apps.inventory.models import OperatorStock, Product, ProductPackaging
 from apps.inventory.pricing import get_sale_price
+from apps.inventory.services import active_loading_for_operator
 
 from .models import InvoiceSequence, Payment, Purchase, PurchaseLine, Sale, SaleLine, TicketSequence
 
@@ -90,6 +91,7 @@ def create_sale(*, client, lines, discount=0, tax_rate=0, payment_type=Sale.CASH
     if len(packagings) != len(packaging_ids):
         raise ValidationError({'packaging': _('Conditionnement invalide ou inactif.')})
 
+    active_loading = active_loading_for_operator(user, lock=True) if getattr(user, 'is_authenticated', False) else None
     requested = {}
     subtotal = Decimal('0')
     margin = Decimal('0')
@@ -133,12 +135,24 @@ def create_sale(*, client, lines, discount=0, tax_rate=0, payment_type=Sale.CASH
             'unit_price': package_price,
         })
 
+    operator_stocks = {}
+    if active_loading:
+        operator_stocks = {
+            stock.product_id: stock
+            for stock in OperatorStock.objects.select_for_update().filter(
+                operator=user, product_id__in=requested,
+            ).order_by('product_id')
+        }
     for product_id, quantity in requested.items():
-        if products[product_id].quantity < quantity:
+        available = operator_stocks.get(product_id).quantity if product_id in operator_stocks else (
+            0 if active_loading else products[product_id].quantity
+        )
+        if available < quantity:
             raise ValidationError(
                 {'quantity': ValidationError(
-                    _('Stock insuffisant : %(available)s unité(s) disponible(s).') % {
-                        'available': products[product_id].quantity
+                    _('%(label)s insuffisant : %(available)s unité(s) disponible(s).') % {
+                        'label': _('Stock opérateur') if active_loading else _('Stock'),
+                        'available': available,
                     },
                     code='insufficient_stock',
                 )}
@@ -168,6 +182,7 @@ def create_sale(*, client, lines, discount=0, tax_rate=0, payment_type=Sale.CASH
         payment_type=payment_type,
         payment_tracking_initialized=True,
         created_by=user,
+        loading_order=active_loading,
     )
     for line in normalized_lines:
         sale_line = SaleLine(

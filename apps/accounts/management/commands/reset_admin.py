@@ -69,6 +69,7 @@ class Command(BaseCommand):
                 admin_user.role = User.ADMIN
             admin_user.set_password(password)
             admin_user.save()
+            admin_user.revoke_api_tokens()
             administrator = Group.objects.filter(name='Administrateur').first()
             if administrator:
                 admin_user.groups.add(administrator)

@@ -47,6 +47,7 @@
                 {% endif %}
                 {% if can_view_suppliers %}<li class="nav-item"><a class="nav-link text-white" data-sidebar-link href="{% url 'supplier_list' %}"><i class="bi bi-truck me-2"></i> {% trans "Fournisseurs" %}</a></li>{% endif %}
                 {% if can_view_stock %}<li class="nav-item"><a class="nav-link text-white" data-sidebar-link href="{% url 'stock_movement_list' %}"><i class="bi bi-arrow-left-right me-2"></i> {% trans "Stock" %}</a></li>{% endif %}
+                <li class="nav-item"><a class="nav-link text-white" data-sidebar-link href="{% url 'loading_order_list' %}"><i class="bi bi-box-arrow-up-right me-2"></i> {% trans "Chargements" %}</a></li>
                 {% if can_view_sales %}<li class="nav-item"><a class="nav-link text-white" data-sidebar-link href="{% url 'sale_list' %}"><i class="bi bi-receipt me-2"></i> {% trans "Ventes" %}</a></li>{% endif %}
                 {% if can_view_purchases %}<li class="nav-item"><a class="nav-link text-white" data-sidebar-link href="{% url 'purchase_list' %}"><i class="bi bi-cart-plus me-2"></i> {% trans "Achats" %}</a></li>{% endif %}
                 {% if can_view_expenses %}<li class="nav-item"><a class="nav-link text-white" data-sidebar-link href="{% url 'expense_list' %}"><i class="bi bi-cash-coin me-2"></i> {% trans "Charges" %}</a></li>{% endif %}

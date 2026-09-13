@@ -37,13 +37,16 @@ def api_exception_handler(exc, context):
     if response is None:
         return None
 
-    if isinstance(exc, BusinessAPIException):
+    if isinstance(exc, BusinessAPIException) or hasattr(exc, 'business_code'):
         response.data = {
             'success': False,
             'error': {
                 'code': exc.business_code,
-                'message': exc.business_message,
-                **({'details': exc.business_details} if exc.business_details is not None else {}),
+                'message': str(exc.business_message),
+                **(
+                    {'details': exc.business_details}
+                    if getattr(exc, 'business_details', None) is not None else {}
+                ),
             },
         }
         return response

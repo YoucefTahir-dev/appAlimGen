@@ -305,7 +305,7 @@ AUTH_USER_MODEL = 'accounts.User'
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'apps.api.jwt_auth.VersionedJWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'apps.api.permissions.BusinessPermission',
@@ -356,6 +356,8 @@ SPECTACULAR_SETTINGS = {
         'apps.api.schema.envelope_responses',
     ],
 }
+
+API_IDEMPOTENCY_RETENTION_DAYS = int(os.getenv('API_IDEMPOTENCY_RETENTION_DAYS', '7'))
 
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'dashboard'

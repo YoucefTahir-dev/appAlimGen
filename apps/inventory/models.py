@@ -343,6 +343,7 @@ class StockMovement(models.Model):
     SOURCE_IMPORT = 'import'
     SOURCE_PURCHASE = 'purchase'
     SOURCE_SALE = 'sale'
+    SOURCE_LOADING = 'loading'
     SOURCE_REVERSAL = 'reversal'
     SOURCE_CHOICES = [
         (SOURCE_LEGACY, _('Historique antérieur')),
@@ -351,6 +352,7 @@ class StockMovement(models.Model):
         (SOURCE_IMPORT, _('Import produits')),
         (SOURCE_PURCHASE, _('Achat')),
         (SOURCE_SALE, _('Vente')),
+        (SOURCE_LOADING, _('Chargement opérateur')),
         (SOURCE_REVERSAL, _('Annulation')),
     ]
 
@@ -441,6 +443,128 @@ class StockMovement(models.Model):
 
     def __str__(self):
         return f"{self.product.name} - {self.movement_type}"
+
+
+class LoadingOrder(models.Model):
+    DRAFT = 'draft'
+    VALIDATED = 'validated'
+    IN_PROGRESS = 'in_progress'
+    CLOSED = 'closed'
+    CANCELLED = 'cancelled'
+    STATUS_CHOICES = [
+        (DRAFT, _('Brouillon')), (VALIDATED, _('Validé')),
+        (IN_PROGRESS, _('En cours')), (CLOSED, _('Clôturé')),
+        (CANCELLED, _('Annulé')),
+    ]
+    number = models.CharField(_('Numéro'), max_length=32, unique=True)
+    operator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='loading_orders', verbose_name=_('Opérateur'))
+    status = models.CharField(_('Statut'), max_length=16, choices=STATUS_CHOICES, default=DRAFT, db_index=True)
+    notes = models.TextField(_('Notes'), blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='created_loading_orders', verbose_name=_('Créé par'))
+    created_at = models.DateTimeField(auto_now_add=True)
+    validated_at = models.DateTimeField(null=True, blank=True)
+    closed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ('-created_at', '-pk')
+        permissions = [
+            ('validate_loadingorder', 'Peut valider un bon de chargement'),
+            ('close_loadingorder', 'Peut clôturer un bon de chargement'),
+            ('view_all_loadingorders', 'Peut voir tous les chargements'),
+        ]
+        constraints = [
+            models.UniqueConstraint(fields=('operator',), condition=Q(status__in=('validated', 'in_progress')), name='uniq_active_loading_per_operator'),
+        ]
+
+    def __str__(self):
+        return self.number
+
+
+class LoadingOrderLine(models.Model):
+    loading_order = models.ForeignKey(LoadingOrder, on_delete=models.CASCADE, related_name='lines')
+    product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name='loading_lines')
+    quantity = models.PositiveIntegerField(_('Quantité chargée'))
+    returned_quantity = models.PositiveIntegerField(_('Quantité retournée'), default=0, editable=False)
+
+    class Meta:
+        ordering = ('pk',)
+        constraints = [
+            models.UniqueConstraint(fields=('loading_order', 'product'), name='uniq_product_per_loading'),
+            models.CheckConstraint(condition=Q(quantity__gt=0), name='loading_line_quantity_positive'),
+            models.CheckConstraint(condition=Q(returned_quantity__gte=0), name='loading_returned_non_negative'),
+        ]
+
+    @property
+    def sold_quantity(self):
+        return self.quantity - self.returned_quantity
+
+
+class OperatorStock(models.Model):
+    operator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='operator_stocks')
+    product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name='operator_stocks')
+    quantity = models.PositiveIntegerField(_('Quantité'), default=0)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ('product__name', 'product_id')
+        constraints = [
+            models.UniqueConstraint(fields=('operator', 'product'), name='uniq_operator_product_stock'),
+            models.CheckConstraint(condition=Q(quantity__gte=0), name='operator_stock_non_negative'),
+        ]
+
+
+class ImmutableOperatorStockMovementQuerySet(models.QuerySet):
+    def _immutable(self):
+        raise ValidationError(_('Le journal de stock opérateur est immuable.'))
+
+    def delete(self):
+        self._immutable()
+
+    def update(self, **kwargs):
+        self._immutable()
+
+    def bulk_create(self, objs, **kwargs):
+        self._immutable()
+
+    def bulk_update(self, objs, fields, **kwargs):
+        self._immutable()
+
+
+class OperatorStockMovement(models.Model):
+    LOAD = 'load'
+    SALE = 'sale'
+    RETURN = 'return'
+    REVERSAL = 'reversal'
+    MOVEMENT_CHOICES = [(LOAD, _('Chargement')), (SALE, _('Vente')), (RETURN, _('Retour dépôt')), (REVERSAL, _('Contrepassation'))]
+    operator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='operator_stock_movements')
+    product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name='operator_stock_movements')
+    loading_order = models.ForeignKey(LoadingOrder, on_delete=models.PROTECT, related_name='stock_movements')
+    movement_type = models.CharField(max_length=16, choices=MOVEMENT_CHOICES)
+    quantity = models.PositiveIntegerField()
+    applied_delta = models.IntegerField(editable=False)
+    balance_before = models.PositiveIntegerField(editable=False)
+    balance_after = models.PositiveIntegerField(editable=False)
+    source_reference = models.CharField(max_length=100, blank=True, editable=False)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    created_at = models.DateTimeField(auto_now_add=True)
+    objects = ImmutableOperatorStockMovementQuerySet.as_manager()
+
+    class Meta:
+        ordering = ('-created_at', '-pk')
+        indexes = [models.Index(fields=('operator', 'product', '-created_at'), name='opstock_operator_prod_idx')]
+
+    def save(self, *args, **kwargs):
+        if self.pk or not getattr(self, '_ledger_write_allowed', False):
+            raise ValidationError(_('Le journal de stock opérateur est immuable.'))
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError(_('Le journal de stock opérateur est immuable.'))
+
+
+class LoadingOrderSequence(models.Model):
+    year = models.PositiveIntegerField(unique=True)
+    last_number = models.PositiveIntegerField(default=0)
 
 
 class Client(models.Model):

@@ -1,0 +1,25 @@
+{% extends 'base/base.html' %}
+{% load i18n %}
+{% block title %}{{ title }} - El Amine ERP{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="card card-dashboard p-4 bg-white">
+  <form method="post">{% csrf_token %}
+    {{ form.non_field_errors }}
+    <div class="row g-3 mb-4">
+      <div class="col-md-6">{{ form.operator.label_tag }}{{ form.operator }}{{ form.operator.errors }}</div>
+      <div class="col-md-6">{{ form.notes.label_tag }}{{ form.notes }}{{ form.notes.errors }}</div>
+    </div>
+    {{ formset.management_form }}{{ formset.non_form_errors }}
+    <div class="table-responsive"><table class="table table-bordered align-middle">
+      <thead><tr><th>{% trans "Produit" %}</th><th>{% trans "Quantité" %}</th><th>{% trans "Supprimer" %}</th></tr></thead>
+      <tbody>{% for line in formset %}<tr>
+        <td>{{ line.id }}{{ line.product }}{{ line.product.errors }}</td>
+        <td>{{ line.quantity }}{{ line.quantity.errors }}</td><td>{{ line.DELETE }}</td>
+      </tr>{% endfor %}</tbody>
+    </table></div>
+    <button class="btn btn-success">{% trans "Enregistrer le brouillon" %}</button>
+    <a href="{% url 'loading_order_list' %}" class="btn btn-secondary">{% trans "Retour" %}</a>
+  </form>
+</div>
+{% endblock %}

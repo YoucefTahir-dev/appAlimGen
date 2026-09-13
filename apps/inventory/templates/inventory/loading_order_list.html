@@ -1,0 +1,26 @@
+{% extends 'base/base.html' %}
+{% load i18n access_tags %}
+{% block title %}{% trans "Chargements opérateurs" %} - El Amine ERP{% endblock %}
+{% block page_title %}{% trans "Chargements opérateurs" %}{% endblock %}
+{% block content %}
+{% has_access 'inventory.add_loadingorder' as can_add %}
+{% has_access 'inventory.validate_loadingorder' as can_validate %}
+{% has_access 'inventory.close_loadingorder' as can_close %}
+{% has_access 'inventory.change_loadingorder' as can_change %}
+{% has_access 'inventory.delete_loadingorder' as can_delete %}
+{% if operator_stocks %}<div class="card card-dashboard p-4 bg-white mb-4"><h2 class="h5">{% trans "Mon stock courant" %}</h2>
+<div class="row g-2">{% for stock in operator_stocks %}<div class="col-md-4"><strong>{{ stock.product.name }}</strong> : {{ stock.quantity }}</div>{% endfor %}</div></div>{% endif %}
+<div class="card card-dashboard p-4 bg-white">
+  <div class="page-toolbar mb-3"><h2 class="h5">{% trans "Bons de chargement" %}</h2>{% if can_add %}<a class="btn btn-success" href="{% url 'loading_order_create' %}">{% trans "Nouveau chargement" %}</a>{% endif %}</div>
+  <div class="table-responsive"><table class="table table-hover align-middle"><thead><tr>
+    <th>{% trans "Numéro" %}</th><th>{% trans "Opérateur" %}</th><th>{% trans "Statut" %}</th><th>{% trans "Produits" %}</th><th>{% trans "Actions" %}</th>
+  </tr></thead><tbody>{% for order in orders %}<tr>
+    <td>{{ order.number }}</td><td>{{ order.operator.get_full_name|default:order.operator.username }}</td><td>{{ order.get_status_display }}</td>
+    <td><ul class="mb-0">{% for line in order.lines.all %}<li>{{ line.product.name }} : {{ line.quantity }}{% if order.status == 'closed' %} ({% trans "retour" %} {{ line.returned_quantity }}){% endif %}</li>{% endfor %}</ul></td>
+    <td><div class="d-flex gap-1 flex-wrap">{% if order.status == 'draft' and can_change %}<a class="btn btn-sm btn-outline-primary" href="{% url 'loading_order_update' order.pk %}">{% trans "Modifier" %}</a>{% endif %}
+    {% if order.status == 'draft' and can_validate %}<form method="post" action="{% url 'loading_order_validate' order.pk %}">{% csrf_token %}<button class="btn btn-sm btn-primary">{% trans "Valider" %}</button></form>{% endif %}
+    {% if order.status == 'draft' and can_delete %}<form method="post" action="{% url 'loading_order_cancel' order.pk %}">{% csrf_token %}<button class="btn btn-sm btn-outline-danger">{% trans "Annuler" %}</button></form>{% endif %}
+    {% if order.status == 'in_progress' and can_close %}<form method="post" action="{% url 'loading_order_close' order.pk %}">{% csrf_token %}<button class="btn btn-sm btn-warning">{% trans "Clôturer" %}</button></form>{% endif %}</div></td>
+  </tr>{% empty %}<tr><td colspan="5" class="text-center">{% trans "Aucun chargement." %}</td></tr>{% endfor %}</tbody></table></div>
+</div>
+{% endblock %}

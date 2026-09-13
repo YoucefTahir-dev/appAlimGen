@@ -1,5 +1,15 @@
 """Describe the JSON envelope actually emitted by EnvelopeJSONRenderer."""
 
+from drf_spectacular.extensions import OpenApiAuthenticationExtension
+
+
+class VersionedJWTScheme(OpenApiAuthenticationExtension):
+    target_class = 'apps.api.jwt_auth.VersionedJWTAuthentication'
+    name = 'jwtAuth'
+
+    def get_security_definition(self, auto_schema):
+        return {'type': 'http', 'scheme': 'bearer', 'bearerFormat': 'JWT'}
+
 
 def envelope_responses(result, generator, request, public):
     error_schema = {

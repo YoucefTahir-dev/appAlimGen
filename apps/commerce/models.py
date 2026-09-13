@@ -7,8 +7,8 @@ from django.db.models import Q, Sum
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
-from apps.inventory.models import Client, Product, ProductPackaging, StockMovement, Supplier
-from apps.inventory.services import record_stock_movements, stock_change_for_delta
+from apps.inventory.models import Client, LoadingOrder, OperatorStockMovement, Product, ProductPackaging, StockMovement, Supplier
+from apps.inventory.services import adjust_operator_stock, record_stock_movements, stock_change_for_delta
 
 
 ZERO = Decimal('0.00')
@@ -24,6 +24,24 @@ def _stock_reference(kind, parent_id, line_id, action):
 
 def _apply_line_stock_changes(*changes):
     record_stock_movements([change for change in changes if change is not None])
+
+
+def _apply_sale_stock_delta(*, sale, product_id, delta, user, reference, reason):
+    if not delta:
+        return
+    if sale.loading_order_id:
+        if sale.loading_order.status not in (LoadingOrder.VALIDATED, LoadingOrder.IN_PROGRESS):
+            raise ValidationError(_('Le chargement associé à cette vente n’est plus actif.'))
+        adjust_operator_stock(
+            loading_order=sale.loading_order, product=product_id, delta=delta,
+            movement_type=OperatorStockMovement.SALE if delta < 0 else OperatorStockMovement.REVERSAL,
+            user=user, source_reference=reference,
+        )
+        return
+    _apply_line_stock_changes(stock_change_for_delta(
+        product=product_id, delta=delta, reason=reason, user=user,
+        source_type=StockMovement.SOURCE_SALE, source_reference=reference,
+    ))
 
 
 class StockAwareDeleteQuerySet(models.QuerySet):
@@ -252,6 +270,10 @@ class Sale(models.Model):
         'accounts.User', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='created_sales', verbose_name='Caissier',
     )
+    loading_order = models.ForeignKey(
+        'inventory.LoadingOrder', on_delete=models.PROTECT, null=True, blank=True,
+        related_name='sales', verbose_name=_('Chargement opérateur'),
+    )
     created_at = models.DateTimeField('Date', default=timezone.now, db_index=True)
 
     objects = CommercialDocumentQuerySet.as_manager()
@@ -382,15 +404,10 @@ class SaleLine(models.Model):
                     "Impossible de vendre un produit à un prix inférieur à son prix d'achat."
                 )})
             super().save(*args, **kwargs)
-            _apply_line_stock_changes(
-                stock_change_for_delta(
-                    product=self.product_id,
-                    delta=-self.quantity,
-                    reason=f'Création ligne vente {self.sale.invoice_number}',
-                    user=user,
-                    source_type=StockMovement.SOURCE_SALE,
-                    source_reference=_stock_reference('sale', self.sale_id, self.pk, 'create'),
-                )
+            _apply_sale_stock_delta(
+                sale=self.sale, product_id=self.product_id, delta=-self.quantity, user=user,
+                reason=f'Création ligne vente {self.sale.invoice_number}',
+                reference=_stock_reference('sale', self.sale_id, self.pk, 'create'),
             )
             return
 
@@ -440,48 +457,29 @@ class SaleLine(models.Model):
         self.quantity = persisted_quantity
         reference = _stock_reference('sale', self.sale_id, self.pk, 'update')
         if old.product_id != persisted_product_id:
-            _apply_line_stock_changes(
-                stock_change_for_delta(
-                    product=old.product_id,
-                    delta=old.quantity,
-                    reason=f'Changement produit ligne vente {self.sale.invoice_number}',
-                    user=user,
-                    source_type=StockMovement.SOURCE_SALE,
-                    source_reference=reference,
-                ),
-                stock_change_for_delta(
-                    product=persisted_product_id,
-                    delta=-persisted_quantity,
-                    reason=f'Changement produit ligne vente {self.sale.invoice_number}',
-                    user=user,
-                    source_type=StockMovement.SOURCE_SALE,
-                    source_reference=reference,
-                ),
+            _apply_sale_stock_delta(
+                sale=self.sale, product_id=old.product_id, delta=old.quantity, user=user,
+                reason=f'Changement produit ligne vente {self.sale.invoice_number}', reference=reference,
+            )
+            _apply_sale_stock_delta(
+                sale=self.sale, product_id=persisted_product_id, delta=-persisted_quantity, user=user,
+                reason=f'Changement produit ligne vente {self.sale.invoice_number}', reference=reference,
             )
         else:
-            _apply_line_stock_changes(
-                stock_change_for_delta(
-                    product=persisted_product_id,
-                    delta=old.quantity - persisted_quantity,
-                    reason=f'Modification ligne vente {self.sale.invoice_number}',
-                    user=user,
-                    source_type=StockMovement.SOURCE_SALE,
-                    source_reference=reference,
-                )
+            _apply_sale_stock_delta(
+                sale=self.sale, product_id=persisted_product_id,
+                delta=old.quantity - persisted_quantity, user=user,
+                reason=f'Modification ligne vente {self.sale.invoice_number}', reference=reference,
             )
 
     @transaction.atomic
     def delete(self, *args, **kwargs):
         locked = SaleLine.objects.select_for_update().select_related('sale').get(pk=self.pk)
-        _apply_line_stock_changes(
-            stock_change_for_delta(
-                product=locked.product_id,
-                delta=locked.quantity,
-                reason=f'Suppression ligne vente {locked.sale.invoice_number}',
-                user=getattr(self, '_stock_user', None),
-                source_type=StockMovement.SOURCE_SALE,
-                source_reference=_stock_reference('sale', locked.sale_id, locked.pk, 'delete'),
-            )
+        _apply_sale_stock_delta(
+            sale=locked.sale, product_id=locked.product_id, delta=locked.quantity,
+            reason=f'Suppression ligne vente {locked.sale.invoice_number}',
+            user=getattr(self, '_stock_user', None),
+            reference=_stock_reference('sale', locked.sale_id, locked.pk, 'delete'),
         )
         return super().delete(*args, **kwargs)
 

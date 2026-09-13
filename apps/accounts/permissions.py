@@ -32,6 +32,18 @@ PERMISSION_MATRIX = OrderedDict(
             ],
         ),
         (
+            _('Chargements opérateurs'),
+            [
+                ('inventory.view_loadingorder', _('Voir ses chargements')),
+                ('inventory.view_all_loadingorders', _('Voir tous les chargements')),
+                ('inventory.add_loadingorder', _('Créer')),
+                ('inventory.change_loadingorder', _('Modifier')),
+                ('inventory.delete_loadingorder', _('Supprimer')),
+                ('inventory.validate_loadingorder', _('Valider')),
+                ('inventory.close_loadingorder', _('Clôturer')),
+            ],
+        ),
+        (
             _('Clients'),
             [
                 ('inventory.view_client', _('Voir')),
@@ -330,6 +342,11 @@ ROUTE_PERMISSIONS = {
     'stock_movement_list': ('accounts.view_stock',),
     'stock_movement_create': ('accounts.manage_stock',),
     'stock_movement_delete': ('accounts.manage_stock',),
+    'loading_order_create': ('inventory.add_loadingorder',),
+    'loading_order_update': ('inventory.change_loadingorder',),
+    'loading_order_validate': ('inventory.validate_loadingorder',),
+    'loading_order_close': ('inventory.close_loadingorder',),
+    'loading_order_cancel': ('inventory.delete_loadingorder',),
     'sale_list': ('commerce.view_sale',),
     'sale_create': ('commerce.add_sale',),
     'sale_update': ('commerce.change_sale',),

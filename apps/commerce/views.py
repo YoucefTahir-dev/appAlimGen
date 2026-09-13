@@ -12,9 +12,9 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_GET, require_POST
 from django.utils.translation import gettext as _
 
-from apps.accounts.permissions import manager_required, permission_required, seller_required
+from apps.accounts.permissions import has_permission, manager_required, permission_required, seller_required
 from apps.core.pagination import paginate_queryset
-from apps.inventory.models import Client, Product, ProductPackaging
+from apps.inventory.models import Client, LoadingOrder, Product, ProductPackaging
 from apps.inventory.forms import QuickProductForm
 from apps.inventory.pricing import get_sale_price_context
 
@@ -26,6 +26,15 @@ from .product_search import commercial_products, search_products
 
 
 MONEY_QUANTUM = Decimal('0.01')
+
+
+def visible_sales(user, queryset=None):
+    queryset = queryset if queryset is not None else Sale.objects.all()
+    if LoadingOrder.objects.filter(operator=user).exists() and not has_permission(
+        user, 'inventory.view_all_loadingorders'
+    ):
+        queryset = queryset.filter(created_by=user)
+    return queryset
 
 
 @login_required
@@ -119,7 +128,7 @@ def calculate_purchase_total(purchase, formset):
 
 @seller_required
 def sale_list(request):
-    queryset = _with_payment_totals(Sale.objects.select_related('client')).order_by('-created_at', '-pk')
+    queryset = _with_payment_totals(visible_sales(request.user, Sale.objects.select_related('client'))).order_by('-created_at', '-pk')
     page_obj, pagination_query = paginate_queryset(request, queryset, per_page=25)
     return render(
         request,
@@ -212,7 +221,7 @@ def purchase_create(request):
 
 @manager_required
 def sale_update(request, pk):
-    sale = get_object_or_404(Sale, pk=pk)
+    sale = get_object_or_404(visible_sales(request.user), pk=pk)
     form = SaleForm(request.POST or None, instance=sale)
     formset = SaleLineFormSet(request.POST or None, instance=sale, prefix='lines')
     if form.is_valid() and formset.is_valid():
@@ -244,7 +253,7 @@ def sale_update(request, pk):
 
 @manager_required
 def sale_delete(request, pk):
-    sale = get_object_or_404(Sale, pk=pk)
+    sale = get_object_or_404(visible_sales(request.user), pk=pk)
     if request.method == 'POST':
         try:
             with transaction.atomic():
@@ -312,7 +321,7 @@ def _payment_context(document, document_type):
 
 @permission_required('commerce.view_sale')
 def sale_payment_list(request, pk):
-    sale = get_object_or_404(Sale.objects.select_related('client'), pk=pk)
+    sale = get_object_or_404(visible_sales(request.user, Sale.objects.select_related('client')), pk=pk)
     return render(request, 'commerce/payment_list.html', _payment_context(sale, 'sale'))
 
 
@@ -350,7 +359,7 @@ def _payment_create(request, document, document_type):
 
 @permission_required('commerce.change_sale')
 def sale_payment_create(request, pk):
-    return _payment_create(request, get_object_or_404(Sale, pk=pk), 'sale')
+    return _payment_create(request, get_object_or_404(visible_sales(request.user), pk=pk), 'sale')
 
 
 @permission_required('commerce.change_purchase')
@@ -397,7 +406,7 @@ def _initialize_payment_tracking(document, document_type):
 @require_POST
 @permission_required('commerce.change_sale')
 def sale_payment_tracking_initialize(request, pk):
-    return _initialize_payment_tracking(get_object_or_404(Sale, pk=pk), 'sale')
+    return _initialize_payment_tracking(get_object_or_404(visible_sales(request.user), pk=pk), 'sale')
 
 
 @require_POST
@@ -408,7 +417,7 @@ def purchase_payment_tracking_initialize(request, pk):
 
 @seller_required
 def sale_invoice_pdf(request, pk):
-    sale = get_object_or_404(Sale.objects.select_related('client').prefetch_related('lines__product'), pk=pk)
+    sale = get_object_or_404(visible_sales(request.user, Sale.objects.select_related('client').prefetch_related('lines__product')), pk=pk)
     response = HttpResponse(content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename=facture_{sale.invoice_number}.pdf'
     generate_invoice_pdf(response, sale)
@@ -417,7 +426,7 @@ def sale_invoice_pdf(request, pk):
 
 @seller_required
 def sale_invoice_preview(request, pk):
-    sale = get_object_or_404(Sale.objects.select_related('client').prefetch_related('lines__product'), pk=pk)
+    sale = get_object_or_404(visible_sales(request.user, Sale.objects.select_related('client').prefetch_related('lines__product')), pk=pk)
     context = build_invoice_context(sale)
     context['auto_print'] = request.GET.get('print') == '1'
     return render(request, 'commerce/sale_invoice_preview.html', context)
@@ -425,7 +434,7 @@ def sale_invoice_preview(request, pk):
 
 @seller_required
 def sale_ticket_preview(request, pk, width):
-    sale = get_object_or_404(Sale.objects.select_related('client').prefetch_related('lines__product'), pk=pk)
+    sale = get_object_or_404(visible_sales(request.user, Sale.objects.select_related('client').prefetch_related('lines__product')), pk=pk)
     ensure_ticket_number(sale)
     ticket_width = '58' if str(width) == '58' else '80'
     context = build_invoice_context(sale)

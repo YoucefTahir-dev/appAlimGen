@@ -24,9 +24,21 @@ from .views import (
     product_detail,
     product_qr_download,
     product_barcode_download,
+    loading_order_close,
+    loading_order_cancel,
+    loading_order_create,
+    loading_order_list,
+    loading_order_update,
+    loading_order_validate,
 )
 
 urlpatterns = [
+    path('loading-orders/', loading_order_list, name='loading_order_list'),
+    path('loading-orders/new/', loading_order_create, name='loading_order_create'),
+    path('loading-orders/<int:pk>/edit/', loading_order_update, name='loading_order_update'),
+    path('loading-orders/<int:pk>/cancel/', loading_order_cancel, name='loading_order_cancel'),
+    path('loading-orders/<int:pk>/validate/', loading_order_validate, name='loading_order_validate'),
+    path('loading-orders/<int:pk>/close/', loading_order_close, name='loading_order_close'),
     path('products/', product_list, name='product_list'),
     path('products/new/', product_create, name='product_create'),
     path('products/quick-create/', product_quick_create, name='product_quick_create'),

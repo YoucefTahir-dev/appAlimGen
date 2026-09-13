@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError
 from django.forms import inlineformset_factory
 from django.utils.translation import gettext_lazy as _
 from apps.core.security import validate_excel_upload
-from .models import Product, ProductPackaging, Client, Supplier, StockMovement, Brand
+from .models import Brand, Client, LoadingOrder, LoadingOrderLine, Product, ProductPackaging, StockMovement, Supplier
 
 class ProductForm(forms.ModelForm):
     barcode_display = forms.CharField(
@@ -73,6 +73,36 @@ class ProductForm(forms.ModelForm):
         if purchase_price < 0:
             raise ValidationError(_("Le prix d'achat ne peut pas être négatif."))
         return purchase_price
+
+
+class LoadingOrderForm(forms.ModelForm):
+    class Meta:
+        model = LoadingOrder
+        fields = ('operator', 'notes')
+        widgets = {
+            'operator': forms.Select(attrs={'class': 'form-select'}),
+            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['operator'].queryset = self.fields['operator'].queryset.filter(is_active=True).order_by('username')
+
+
+class LoadingOrderLineForm(forms.ModelForm):
+    class Meta:
+        model = LoadingOrderLine
+        fields = ('product', 'quantity')
+        widgets = {
+            'product': forms.Select(attrs={'class': 'form-select'}),
+            'quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
+        }
+
+
+LoadingOrderLineFormSet = inlineformset_factory(
+    LoadingOrder, LoadingOrderLine, form=LoadingOrderLineForm,
+    extra=5, can_delete=True, min_num=1, validate_min=True,
+)
 
 class QuickProductForm(ProductForm):
     """Reuse catalogue validation; purchases provide the stock separately."""

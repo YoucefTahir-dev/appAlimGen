@@ -3,7 +3,13 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from rest_framework.permissions import IsAdminUser
 from rest_framework.routers import DefaultRouter
 
-from .authentication import CurrentUserView, LogoutView, MobileTokenRefreshView, MobileTokenView
+from .authentication import (
+    CurrentUserView,
+    LogoutView,
+    MobileTokenRefreshView,
+    MobileTokenView,
+    PasswordChangeView,
+)
 from .views import (
     AlertsView,
     BrandViewSet,
@@ -13,6 +19,9 @@ from .views import (
     ExpenseCategoryViewSet,
     ExpenseViewSet,
     InvoiceViewSet,
+    LoadingOrderViewSet,
+    OperatorStockViewSet,
+    PaymentViewSet,
     ProductViewSet,
     ProductPackagingViewSet,
     PrinterProfileViewSet,
@@ -38,6 +47,9 @@ router.register('clients', ClientViewSet, basename='api-client')
 router.register('suppliers', SupplierViewSet, basename='api-supplier')
 router.register('sales', SaleViewSet, basename='api-sale')
 router.register('purchases', PurchaseViewSet, basename='api-purchase')
+router.register('payments', PaymentViewSet, basename='api-payment')
+router.register('loading-orders', LoadingOrderViewSet, basename='api-loading-order')
+router.register('operator-stock', OperatorStockViewSet, basename='api-operator-stock')
 router.register('invoices', InvoiceViewSet, basename='api-invoice')
 router.register('stock', StockViewSet, basename='api-stock')
 router.register('expenses', ExpenseViewSet, basename='api-expense')
@@ -50,6 +62,7 @@ urlpatterns = [
     path('v1/auth/refresh/', MobileTokenRefreshView.as_view(), name='api-refresh'),
     path('v1/auth/logout/', LogoutView.as_view(), name='api-logout'),
     path('v1/auth/me/', CurrentUserView.as_view(), name='api-me'),
+    path('v1/auth/password/change/', PasswordChangeView.as_view(), name='api-password-change'),
     path('v1/dashboard/', DashboardView.as_view(), name='api-dashboard'),
     path('v1/alerts/', AlertsView.as_view(), name='api-alerts'),
     path('v1/printing/', PrintingCapabilitiesView.as_view(), name='api-printing-capabilities'),

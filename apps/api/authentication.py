@@ -8,13 +8,22 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, Toke
 from rest_framework_simplejwt.settings import api_settings
 from rest_framework.exceptions import AuthenticationFailed
 from django.contrib.auth import get_user_model
+from django.contrib.auth import password_validation
+from django.db import transaction
 from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from apps.core.security import log_security_event
+from .jwt_auth import TOKEN_VERSION_CLAIM, TokenRevoked
 
 
 class MobileTokenSerializer(TokenObtainPairSerializer):
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+        token[TOKEN_VERSION_CLAIM] = user.auth_token_version
+        return token
+
     def validate(self, attrs):
         data = super().validate(attrs)
         if self.user.force_password_change:
@@ -63,6 +72,8 @@ class MobileTokenRefreshSerializer(TokenRefreshSerializer):
         ).first()
         if user is None or not user.is_active or user.force_password_change:
             raise AuthenticationFailed(_('Compte indisponible ou changement de mot de passe requis.'))
+        if refresh.get(TOKEN_VERSION_CLAIM) != user.auth_token_version:
+            raise TokenRevoked()
         return super().validate(attrs)
 
 
@@ -112,3 +123,36 @@ class CurrentUserView(APIView):
                 if has_permission(user, permission)
             ),
         })
+
+
+class PasswordChangeSerializer(serializers.Serializer):
+    current_password = serializers.CharField(write_only=True)
+    new_password = serializers.CharField(write_only=True)
+    new_password_confirm = serializers.CharField(write_only=True)
+
+    def validate(self, attrs):
+        user = self.context['request'].user
+        if not user.check_password(attrs['current_password']):
+            raise serializers.ValidationError({'current_password': _('Mot de passe actuel incorrect.')})
+        if attrs['new_password'] != attrs['new_password_confirm']:
+            raise serializers.ValidationError({'new_password_confirm': _('Les mots de passe ne correspondent pas.')})
+        password_validation.validate_password(attrs['new_password'], user=user)
+        return attrs
+
+
+class PasswordChangeView(APIView):
+    @extend_schema(
+        request=PasswordChangeSerializer,
+        responses=inline_serializer('PasswordChangeResponse', {'message': serializers.CharField()}),
+    )
+    @transaction.atomic
+    def post(self, request):
+        serializer = PasswordChangeSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        user = get_user_model().objects.select_for_update().get(pk=request.user.pk)
+        user.set_password(serializer.validated_data['new_password'])
+        user.force_password_change = False
+        user.save(update_fields=['password', 'force_password_change'])
+        user.revoke_api_tokens()
+        log_security_event(request, 'api.auth.password_change', status_code=200)
+        return Response({'message': _('Mot de passe modifié. Reconnectez-vous.')})

@@ -1,5 +1,8 @@
 from django.contrib import admin
-from .models import Category, Brand, Unit, Product, ProductPackaging, StockMovement, Client, Supplier
+from .models import (
+    Brand, Category, Client, LoadingOrder, LoadingOrderLine, OperatorStock,
+    OperatorStockMovement, Product, ProductPackaging, StockMovement, Supplier, Unit,
+)
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
@@ -85,3 +88,50 @@ class ClientAdmin(admin.ModelAdmin):
 class SupplierAdmin(admin.ModelAdmin):
     list_display = ('name', 'phone', 'wilaya')
     search_fields = ('name', 'phone')
+
+
+class LoadingOrderLineInline(admin.TabularInline):
+    model = LoadingOrderLine
+    extra = 0
+    readonly_fields = ('product', 'quantity', 'returned_quantity')
+    can_delete = False
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(LoadingOrder)
+class LoadingOrderAdmin(admin.ModelAdmin):
+    list_display = ('number', 'operator', 'status', 'created_at', 'validated_at', 'closed_at')
+    list_filter = ('status',)
+    search_fields = ('number', 'operator__username')
+    readonly_fields = ('number', 'status', 'created_by', 'created_at', 'validated_at', 'closed_at')
+    inlines = (LoadingOrderLineInline,)
+
+
+@admin.register(OperatorStock)
+class OperatorStockAdmin(admin.ModelAdmin):
+    list_display = ('operator', 'product', 'quantity', 'updated_at')
+    readonly_fields = ('operator', 'product', 'quantity', 'updated_at')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(OperatorStockMovement)
+class OperatorStockMovementAdmin(admin.ModelAdmin):
+    list_display = ('operator', 'product', 'loading_order', 'movement_type', 'applied_delta', 'balance_after', 'created_at')
+    readonly_fields = [field.name for field in OperatorStockMovement._meta.fields]
+    actions = None
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
