@@ -1236,25 +1236,91 @@ msgid "Utilisateur analysé"
 msgstr "Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù… Ø§Ù„Ù…Ø­Ù„Ù„"
 
 msgid "Thermique"
-msgstr "Ø­Ø±Ø§Ø±ÙŠØ©"
+msgstr "حرارية"
 
 msgid "Jet d’encre"
-msgstr "Ø­Ø¨Ø±ÙŠØ©"
+msgstr "نافثة للحبر"
 
 msgid "Laser"
-msgstr "Ù„ÙŠØ²Ø±"
+msgstr "ليزر"
 
 msgid "Autre type"
-msgstr "Ù†ÙˆØ¹ Ø¢Ø®Ø±"
+msgstr "نوع آخر"
 
 msgid "Rechercher les appareils Bluetooth"
-msgstr "Ø§Ù„Ø¨Ø­Ø« Ø¹Ù† Ø£Ø¬Ù‡Ø²Ø© Ø§Ù„Ø¨Ù„ÙˆØªÙˆØ«"
+msgstr "البحث عن أجهزة Bluetooth"
 
 msgid "Imprimer les factures"
-msgstr "Ø·Ø¨Ø§Ø¹Ø© Ø§Ù„ÙÙˆØ§ØªÙŠØ±"
+msgstr "طباعة الفواتير"
 
 msgid "Imprimer les tickets"
-msgstr "Ø·Ø¨Ø§Ø¹Ø© Ø§Ù„Ø¥ÙŠØµØ§Ù„Ø§Øª"
+msgstr "طباعة الإيصالات"
+
+msgid "Recherche d’un appareil Bluetooth…"
+msgstr "جارٍ البحث عن جهاز Bluetooth…"
+
+msgid "Appareil sélectionné. Enregistrez la configuration."
+msgstr "تم اختيار الجهاز. احفظ الإعدادات."
+
+msgid "Appareil sélectionné sans nom."
+msgstr "تم اختيار جهاز بدون اسم."
+
+msgid "Recherche annulée."
+msgstr "تم إلغاء البحث."
+
+msgid "Recherche Bluetooth indisponible."
+msgstr "البحث عبر Bluetooth غير متاح."
+
+msgid "La recherche Bluetooth nécessite un navigateur compatible. Saisissez le nom manuellement."
+msgstr "يتطلب البحث عبر Bluetooth متصفحًا متوافقًا. أدخل الاسم يدويًا."
+
+msgid "Nom interne"
+msgstr "الاسم الداخلي"
+
+msgid "Type d’imprimante"
+msgstr "نوع الطابعة"
+
+msgid "Constructeur"
+msgstr "الشركة المصنّعة"
+
+msgid "Modèle"
+msgstr "الطراز"
+
+msgid "Mode de connexion"
+msgstr "واجهة الاتصال"
+
+msgid "Nom Bluetooth"
+msgstr "اسم Bluetooth"
+
+msgid "Adresse Bluetooth"
+msgstr "عنوان Bluetooth"
+
+msgid "Adresse IP"
+msgstr "عنوان IP"
+
+msgid "Port réseau"
+msgstr "منفذ الشبكة"
+
+msgid "Largeur papier"
+msgstr "عرض الورق"
+
+msgid "Protocole"
+msgstr "البروتوكول"
+
+msgid "Caractères par ligne"
+msgstr "عدد الأحرف في السطر"
+
+msgid "Encodage"
+msgstr "الترميز"
+
+msgid "Impression automatique"
+msgstr "الطباعة التلقائية"
+
+msgid "Imprimante par défaut"
+msgstr "الطابعة الافتراضية"
+
+msgid "Active"
+msgstr "نشطة"
 
 msgid "Recherche trop longue."
 msgstr "نص البحث طويل جدًا."
