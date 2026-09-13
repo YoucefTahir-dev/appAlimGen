@@ -1224,16 +1224,16 @@ msgid "Rechercher un produit"
 msgstr "البحث عن منتج"
 
 msgid "Utilisateur"
-msgstr "Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…"
+msgstr "المستخدم"
 
 msgid "Tous les utilisateurs"
-msgstr "Ø¬Ù…ÙŠØ¹ Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…ÙŠÙ†"
+msgstr "جميع المستخدمين"
 
 msgid "Mon compte"
-msgstr "Ø­Ø³Ø§Ø¨ÙŠ"
+msgstr "حسابي"
 
 msgid "Utilisateur analysé"
-msgstr "Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù… Ø§Ù„Ù…Ø­Ù„Ù„"
+msgstr "المستخدم المحدد"
 
 msgid "Thermique"
 msgstr "حرارية"
