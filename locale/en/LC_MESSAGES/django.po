@@ -325,3 +325,23 @@ msgstr "The received location is approximate. Check that precise location is all
 
 msgid "Adresse détectée. Vérifiez l’adresse proposée."
 msgstr "Address detected. Check the suggested address."
+msgid "Tapez au moins 2 caractères"
+msgstr "Type at least 2 characters"
+
+msgid "Recherche…"
+msgstr "Searching…"
+
+msgid "Aucun produit trouvé"
+msgstr "No products found"
+
+msgid "Recherche indisponible. Réessayez."
+msgstr "Search unavailable. Try again."
+
+msgid "Veuillez sélectionner un produit dans les résultats proposés."
+msgstr "Please select a product from the suggested results."
+
+msgid "Rechercher un produit"
+msgstr "Search for a product"
+
+msgid "Recherche trop longue."
+msgstr "Search query is too long."

@@ -7,6 +7,7 @@ from django.utils.translation import gettext_lazy as _
 from apps.inventory.models import ProductPackaging
 
 from .models import Payment, Purchase, PurchaseLine, Sale, SaleLine
+from .widgets import ProductAutocomplete
 
 
 class PurchaseForm(forms.ModelForm):
@@ -121,7 +122,7 @@ class SaleLineForm(forms.ModelForm):
         model = SaleLine
         fields = ('product', 'packaging', 'quantity', 'unit_price')
         widgets = {
-            'product': forms.Select(attrs={'class': 'form-select'}),
+            'product': ProductAutocomplete(attrs={'search_context': 'sale'}),
             'packaging': forms.Select(attrs={'class': 'form-select'}),
             'quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
             'unit_price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': 0}),
@@ -129,10 +130,13 @@ class SaleLineForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        queryset = ProductPackaging.objects.filter(is_active=True).select_related('product').order_by('product__name', 'name')
+        product_id = self.data.get(self.add_prefix('product')) if self.is_bound else self.initial.get('product')
+        if not str(product_id or '').isdigit():
+            product_id = None
+        queryset = ProductPackaging.objects.filter(product_id=product_id, is_active=True).select_related('product').order_by('name')
         if self.instance and self.instance.pk and self.instance.packaging_id:
             queryset = ProductPackaging.objects.filter(
-                Q(is_active=True) | Q(pk=self.instance.packaging_id)
+                Q(product_id=product_id, is_active=True) | Q(pk=self.instance.packaging_id)
             ).select_related('product').order_by('product__name', 'name')
         self.fields['packaging'].queryset = queryset
         self.fields['packaging'].required = False
@@ -140,6 +144,7 @@ class SaleLineForm(forms.ModelForm):
         if self.instance and self.instance.pk:
             self.initial['quantity'] = self.instance.packaging_quantity
         self.fields['quantity'].widget.attrs['min'] = 1
+        self.fields['product'].error_messages['invalid_choice'] = _('Veuillez sélectionner un produit dans les résultats proposés.')
 
     def clean(self):
         cleaned_data = super().clean()
@@ -223,11 +228,15 @@ class BaseSaleLineFormSet(BaseInlineFormSet):
 
 
 class PurchaseLineForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['product'].error_messages['invalid_choice'] = _('Veuillez sélectionner un produit dans les résultats proposés.')
+
     class Meta:
         model = PurchaseLine
         fields = ('product', 'quantity', 'purchase_price')
         widgets = {
-            'product': forms.Select(attrs={'class': 'form-select'}),
+            'product': ProductAutocomplete(attrs={'search_context': 'purchase'}),
             'quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
             'purchase_price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': 0}),
         }

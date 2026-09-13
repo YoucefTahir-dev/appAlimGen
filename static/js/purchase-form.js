@@ -8,15 +8,9 @@
     const quickForm = document.getElementById('quick-product-form');
     const modalElement = document.getElementById('quick-product-modal');
     const status = document.getElementById('purchase-product-status');
-    const createdProducts = new Map();
     let targetRow = null;
     let pending = false;
 
-    function addOption(select, product) {
-        if (!Array.from(select.options).some(option => option.value === String(product.id))) {
-            select.add(new Option(product.name, String(product.id)));
-        }
-    }
 
     document.getElementById('add-purchase-line').addEventListener('click', function () {
         const index = Number.parseInt(total.value, 10);
@@ -24,8 +18,6 @@
         if (!Number.isInteger(index) || index >= maximum) return;
         lines.insertAdjacentHTML('beforeend', template.innerHTML.replace(/__prefix__/g, String(index)));
         total.value = String(index + 1);
-        const select = lines.lastElementChild.querySelector('select[name$="-product"]');
-        createdProducts.forEach(product => addOption(select, product));
     });
 
     if (!quickForm) return;
@@ -38,6 +30,9 @@
         if (!trigger || pending) return;
         targetRow = trigger.closest('.purchase-line-row');
         quickForm.reset();
+        const productSearch = targetRow.querySelector('.product-search');
+        const quickName = quickForm.querySelector('input[name="quick-name"]');
+        if (productSearch && quickName) quickName.value = productSearch.value.trim();
         clearErrors();
         status.textContent = '';
         if (!window.bootstrap || !window.bootstrap.Modal) {
@@ -85,12 +80,7 @@
                 return;
             }
             const product = payload.product;
-            createdProducts.set(String(product.id), product);
-            lines.querySelectorAll('select[name$="-product"]').forEach(select => addOption(select, product));
-            const targetSelect = targetRow.querySelector('select[name$="-product"]');
-            targetSelect.value = String(product.id);
-            targetRow.querySelector('input[name$="-purchase_price"]').value = product.purchase_price;
-            targetSelect.dispatchEvent(new Event('change', {bubbles: true}));
+            window.ProductAutocomplete.select(targetRow.querySelector('.product-picker'), product);
             pending = false;
             window.bootstrap.Modal.getOrCreateInstance(modalElement).hide();
             status.textContent = quickForm.dataset.success;

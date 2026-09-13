@@ -1,5 +1,6 @@
 from django.urls import path
 from .views import (
+    commercial_product_search,
     sale_list,
     purchase_list,
     sale_create,
@@ -23,6 +24,7 @@ from .views import (
 )
 
 urlpatterns = [
+    path('products/search/', commercial_product_search, name='commercial_product_search'),
     path('sales/', sale_list, name='sale_list'),
     path('sales/new/', sale_create, name='sale_create'),
     path('sales/price/', sale_price_lookup, name='sale_price_lookup'),

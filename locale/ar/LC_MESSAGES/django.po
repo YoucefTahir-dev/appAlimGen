@@ -1205,3 +1205,23 @@ msgstr "الموقع المستلم تقريبي. تحقق من السماح ل�
 
 msgid "Adresse détectée. Vérifiez l’adresse proposée."
 msgstr "تم تحديد العنوان. تحقق من العنوان المقترح."
+msgid "Tapez au moins 2 caractères"
+msgstr "اكتب حرفين على الأقل"
+
+msgid "Recherche…"
+msgstr "جارٍ البحث…"
+
+msgid "Aucun produit trouvé"
+msgstr "لم يتم العثور على منتجات"
+
+msgid "Recherche indisponible. Réessayez."
+msgstr "البحث غير متاح. حاول مجددًا."
+
+msgid "Veuillez sélectionner un produit dans les résultats proposés."
+msgstr "يرجى اختيار منتج من النتائج المقترحة."
+
+msgid "Rechercher un produit"
+msgstr "البحث عن منتج"
+
+msgid "Recherche trop longue."
+msgstr "نص البحث طويل جدًا."

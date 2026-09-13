@@ -227,3 +227,23 @@ msgstr "La localisation reçue est approximative. Vérifiez que la position pré
 
 msgid "Adresse détectée. Vérifiez l’adresse proposée."
 msgstr "Adresse détectée. Vérifiez l’adresse proposée."
+msgid "Tapez au moins 2 caractères"
+msgstr "Tapez au moins 2 caractères"
+
+msgid "Recherche…"
+msgstr "Recherche…"
+
+msgid "Aucun produit trouvé"
+msgstr "Aucun produit trouvé"
+
+msgid "Recherche indisponible. Réessayez."
+msgstr "Recherche indisponible. Réessayez."
+
+msgid "Veuillez sélectionner un produit dans les résultats proposés."
+msgstr "Veuillez sélectionner un produit dans les résultats proposés."
+
+msgid "Rechercher un produit"
+msgstr "Rechercher un produit"
+
+msgid "Recherche trop longue."
+msgstr "Recherche trop longue."

@@ -4,6 +4,15 @@ Toutes les modifications notables de ce projet seront documentées ici.
 
 ## [Non publié]
 
+### Commerce : recherche produit AJAX
+
+- Remplacement des catalogues complets des lignes d'achat et de vente par une
+  recherche serveur bornée, authentifiée, accessible au clavier et compatible RTL.
+- Recherche par nom, référence, code-barres et marque après deux caractères,
+  avec temporisation de 300 ms et vingt résultats maximum.
+- Tarifs client calculés côté serveur ; coût d'achat absent des réponses de vente.
+- Lignes formset dynamiques et création rapide depuis un achat préservées.
+
 ### Clients : sélection d'une position suffisamment précise
 
 - Suivi GPS limité à 12 secondes ; meilleure mesure retenue et un seul appel
