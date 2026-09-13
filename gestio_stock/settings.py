@@ -159,9 +159,11 @@ TEMPLATES = [
 WSGI_APPLICATION = 'gestio_stock.wsgi.application'
 
 DATABASE_URL = os.getenv('DATABASE_URL', '').strip()
+DATABASE_CONNECT_TIMEOUT = max(1, env_int('DATABASE_CONNECT_TIMEOUT', 10))
 if DATABASE_URL:
     parsed_database_url = urlparse(DATABASE_URL)
     database_options = dict(parse_qsl(parsed_database_url.query, keep_blank_values=True))
+    database_options.setdefault('connect_timeout', str(DATABASE_CONNECT_TIMEOUT))
     database_config = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': parsed_database_url.path.lstrip('/'),
@@ -170,8 +172,7 @@ if DATABASE_URL:
         'HOST': parsed_database_url.hostname or '',
         'PORT': str(parsed_database_url.port or 5432),
     }
-    if database_options:
-        database_config['OPTIONS'] = database_options
+    database_config['OPTIONS'] = database_options
 
     DATABASES = {
         'default': database_config
@@ -199,6 +200,9 @@ else:
                 'PASSWORD': os.getenv('DATABASE_PASSWORD', 'gestio_pass'),
                 'HOST': os.getenv('DATABASE_HOST', 'localhost'),
                 'PORT': os.getenv('DATABASE_PORT', '5432'),
+                'OPTIONS': {
+                    'connect_timeout': DATABASE_CONNECT_TIMEOUT,
+                },
             }
         }
 

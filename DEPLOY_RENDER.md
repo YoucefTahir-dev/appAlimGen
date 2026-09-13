@@ -30,11 +30,20 @@ Start command :
 bash start.sh
 ```
 
+Sur l'offre Render Free, `build.sh` applique aussi les migrations, car la commande de
+pré-déploiement est réservée aux services payants. `start.sh` lance uniquement Gunicorn afin
+d'ouvrir immédiatement le port HTTP attendu par Render. Une connexion PostgreSQL est abandonnée
+après `DATABASE_CONNECT_TIMEOUT` secondes (10 par défaut), et l'ensemble des migrations après
+`MIGRATION_TIMEOUT_SECONDS` secondes (300 par défaut), au lieu de bloquer silencieusement le
+déploiement.
+
 Variables minimales :
 
 - `DJANGO_DEBUG=False`
 - `SECRET_KEY=<clé longue et aléatoire>`
 - `DATABASE_URL=<connection string PostgreSQL existante>`
+- `DATABASE_CONNECT_TIMEOUT=10`
+- `MIGRATION_TIMEOUT_SECONDS=300`
 - `ALLOWED_HOSTS=<votre-app>.onrender.com`
 - `CSRF_TRUSTED_ORIGINS=https://<votre-app>.onrender.com`
 - `MEDIA_STORAGE_BACKEND=s3`

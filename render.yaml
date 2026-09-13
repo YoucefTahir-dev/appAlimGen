@@ -17,6 +17,10 @@ services:
         generateValue: true
       - key: DATABASE_URL
         sync: false
+      - key: DATABASE_CONNECT_TIMEOUT
+        value: "10"
+      - key: MIGRATION_TIMEOUT_SECONDS
+        value: "300"
       - key: ALLOWED_HOSTS
         value: ".onrender.com"
       - key: CSRF_TRUSTED_ORIGINS
