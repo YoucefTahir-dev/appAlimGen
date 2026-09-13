@@ -1,4 +1,5 @@
 from django.contrib import messages
+from django.core.exceptions import ValidationError
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext as _
@@ -49,7 +50,11 @@ def printer_delete(request, pk):
 @permission_required('printing.test_printerprofile')
 def printer_test(request, pk):
     printer = get_object_or_404(PrinterProfile, pk=pk, is_active=True)
-    result = printer_test_payload(printer)
+    try:
+        result = printer_test_payload(printer)
+    except ValidationError as exc:
+        messages.error(request, ' '.join(exc.messages))
+        return redirect('printer_update', pk=printer.pk)
     response = HttpResponse(result.payload, content_type='application/octet-stream')
     response['Content-Disposition'] = f'attachment; filename="printer-test-{printer.pk}.bin"'
     response['X-Printer-Protocol'] = result.protocol

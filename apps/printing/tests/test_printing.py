@@ -50,6 +50,55 @@ class PrinterDomainTests(TestCase):
         self.assertTrue(result.raster_arabic_recommended)
         self.assertEqual(transport.payloads, [result.payload])
 
+    def test_rpp02n_bluetooth_name_overrides_custom_protocol(self):
+        printer = self.printer(
+            model_name='thermal printer',
+            bluetooth_name='RPP02N',
+            protocol=PrinterProfile.CUSTOM,
+            paper_width=58,
+            characters_per_line=42,
+        )
+
+        result = printer_test_payload(printer)
+
+        self.assertEqual(result.protocol, 'rpp02n_diagnostic')
+        self.assertTrue(result.payload.startswith(b'\x1b\x40'))
+
+    def test_web_test_downloads_rpp02n_payload_with_custom_protocol(self):
+        admin = User.objects.create_superuser(username='printer-web-admin', password='StrongPass123!')
+        printer = self.printer(
+            model_name='thermal printer',
+            bluetooth_name='RPP02N',
+            protocol=PrinterProfile.CUSTOM,
+            paper_width=58,
+            characters_per_line=42,
+        )
+        self.client.force_login(admin)
+
+        response = self.client.get(reverse('printer_test', args=[printer.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/octet-stream')
+        self.assertEqual(response['X-Printer-Protocol'], 'rpp02n_diagnostic')
+        self.assertTrue(response.content.startswith(b'\x1b\x40'))
+
+    def test_web_test_redirects_instead_of_500_for_unsupported_protocol(self):
+        admin = User.objects.create_superuser(username='unsupported-web-admin', password='StrongPass123!')
+        printer = self.printer(
+            model_name='Unknown printer',
+            bluetooth_name='',
+            protocol=PrinterProfile.CUSTOM,
+        )
+        self.client.force_login(admin)
+
+        response = self.client.get(reverse('printer_test', args=[printer.pk]))
+
+        self.assertRedirects(
+            response,
+            reverse('printer_update', args=[printer.pk]),
+            fetch_redirect_response=False,
+        )
+
     def test_seeded_print_profile_types_are_valid(self):
         PrintProfile.objects.create(
             name='Ticket magasin', document_type=PrintProfile.TICKET_80,

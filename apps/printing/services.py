@@ -70,6 +70,25 @@ class Rpp02nDiagnosticDriver(GenericEscPosDriver):
 
 
 def driver_for(printer):
+    # RPP02N profiles are often configured as an unknown/generic model by the
+    # companion applications. Detect the device from every locally visible
+    # identifier before falling back to the manually selected protocol.
+    identifiers = (
+        printer.model_name,
+        printer.bluetooth_name,
+        printer.name,
+    )
+    normalized_identifiers = {
+        ''.join(character for character in (value or '').upper() if character.isalnum())
+        for value in identifiers
+    }
+    if any(
+        alias in identifier
+        for identifier in normalized_identifiers
+        for alias in ('RPP02N', 'RPPO2N')
+    ):
+        return Rpp02nDiagnosticDriver()
+
     if printer.protocol in {
         PrinterProfile.GENERIC_ESCPOS,
         PrinterProfile.EPSON_ESCPOS,
@@ -77,8 +96,6 @@ def driver_for(printer):
         PrinterProfile.POSIFLEX,
         PrinterProfile.GP,
     }:
-        if printer.model_name.strip().upper() == 'RPP02N':
-            return Rpp02nDiagnosticDriver()
         return GenericEscPosDriver()
     raise ValidationError(_('Ce protocole nécessite un adaptateur local dédié.'))
 
