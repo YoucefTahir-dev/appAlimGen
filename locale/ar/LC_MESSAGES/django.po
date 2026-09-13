@@ -1235,5 +1235,26 @@ msgstr "Ø­Ø³Ø§Ø¨ÙŠ"
 msgid "Utilisateur analysé"
 msgstr "Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù… Ø§Ù„Ù…Ø­Ù„Ù„"
 
+msgid "Thermique"
+msgstr "Ø­Ø±Ø§Ø±ÙŠØ©"
+
+msgid "Jet d’encre"
+msgstr "Ø­Ø¨Ø±ÙŠØ©"
+
+msgid "Laser"
+msgstr "Ù„ÙŠØ²Ø±"
+
+msgid "Autre type"
+msgstr "Ù†ÙˆØ¹ Ø¢Ø®Ø±"
+
+msgid "Rechercher les appareils Bluetooth"
+msgstr "Ø§Ù„Ø¨Ø­Ø« Ø¹Ù† Ø£Ø¬Ù‡Ø²Ø© Ø§Ù„Ø¨Ù„ÙˆØªÙˆØ«"
+
+msgid "Imprimer les factures"
+msgstr "Ø·Ø¨Ø§Ø¹Ø© Ø§Ù„ÙÙˆØ§ØªÙŠØ±"
+
+msgid "Imprimer les tickets"
+msgstr "Ø·Ø¨Ø§Ø¹Ø© Ø§Ù„Ø¥ÙŠØµØ§Ù„Ø§Øª"
+
 msgid "Recherche trop longue."
 msgstr "نص البحث طويل جدًا."

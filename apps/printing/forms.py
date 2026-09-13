@@ -10,7 +10,7 @@ class PrinterProfileForm(forms.ModelForm):
             'name', 'description', 'printer_type', 'manufacturer', 'model_name',
             'connection_mode', 'local_identifier', 'bluetooth_name', 'bluetooth_address', 'ip_address', 'network_port',
             'paper_width', 'protocol', 'characters_per_line', 'encoding',
-            'auto_print', 'is_default', 'is_active',
+            'auto_print', 'print_invoices', 'print_receipts', 'is_default', 'is_active',
         )
         widgets = {
             'description': forms.Textarea(attrs={'rows': 3}),

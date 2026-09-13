@@ -1,5 +1,5 @@
 {% extends 'base/base.html' %}
-{% load i18n %}
+{% load i18n static %}
 {% block title %}{{ title }} - El Amine ERP{% endblock %}
 {% block page_title %}{{ title }}{% endblock %}
 {% block content %}
@@ -9,7 +9,7 @@
         <div class="row g-3">
         {% for field in form %}
             <div class="{% if field.field.widget.input_type == 'checkbox' %}col-12 form-check ms-2{% else %}col-12 col-md-6{% endif %}">
-                {% if field.field.widget.input_type == 'checkbox' %}{{ field }} {{ field.label_tag }}{% else %}{{ field.label_tag }}{{ field }}{% endif %}
+                {% if field.field.widget.input_type == 'checkbox' %}{{ field }} {{ field.label_tag }}{% else %}{{ field.label_tag }}{{ field }}{% if field.name == 'bluetooth_name' %}<button type="button" class="btn btn-outline-primary mt-2" id="bluetoothScanButton" data-searching="{% trans "Recherche d’un appareil Bluetooth…" %}" data-selected="{% trans "Appareil sélectionné. Enregistrez la configuration." %}" data-unnamed="{% trans "Appareil sélectionné sans nom." %}" data-cancelled="{% trans "Recherche annulée." %}" data-unavailable="{% trans "Recherche Bluetooth indisponible." %}" data-unsupported="{% trans "La recherche Bluetooth nécessite un navigateur compatible. Saisissez le nom manuellement." %}"><i class="bi bi-search me-1"></i>{% trans "Rechercher les appareils Bluetooth" %}</button><div id="bluetoothScanStatus" class="form-text" role="status"></div>{% endif %}{% endif %}
                 {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}{{ field.errors }}
             </div>
         {% endfor %}
@@ -18,3 +18,4 @@
     </form>
 </div>
 {% endblock %}
+{% block extra_js %}<script src="{% static 'js/printer-config.js' %}"></script>{% endblock %}

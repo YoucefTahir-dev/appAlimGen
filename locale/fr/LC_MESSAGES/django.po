@@ -259,3 +259,42 @@ msgstr "Mon compte"
 
 msgid "Utilisateur analysé"
 msgstr "Utilisateur analysé"
+
+msgid "Thermique"
+msgstr "Thermique"
+
+msgid "Jet d’encre"
+msgstr "Jet d’encre"
+
+msgid "Laser"
+msgstr "Laser"
+
+msgid "Autre type"
+msgstr "Autre type"
+
+msgid "Rechercher les appareils Bluetooth"
+msgstr "Rechercher les appareils Bluetooth"
+
+msgid "Recherche d’un appareil Bluetooth…"
+msgstr "Recherche d’un appareil Bluetooth…"
+
+msgid "Appareil sélectionné. Enregistrez la configuration."
+msgstr "Appareil sélectionné. Enregistrez la configuration."
+
+msgid "Appareil sélectionné sans nom."
+msgstr "Appareil sélectionné sans nom."
+
+msgid "Recherche annulée."
+msgstr "Recherche annulée."
+
+msgid "Recherche Bluetooth indisponible."
+msgstr "Recherche Bluetooth indisponible."
+
+msgid "La recherche Bluetooth nécessite un navigateur compatible. Saisissez le nom manuellement."
+msgstr "La recherche Bluetooth nécessite un navigateur compatible. Saisissez le nom manuellement."
+
+msgid "Imprimer les factures"
+msgstr "Imprimer les factures"
+
+msgid "Imprimer les tickets"
+msgstr "Imprimer les tickets"

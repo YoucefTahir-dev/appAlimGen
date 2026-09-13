@@ -7,6 +7,12 @@ import re
 
 
 class PrinterProfile(models.Model):
+    PRINTER_TYPE_CHOICES = (
+        ('thermal', _('Thermique')),
+        ('inkjet', _('Jet d’encre')),
+        ('laser', _('Laser')),
+        ('other', _('Autre type')),
+    )
     BLUETOOTH = 'bluetooth'
     USB = 'usb'
     NETWORK = 'network'
@@ -43,7 +49,7 @@ class PrinterProfile(models.Model):
 
     name = models.CharField(_('Nom interne'), max_length=100, unique=True)
     description = models.TextField(_('Description'), blank=True)
-    printer_type = models.CharField(_('Type d’imprimante'), max_length=50, default='thermal')
+    printer_type = models.CharField(_('Type d’imprimante'), max_length=50, choices=PRINTER_TYPE_CHOICES, default='thermal')
     manufacturer = models.CharField(_('Constructeur'), max_length=100, blank=True)
     model_name = models.CharField(_('Modèle'), max_length=100, blank=True)
     connection_mode = models.CharField(_('Mode de connexion'), max_length=20, choices=CONNECTION_CHOICES)
@@ -60,6 +66,8 @@ class PrinterProfile(models.Model):
     characters_per_line = models.PositiveSmallIntegerField(_('Caractères par ligne'), default=48)
     encoding = models.CharField(_('Encodage'), max_length=50, default='cp858')
     auto_print = models.BooleanField(_('Impression automatique'), default=False)
+    print_invoices = models.BooleanField(_('Imprimer les factures'), default=True)
+    print_receipts = models.BooleanField(_('Imprimer les tickets'), default=True)
     is_default = models.BooleanField(_('Imprimante par défaut'), default=False)
     is_active = models.BooleanField(_('Active'), default=True)
     created_at = models.DateTimeField(auto_now_add=True)
