@@ -9,6 +9,7 @@
 <div class="card card-dashboard p-4 bg-white">
     <form method="post" id="sale-form"
           data-price-url="{% url 'sale_price_lookup' %}"
+          data-stock-label="{% trans 'Stock' %}"
           data-auto-pricing="{% if form.instance.pk %}false{% else %}true{% endif %}"
           data-loading-label="{% trans 'Chargement…' %}"
           data-price-error-label="{% trans 'Impossible de récupérer le prix du produit.' %}"
@@ -119,5 +120,6 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="{% static 'js/product-autocomplete.js' %}" defer></script>
 <script src="{% static 'js/sale-formset.js' %}" defer></script>
 {% endblock %}

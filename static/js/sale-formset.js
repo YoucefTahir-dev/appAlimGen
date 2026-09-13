@@ -58,7 +58,7 @@
             if (!autoPricing || !priceUrl || !clientSelect) {
                 return;
             }
-            const productSelect = row.querySelector('select[name$="-product"]');
+            const productSelect = row.querySelector('.product-id');
             const packagingSelect = row.querySelector('select[name$="-packaging"]');
             const priceInput = row.querySelector('input[name$="-unit_price"]');
             const productMeta = row.querySelector('.sale-product-meta');
@@ -87,6 +87,7 @@
             const packagingValue = packagingSelect ? packagingSelect.value : '';
             const requestKey = `${clientSelect.value}:${productSelect.value}:${packagingValue}:${++requestSequence}`;
             row.dataset.priceRequest = requestKey;
+            priceInput.value = '';
             const query = new URLSearchParams({
                 client_id: clientSelect.value,
                 product_id: productSelect.value,
@@ -112,7 +113,7 @@
                         clientType.textContent = payload.customer_type_label || '';
                     }
                     if (productMeta) {
-                        productMeta.textContent = `${payload.reference} · Stock: ${payload.stock}`;
+                        productMeta.textContent = `${payload.reference} · ${saleForm.dataset.stockLabel}: ${payload.stock}`;
                     }
                     setFeedback(row, '', false);
                 }
@@ -135,6 +136,9 @@
                 if (deleteInput) {
                     deleteInput.checked = true;
                     row.hidden = true;
+                    row.dataset.priceRequest = '';
+                    row.querySelector('.product-search').setCustomValidity('');
+                    window.ProductAutocomplete.close(row.querySelector('.product-picker'));
                 } else {
                     row.remove();
                 }
@@ -146,10 +150,10 @@
             if (!row) {
                 return;
             }
-            if (event.target.matches('select[name$="-product"]')) {
+            if (event.target.matches('.product-id')) {
                 const packagingSelect = row.querySelector('select[name$="-packaging"]');
                 if (packagingSelect) {
-                    packagingSelect.value = '';
+                    updatePackagingOptions(packagingSelect, [], '');
                 }
                 updateRowPrice(row);
             } else if (event.target.matches('select[name$="-packaging"]')) {
@@ -162,6 +166,13 @@
                 body.querySelectorAll('.sale-line-row:not([hidden])').forEach(updateRowPrice);
             });
         }
+
+        body.addEventListener('input', function (event) {
+            if (event.target.matches('input[name$="-unit_price"]')) {
+                event.target.closest('.sale-line-row').dataset.priceRequest = '';
+                event.target.removeAttribute('aria-busy');
+            }
+        });
 
         addButton.addEventListener('click', function () {
             const index = Number.parseInt(totalForms.value, 10);

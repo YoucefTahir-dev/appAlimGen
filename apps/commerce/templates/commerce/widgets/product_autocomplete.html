@@ -1,0 +1,18 @@
+{% load i18n %}
+<div class="product-picker"
+     data-url="{% url 'commercial_product_search' %}" data-context="{{ widget.attrs.search_context }}"
+     data-minimum="{% trans 'Tapez au moins 2 caractères' %}"
+     data-loading="{% trans 'Recherche…' %}"
+     data-empty="{% trans 'Aucun produit trouvé' %}"
+     data-error="{% trans 'Recherche indisponible. Réessayez.' %}"
+     data-stock="{% trans 'Stock' %}" data-price="{% trans 'Prix' %}"
+     data-invalid="{% trans 'Veuillez sélectionner un produit dans les résultats proposés.' %}">
+    <input type="hidden" name="{{ widget.name }}" id="{{ widget.attrs.id }}" class="product-id" value="{{ widget.value|default_if_none:'' }}">
+    <input type="text" name="{{ widget.name }}_search" id="{{ widget.attrs.id }}_search"
+           class="form-control product-search" value="{{ widget.label }}" maxlength="100"
+           placeholder="{% trans 'Rechercher un produit' %}" aria-label="{% trans 'Rechercher un produit' %}"
+           autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false"
+           aria-controls="{{ widget.attrs.id }}_results" aria-describedby="{{ widget.attrs.id }}_status">
+    <div class="product-results list-group" id="{{ widget.attrs.id }}_results" role="listbox" hidden></div>
+    <small id="{{ widget.attrs.id }}_status" class="product-search-status form-text" role="status" aria-live="polite"></small>
+</div>

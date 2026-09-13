@@ -431,3 +431,6 @@ body.rtl .text-end {
     margin: 0;
     margin-inline-start: auto;
 }
+.product-results { max-height: 12rem; overflow-y: auto; margin-block-start: .25rem; }
+.product-result { text-align: start; white-space: normal; overflow-wrap: anywhere; }
+.product-picker { min-width: 0; }

@@ -1,6 +1,7 @@
 from decimal import Decimal, ROUND_HALF_UP
 
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import DecimalField, ExpressionWrapper, F, Sum, Value
@@ -21,9 +22,31 @@ from .forms import PaymentForm, PurchaseForm, PurchaseLineFormSet, SaleForm, Sal
 from .models import Payment, Purchase, Sale
 from .services import ensure_ticket_number, generate_invoice_number, generate_ticket_number
 from .utils import build_invoice_context, generate_invoice_pdf, qr_code_data_uri
+from .product_search import commercial_products, search_products
 
 
 MONEY_QUANTUM = Decimal('0.01')
+
+
+@login_required
+@require_GET
+def commercial_product_search(request):
+    context = request.GET.get('context', '')
+    commercial_products(request.user, context)
+    query = request.GET.get('q', '').strip()
+    if len(query) > 100:
+        return JsonResponse({'error': _('Recherche trop longue.')}, status=400)
+    customer = None
+    client_id = request.GET.get('client_id')
+    if context == 'sale' and client_id:
+        if not client_id.isdecimal() or len(client_id) > 18:
+            return JsonResponse({'error': _('Client invalide.')}, status=400)
+        customer = get_object_or_404(Client, pk=client_id)
+    response = JsonResponse({'results': search_products(
+        user=request.user, query=query, context=context, customer=customer,
+    )})
+    response['Cache-Control'] = 'private, no-store'
+    return response
 
 
 def _money(value):
@@ -154,17 +177,21 @@ def sale_create(request):
 
 
 @require_GET
-@permission_required('commerce.add_sale')
+@permission_required('commerce.add_sale', 'commerce.change_sale', any_permission=True)
 def sale_price_lookup(request):
     product_id = request.GET.get('product_id')
     client_id = request.GET.get('client_id')
     if not product_id or not client_id:
         return JsonResponse({'error': _('Produit et client obligatoires.')}, status=400)
-    product = get_object_or_404(Product.objects.prefetch_related('packagings'), pk=product_id)
+    if any(not value.isdecimal() or len(value) > 18 for value in (product_id, client_id)):
+        return JsonResponse({'error': _('Produit et client obligatoires.')}, status=400)
+    product = get_object_or_404(commercial_products(request.user, 'sale').prefetch_related('packagings'), pk=product_id)
     customer = get_object_or_404(Client, pk=client_id)
     packaging = None
     packaging_id = request.GET.get('packaging_id')
     if packaging_id:
+        if not packaging_id.isdecimal() or len(packaging_id) > 18:
+            return JsonResponse({'error': _('Conditionnement invalide ou inactif.')}, status=400)
         packaging = get_object_or_404(
             ProductPackaging,
             pk=packaging_id,
