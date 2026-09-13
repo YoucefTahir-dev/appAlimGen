@@ -1,37 +1,28 @@
 {% load i18n %}
-<section id="client-location" class="border rounded p-3" data-url="{% url 'client_reverse_geocode' %}"
+<div id="client-location" data-url="{% url 'client_reverse_geocode' %}"
     data-denied="{% trans 'L’accès à votre position a été refusé.' %}"
     data-unavailable="{% trans 'Impossible de déterminer votre position.' %}"
     data-timeout="{% trans 'La localisation a expiré. Veuillez réessayer.' %}"
     data-unsupported="{% trans 'La géolocalisation nécessite HTTPS et un navigateur compatible.' %}"
-    data-pending="{% trans 'Recherche de votre position…' %}"
-    data-confirm-first="{% trans 'Confirmez ou annulez la position proposée avant d’enregistrer.' %}"
-    data-fallback="{% trans 'Adresse indisponible. Vous pouvez conserver le GPS et saisir l’adresse manuellement.' %}"
-    data-weak="{% trans 'La position GPS semble imprécise.' %}"
-    data-confirmed="{% trans 'Position confirmée. Enregistrez le formulaire pour la sauvegarder.' %}"
-    data-long="{% trans 'Adresse détectée trop longue : conservez le GPS et adaptez l’adresse manuellement.' %}">
-    <h2 class="h6">{% trans 'Localisation du client (facultative)' %}</h2>
-    <p class="small text-muted">{% trans 'Votre position est demandée uniquement au clic. Elle ne sera enregistrée qu’après confirmation et enregistrement du client.' %}</p>
-    <button type="button" id="locate-client" class="btn btn-outline-primary py-3 text-wrap w-100">{% trans 'Utiliser ma position actuelle' %}</button>
-    <p id="location-status" class="mt-2 mb-0" role="status" aria-live="polite"></p>
-    <div id="location-proposal" class="mt-3" hidden>
-        <strong>{% trans 'Adresse détectée' %}</strong>
-        <p id="detected-address" class="text-break"></p>
-        <p id="detected-coordinates" dir="ltr"></p>
-        <p>{% trans 'Précision GPS' %} : <span id="detected-accuracy"></span> m</p>
-        <p id="location-warning" class="text-warning"></p>
-        <div class="d-flex flex-wrap gap-2">
-            <button type="button" id="confirm-location" class="btn btn-success text-wrap">{% trans 'Confirmer cette adresse' %}</button>
-            <button type="button" id="keep-manual-address" class="btn btn-outline-primary text-wrap">{% trans 'Conserver le GPS et modifier manuellement' %}</button>
-            <button type="button" id="cancel-location" class="btn btn-outline-secondary">{% trans 'Annuler' %}</button>
-        </div>
+    data-pending="{% trans 'Localisation en cours…' %}"
+    data-fallback="{% trans 'Adresse automatique indisponible. Saisissez l’adresse manuellement.' %}"
+    data-weak="{% trans 'Position GPS peu précise. Vérifiez l’adresse proposée.' %}"
+    data-found="{% trans 'Adresse trouvée.' %}">
+    {{ form.address.label_tag }}
+    <div class="input-group client-address-group">
+        {{ form.address }}
+        <button type="button" id="detect-location" class="btn btn-outline-primary"
+            title="{% trans 'Utiliser ma position actuelle' %}" aria-label="{% trans 'Utiliser ma position actuelle' %}"
+            aria-describedby="location-status">
+            <i class="bi bi-geo-alt-fill" id="location-icon" aria-hidden="true"></i>
+            <span id="location-spinner" class="spinner-border spinner-border-sm" aria-hidden="true" hidden></span>
+        </button>
     </div>
-    <div class="row g-2 mt-2">
-        <div class="col-12 col-md-4">{{ form.latitude.label_tag }}{{ form.latitude }}{{ form.latitude.errors }}</div>
-        <div class="col-12 col-md-4">{{ form.longitude.label_tag }}{{ form.longitude }}{{ form.longitude.errors }}</div>
-        <div class="col-12 col-md-4">{{ form.location_accuracy.label_tag }}{{ form.location_accuracy }}{{ form.location_accuracy.errors }}</div>
-    </div>
-    {{ form.formatted_address }}{{ form.formatted_address.errors }}
-    {{ form.place_id }}{{ form.place_id.errors }}
-    <a id="client-maps-link" class="btn btn-outline-secondary mt-2" href="{{ form.instance.maps_url|default:'#' }}" target="_blank" rel="noopener noreferrer" {% if not form.instance.maps_url %}hidden{% endif %}>{% trans 'Voir sur Maps' %}</a>
-</section>
+    {{ form.address.errors }}
+    <small id="location-status" class="d-block text-muted" role="status" aria-live="polite"></small>
+    {{ form.latitude }}{{ form.longitude }}{{ form.location_accuracy }}
+    {{ form.formatted_address }}{{ form.place_id }}
+    {% if form.latitude.errors or form.longitude.errors or form.location_accuracy.errors or form.formatted_address.errors or form.place_id.errors %}
+    <small class="text-danger" role="alert">{% trans 'Localisation invalide. Réessayez le bouton de localisation.' %}</small>
+    {% endif %}
+</div>

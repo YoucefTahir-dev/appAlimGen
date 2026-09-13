@@ -4,6 +4,15 @@ Toutes les modifications notables de ce projet seront documentées ici.
 
 ## [Non publié]
 
+### Clients : simplification de l'adresse GPS
+
+- Champ Adresse avec bouton GPS intégré, spinner et message discret ; suppression
+  du panneau technique et des boutons de confirmation du formulaire.
+- Coordonnées cachées, remplissage automatique éditable, sauvegarde uniquement
+  par Enregistrer et protection contre les réponses tardives pendant la saisie.
+- Service, API, validations, audit et modèle conservés ; aucune nouvelle migration.
+- Traductions FR/AR/EN et tests de non-régression web/mobile actualisés.
+
 ### Clients : localisation GPS facultative (phase 1, locale)
 
 - Coordonnées, précision, adresse détectée et identifiant Maps optionnels,

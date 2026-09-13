@@ -14,8 +14,7 @@
         <div class="row g-3">
             <div class="col-md-6">{{ form.name.label_tag }}{{ form.name }}{{ form.name.errors }}</div>
             <div class="col-md-6">{{ form.phone.label_tag }}{{ form.phone }}{{ form.phone.errors }}</div>
-            <div class="col-md-6">{{ form.address.label_tag }}{{ form.address }}{{ form.address.errors }}</div>
-            <div class="col-12">
+            <div class="col-md-6">
                 {% include 'inventory/_client_location.html' %}
             </div>
             <div class="col-md-6">{{ form.wilaya.label_tag }}{{ form.wilaya }}{{ form.wilaya.errors }}</div>

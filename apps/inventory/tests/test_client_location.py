@@ -43,6 +43,19 @@ class ClientLocationMigrationTests(TransactionTestCase):
 
 
 class ClientLocationTests(TestCase):
+    def test_web_location_fields_are_hidden_without_confirmation_section(self):
+        for field in ('latitude', 'longitude', 'location_accuracy', 'formatted_address', 'place_id'):
+            self.assertTrue(ClientForm().fields[field].widget.is_hidden)
+        existing = Client.objects.create(name='Existing location', latitude=36, longitude=3)
+        for url in (reverse('client_create'), reverse('client_update', args=[existing.pk])):
+            response = self.client.get(url)
+            self.assertContains(response, 'id="detect-location"')
+            self.assertContains(response, 'class="input-group client-address-group"')
+            self.assertNotContains(response, 'id="location-proposal"')
+            self.assertNotContains(response, 'id="confirm-location"')
+            self.assertNotContains(response, 'for="id_latitude"')
+            self.assertContains(response, 'type="hidden" name="latitude"')
+
     def setUp(self):
         cache.clear()
         self.user = get_user_model().objects.create_user(username='geo', role='manager')

@@ -293,3 +293,18 @@ msgstr "Add a customer"
 
 msgid "Modifier le client"
 msgstr "Edit customer"
+
+msgid "Localisation en cours…"
+msgstr "Finding your location…"
+
+msgid "Adresse automatique indisponible. Saisissez l’adresse manuellement."
+msgstr "Automatic address unavailable. Enter the address manually."
+
+msgid "Position GPS peu précise. Vérifiez l’adresse proposée."
+msgstr "GPS position is imprecise. Check the suggested address."
+
+msgid "Adresse trouvée."
+msgstr "Address found."
+
+msgid "Localisation invalide. Réessayez le bouton de localisation."
+msgstr "Invalid location. Try the location button again."

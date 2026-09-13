@@ -6,6 +6,23 @@
     --transition: 220ms ease;
 }
 
+.client-address-group { flex-wrap: nowrap; }
+.client-address-group > .form-control {
+    border-radius: 0;
+    border-start-start-radius: var(--bs-border-radius, .375rem);
+    border-end-start-radius: var(--bs-border-radius, .375rem);
+}
+.client-address-group > #detect-location {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 44px;
+    min-height: 44px;
+    margin: 0;
+    border-radius: 0;
+    border-start-end-radius: var(--bs-border-radius, .375rem);
+    border-end-end-radius: var(--bs-border-radius, .375rem);
+}
+
 @font-face {
     font-family: "Tajawal";
     src: local("Tajawal");

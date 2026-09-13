@@ -1,177 +1,152 @@
-# Localisation client — phase 1
+# Localisation client — champ Adresse simplifié
 
-## Audit et périmètre
+## Cause et correction
 
-Le modèle Client ne possédait que l'adresse texte et la wilaya. Aucun champ GPS,
-service de géocodage ou carte client n'était présent dans cette version.
-La politique HTTP désactivait la géolocalisation (`geolocation=()`).
-Les vues et l'API disposent déjà de permissions métier et d'un journal d'audit.
+L'implémentation précédente utilisait des widgets numériques visibles dans
+ClientForm, un encadré dans _client_location.html et un état de proposition
+dans client-location.js. Cet état imposait Confirmer / Conserver / Annuler.
 
-Développement initial sur `feature/client-geolocation`, sans publication en production.
-La publication vers main a ensuite été autorisée sous réserve de tests réussis.
-Les bases utilisées par les tests
-sont temporaires et isolées. L'adresse existante reste inchangée.
+Le formulaire présente désormais uniquement **Adresse [texte][📍]**, avec
+un petit message d'état. Le bouton a un titre et un nom accessible traduits.
+Le champ reste éditable ; aucun client n'est sauvegardé par la détection.
 
-## Modèles et migration
+## Fichiers concernés
 
-`apps/inventory/models.py` ajoute à Client cinq champs `null=True, blank=True` :
+- apps/inventory/forms.py : cinq widgets HiddenInput, mêmes validations.
+- apps/inventory/templates/inventory/client_form.html : bloc Adresse intégré
+  dans la grille existante, sans ligne complète réservée au GPS.
+- apps/inventory/templates/inventory/_client_location.html : input-group,
+  icône Bootstrap existante, spinner et message discret.
+- static/js/client-location.js : remplissage direct, aucune confirmation
+  supplémentaire, protection contre les réponses tardives.
+- static/css/styles.css : groupe sans retour à la ligne, bouton tactile 44 px
+  minimum, coins logiques compatibles LTR/RTL.
+- locale/{fr,ar,en}/LC_MESSAGES/django.po et django.mo : nouveaux messages.
+- apps/inventory/tests/test_client_location.py : régression des widgets cachés.
+- browser_tests/client_location.py : parcours actualisés et réponse tardive.
+- CHANGELOG.md et ce rapport.
 
-- latitude et longitude : FloatField, bornes -90/90 et -180/180 ;
-- location_accuracy : FloatField, mètres, valeur finie >= 0 ;
-- formatted_address : CharField de 1000 caractères ;
-- place_id : CharField de 255 caractères.
+Aucun changement du modèle, de la migration inventory.0014_client_location,
+du service de géocodage, des permissions ou du contrat API. Aucune nouvelle migration.
 
-`apps/inventory/migrations/0014_client_location.py` ajoute les colonnes, sans
-renommer, supprimer ni remplir les anciennes données. Aucune nouvelle table.
-Latitude et longitude doivent être renseignées ensemble. Une précision ne peut
-pas exister sans position. Les valeurs NaN et infinies sont rejetées.
-`apps/inventory/location.py` centralise validation et audit ; le modèle, le
-formulaire et l'API les réutilisent. Les mises à jour SQL directes/bulk ne passent
-pas par `Model.save` : elles doivent respecter ces validations si ajoutées plus tard.
+## Parcours exact
 
-## Formulaire et comportement
+1. À l'ouverture : aucun GPS ni appel fournisseur ; l'adresse existante reste intacte.
+2. Clic sur 📍 : spinner et message « Localisation en cours… », bouton désactivé.
+3. GPS navigateur : haute précision, timeout 15 s, maximumAge 30 s.
+4. POST vers l'endpoint interne avec CSRF.
+5. Succès : adresse automatiquement placée dans le champ, coordonnées et
+   métadonnées dans les champs cachés, spinner arrêté.
+6. L'utilisateur peut compléter/corriger le texte ; la position reste attachée.
+7. Seul le bouton habituel Enregistrer sauvegarde le client.
 
-Fichiers : `apps/inventory/forms.py`, `views.py`,
-`templates/inventory/client_form.html`, `_client_location.html`, `client_detail.html`,
-`static/js/client-location.js` (les chemins de templates sont sous apps/inventory).
+Les champs conservés sont latitude, longitude, location_accuracy,
+formatted_address et place_id. Aucun label, valeur numérique GPS ni bouton Maps
+n'est affiché dans le formulaire. La fiche de consultation et son lien Maps
+existants ne sont pas modifiés par cette correction.
 
-Le clic demande une position avec haute précision, délai de 15 secondes et
-position mise en cache par le navigateur au maximum 30 secondes. Aucune demande
-GPS ni appel Google à l'ouverture d'une fiche. Le navigateur conserve son propre
-consentement et peut ne pas redemander si une autorisation est déjà accordée.
+## Erreurs et concurrence
 
-La proposition ne remplit pas les champs enregistrés avant confirmation :
+- Refus, timeout, navigateur incompatible, position indisponible : petit message,
+  pas de remplacement de l'adresse ni des anciennes coordonnées.
+- Géocodage absent, clé non configurée, réponse vide ou panne réseau :
+  « Adresse automatique indisponible. Saisissez l’adresse manuellement. »
+  L'adresse existante est conservée et le GPS obtenu est préparé en champs cachés.
+- Une adresse détectée trop longue pour le champ historique n'est ni tronquée
+  ni substituée par des coordonnées ; saisie manuelle disponible.
+- Précision > 100 m : avertissement textuel sans valeur numérique, non bloquant.
+- Si l'utilisateur saisit une adresse ou soumet le formulaire pendant une recherche,
+  celle-ci est invalidée ; une réponse tardive ne remplace pas sa saisie.
+- Aucune boucle de permission, aucun appel automatique à l'ouverture et aucun
+  enregistrement automatique. Aucun appel externe ajouté.
 
-- Confirmer cette adresse : coordonnées et adresse détectée reprises ;
-- Conserver le GPS et modifier manuellement : coordonnées reprises, adresse
-  manuelle préservée ;
-- Annuler : aucune modification de la localisation précédente.
+## Backend conservé
 
-Il faut ensuite enregistrer le formulaire. Une proposition en attente bloque
-la soumission pour éviter un enregistrement ambigu. La précision > 100 m affiche
-un avertissement non bloquant. Refus, indisponibilité, délai dépassé, HTTP non
-sécurisé ou navigateur incompatible permettent toujours une saisie manuelle.
-Si l'adresse détectée dépasse les 255 caractères du champ historique, elle reste
-dans formatted_address ; l'utilisateur garde le GPS et adapte le texte manuellement.
+POST /inventory/clients/reverse-geocode/ reçoit latitude/longitude et retourne
+formatted_address/place_id. Il ne modifie jamais un client. Authentification de
+session, CSRF, permission add_client OU change_client et limite d'appels restent
+actifs. Les écritures client restent soumises à leurs permissions normales.
 
-La fiche et le formulaire proposent un lien Google Maps basé sur les coordonnées,
-y compris 0,0. Modifier manuellement les coordonnées dans le formulaire efface
-les métadonnées de la précédente détection. L'API efface les métadonnées omises
-lorsqu'une position existante change, sans toucher à address.
+GeocodingService réutilise GoogleGeocoder côté serveur. Un fournisseur alternatif
+peut toujours être injecté. La clé n'est pas transmise dans le JavaScript.
 
-## Service et endpoints
+L'API /api/v1/clients/ conserve les champs facultatifs et les validations :
+coordonnées finies, latitude -90/90, longitude -180/180, précision >= 0,
+latitude/longitude ensemble et longueurs limitées. HiddenInput ne dispense jamais
+de ces contrôles. L'audit de localisation existant est conservé.
 
-- `apps/inventory/geocoding.py` : GeocodingService avec fournisseur injecté ;
-  GoogleGeocoder est le fournisseur par défaut, remplaçable ultérieurement.
-- `POST /inventory/clients/reverse-geocode/` : champs latitude/longitude,
-  session authentifiée, CSRF et permission add_client OU change_client.
-  Renvoie formatted_address/place_id, mais ne sauvegarde jamais de client.
-  HTTP 400 si coordonnées invalides, 429 si limite atteinte, 503 si service absent
-  ou indisponible. Aucune erreur fournisseur ou clé privée renvoyée au navigateur.
-- API existante `/api/v1/clients/` : champs optionnels ajoutés via ClientSerializer,
-  mêmes permissions create/update/partial_update qu'avant. Les anciennes requêtes
-  sans champs GPS restent compatibles ; PATCH adresse seule garde la localisation.
-- `apps/api/views.py` et `apps/api/serializers.py` : validation et audit dédiés.
+## Configuration inchangée
 
-Audit dans AuditLog existant : identifiant client, anciennes/nouvelles coordonnées,
-utilisateur et date. Les coordonnées sont sensibles : limiter l'accès et définir
-la rétention des journaux. Pas de clé API journalisée.
+GOOGLE_MAPS_API_KEY : clé serveur facultative ; pas de clé en dur, aucun appel
+Google réel dans les tests. Sans clé, GPS caché et adresse manuelle restent possibles.
 
-## Configuration
+PERMISSIONS_POLICY : doit autoriser geolocation=(self). HTTPS requis hors
+localhost. La configuration Render n'est pas modifiée par cette branche.
+Conserver les restrictions API/IP adaptées à la clé serveur et les quotas Google.
+Le cache local de limitation existant n'est pas partagé entre workers.
 
-`.env.example` et `gestio_stock/settings.py` documentent :
+## Tests
 
-```dotenv
-GOOGLE_MAPS_API_KEY=
-PERMISSIONS_POLICY=camera=(), microphone=(), geolocation=(self), payment=()
-```
+Les tests backend existants couvrent les clients sans GPS, valeurs invalides,
+API, permissions, CSRF, migration additive et conservation des données historiques.
 
-La clé est uniquement côté serveur, jamais dans les templates ou le JavaScript.
-La laisser vide désactive les appels Google, pas le GPS ni la saisie manuelle.
-Pour staging : activer Geocoding API, limiter la clé à cette API et aux IP de sortie
-du serveur si disponibles. Les restrictions par référent HTTP concernent une
-future clé navigateur Maps, à séparer de cette clé serveur. Définir quotas et
-alertes de facturation dans Google Cloud. Ne jamais transmettre une vraie clé dans Git.
+Le navigateur teste :
+- FR/AR/EN sur largeur mobile 390 px, champ unique et coordonnées cachées ;
+- remplissage automatique, absence de POST de sauvegarde avant Enregistrer ;
+- correction manuelle, sauvegarde, réouverture et nouvelle détection en modification ;
+- refus, indisponibilité, timeout et navigateur non compatible ;
+- géocodage échoué avec conservation de l'adresse ;
+- saisie et soumission pendant une recherche GPS, réponse tardive ignorée.
 
-Les appels utilisent l'[API officielle de géocodage inverse](https://developers.google.com/maps/documentation/geocoding/guides-v3/requests-reverse-geocoding).
-Vérifier les conditions Google applicables au stockage et à l'utilisation des
-adresses retournées avant activation réelle. Aucun appel Google réel durant les tests.
+Les fournisseurs sont simulés : tests gratuits, déterministes, sans données réelles.
+Les captures sont dans tmp/client-location/simple-{fr,ar,en}.png, ignorées par Git.
 
-Limite applicative de 30 appels par utilisateur/minute dans le cache Django,
-sans stockage de réponses Google. Le cache local par défaut n'est pas partagé
-entre workers : un cache partagé et les quotas Google sont nécessaires pour
-un plafond global en production. Timeout serveur 5 s, timeout fetch 8 s.
+Résultats locaux du 13 septembre 2026 : suite complète **225 tests exécutés,
+224 réussis, un ignoré** (test de concurrence réservé à PostgreSQL), en 355,2 s.
+Les contrôles Django, compileall, collectstatic, validation OpenAPI et
+makemigrations --check --dry-run passent. Aucune migration nouvelle détectée.
+Trois parcours navigateur passent sur Edge/Playwright local (FR/AR/EN, erreurs,
+saisie concurrente), sans appel Google réel. Le contrôle visuel confirme le
+champ unique et le placement du bouton à gauche en RTL et à droite en LTR.
+Le scénario de faible précision vérifie l'absence de valeur numérique affichée.
 
-Si Render/staging définit déjà `PERMISSIONS_POLICY` avec `geolocation=()`, cette
-variable reste prioritaire : la mettre à jour avant la recette. Le navigateur
-doit utiliser HTTPS (localhost est admis en local). Ne pas activer geolocation=*.
+Le contrôle en lecture seule de l'ancienne version Render confirme HTTPS,
+HTTP 200 et geolocation=(self). Il ne constitue pas une validation du nouveau
+formulaire en production. Les erreurs HTTP 503 des logs de test correspondent
+au fournisseur volontairement simulé en panne ; le favicon 404 préexistant est
+sans rapport avec cette correction. La suite émet également un avertissement
+JWT sur une clé courte utilisée par les fixtures de test, hors de ce changement.
 
-## Tests et reproduction locale
-
-Les catalogues `locale/{fr,ar,en}/LC_MESSAGES/django.po` et `.mo` contiennent
-les nouveaux libellés. Le contrôle visuel a également conduit à traduire les
-titres Ajouter un client / Modifier le client et Notes, auparavant manquants.
-`CHANGELOG.md` résume cette évolution.
-
-`apps/inventory/tests/test_client_location.py` couvre modèle/formulaire/API,
-clients sans GPS, bornes, NaN/infini, précision, modification et nettoyage des
-métadonnées, audit, RBAC, CSRF, limite d'appels, fournisseur absent/erreur/succès.
-
-`browser_tests/client_location.py` couvre le parcours mobile FR/AR/EN, confirmation,
-annulation, sauvegarde et réouverture, lien Maps, refus/timeout/indisponibilité,
-navigateur incompatible et géocodage échoué avec conservation de l'adresse.
-La localisation navigateur et Google sont simulés. Playwright/Edge est une
-dépendance locale de test, non ajoutée aux dépendances de production.
-
-Résultats locaux du 12 septembre 2026 :
-
-- neuf tests backend de géolocalisation réussis ;
-- avant publication : test supplémentaire de migration préservant un client
-  historique, son adresse, téléphone, solde et tarif ; 12 tests ciblés réussis
-  avec la géolocalisation et l'i18n ;
-- suite Django complète : **223 tests, 222 réussis et un ignoré** (concurrence
-  réservée à PostgreSQL), durée 316,7 secondes ;
-- deux tests navigateur réussis, incluant FR/AR/EN et scénarios d'erreur ;
-- après les dernières traductions, nouvelle exécution : 11 tests ciblés
-  géolocalisation/i18n réussis et deux tests navigateur réussis en 92,2 secondes ;
-- `check`, vérification des migrations, compilation Python, collecte des fichiers
-  statiques et validation du contrat OpenAPI réussis ;
-- migration appliquée automatiquement uniquement aux bases temporaires de tests ;
-- captures `tmp/client-location/proposal-{fr,ar,en}.png` ; aucune barre horizontale
-  de page dans le scénario mobile à 390 px, boutons accessibles et RTL arabe.
-
-La première exécution navigateur avait échoué dans le test lui-même : lecture ORM
-synchrone à l'intérieur du contexte Playwright. Les assertions base sont désormais
-faites après sa fermeture ; l'application n'a pas été modifiée pour masquer l'erreur.
-Le HTTP 503 est volontaire dans le scénario fournisseur indisponible.
+Commandes locales, en base de tests isolée :
 
 ```powershell
 $env:DATABASE_URL = ''
 $env:DATABASE_ENGINE = 'sqlite'
 $env:DJANGO_DEBUG = 'True'
 .\.venv\Scripts\python.exe manage.py collectstatic --noinput
-.\.venv\Scripts\python.exe manage.py test apps.inventory.tests.test_client_location --noinput
-.\.venv\Scripts\python.exe manage.py test browser_tests.client_location --noinput
 .\.venv\Scripts\python.exe manage.py test --noinput
+.\.venv\Scripts\python.exe manage.py test browser_tests.client_location --noinput
 ```
 
-## Recette Android HTTPS à réaliser
+## Recette staging Android restant à effectuer
 
-1. Préparer une branche/service staging et une base indépendante, jamais Neon production.
-2. Sauvegarder la base staging puis appliquer les migrations dans cet environnement.
-3. Configurer éventuellement la clé serveur et Permissions-Policy ci-dessus.
-4. Sur Android physique, ouvrir l'URL HTTPS staging, se connecter et ouvrir Nouveau client.
-5. Saisir une adresse manuelle, demander le GPS et accepter la permission.
-6. Vérifier coordonnées, précision et adresse proposée ; confirmer puis enregistrer.
-7. Rouvrir le client, vérifier les données, ouvrir Voir sur Maps.
-8. Refaire avec refus GPS, localisation désactivée, annulation et géocodage sans clé.
-9. Vérifier qu'un utilisateur sans modification client ne peut changer ses coordonnées.
-10. Vérifier console navigateur et logs serveur, sans exposer clés ni données clients.
+1. Disposer d'un service HTTPS et d'une base staging indépendants.
+2. Y publier cette branche après autorisation adaptée, jamais sur Render production.
+3. Configurer éventuellement la clé de géocodage et vérifier Permissions-Policy.
+4. Sur Android Chrome : ouvrir Nouveau client, vérifier Adresse + 📍 sans champs GPS.
+5. Saisir puis effacer une adresse, cliquer 📍 et accepter la permission.
+6. Vérifier le remplissage, corriger quelques mots, enregistrer puis rouvrir le client.
+7. Refaire en refusant le GPS et sans fournisseur configuré ; la saisie reste possible.
+8. Vérifier les logs et la console sans divulguer clé ni coordonnées réelles.
 
-## Réserves et phase suivante
+Aucun Android physique ou staging HTTPS n'est accessible dans cette session :
+ces tests réels ne sont pas revendiqués comme réalisés. Le navigateur automatisé
+local ne les remplace pas. Pas de carte interactive ni d'autocomplete dans cette phase.
 
-Aucun Android physique, clé Google réelle ou staging HTTPS dédié n'a été utilisé.
-La recette terrain et la compatibilité effective PostgreSQL restent à valider.
-La recherche Maps, l'autocomplete, la carte interactive et le marqueur déplaçable
-sont volontairement réservés à la deuxième phase, après validation de celle-ci.
-Pas de tournées, zones ou calcul d'itinéraires ajoutés.
+## Publication
+
+Branche fix/client-location-simple-ux. Aucune fusion vers main, aucun push,
+déploiement ou migration de production dans cette intervention.
+Commit local autorisé après une nouvelle vérification : 13 tests ciblés réussis
+et trois tests navigateur réussis en 102,5 secondes. Le test Android physique
+sur staging HTTPS reste à réaliser ; il n'est pas remplacé par ces simulations.

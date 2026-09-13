@@ -195,3 +195,18 @@ msgstr "Ajouter un client"
 
 msgid "Modifier le client"
 msgstr "Modifier le client"
+
+msgid "Localisation en cours…"
+msgstr "Localisation en cours…"
+
+msgid "Adresse automatique indisponible. Saisissez l’adresse manuellement."
+msgstr "Adresse automatique indisponible. Saisissez l’adresse manuellement."
+
+msgid "Position GPS peu précise. Vérifiez l’adresse proposée."
+msgstr "Position GPS peu précise. Vérifiez l’adresse proposée."
+
+msgid "Adresse trouvée."
+msgstr "Adresse trouvée."
+
+msgid "Localisation invalide. Réessayez le bouton de localisation."
+msgstr "Localisation invalide. Réessayez le bouton de localisation."

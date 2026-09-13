@@ -1173,3 +1173,18 @@ msgstr "إضافة عميل"
 
 msgid "Modifier le client"
 msgstr "تعديل العميل"
+
+msgid "Localisation en cours…"
+msgstr "جارٍ تحديد موقعك…"
+
+msgid "Adresse automatique indisponible. Saisissez l’adresse manuellement."
+msgstr "العنوان التلقائي غير متاح. أدخل العنوان يدويًا."
+
+msgid "Position GPS peu précise. Vérifiez l’adresse proposée."
+msgstr "الموقع غير دقيق. تحقق من العنوان المقترح."
+
+msgid "Adresse trouvée."
+msgstr "تم العثور على العنوان."
+
+msgid "Localisation invalide. Réessayez le bouton de localisation."
+msgstr "الموقع غير صالح. أعد المحاولة باستخدام زر تحديد الموقع."
