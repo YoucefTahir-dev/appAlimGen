@@ -1,6 +1,5 @@
 from django.contrib import messages
 from django.core.exceptions import ValidationError
-from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext as _
 
@@ -55,11 +54,10 @@ def printer_test(request, pk):
     except ValidationError as exc:
         messages.error(request, ' '.join(exc.messages))
         return redirect('printer_update', pk=printer.pk)
-    response = HttpResponse(result.payload, content_type='application/octet-stream')
-    response['Content-Disposition'] = f'attachment; filename="printer-test-{printer.pk}.bin"'
-    response['X-Printer-Protocol'] = result.protocol
-    response['X-Arabic-Raster-Recommendation'] = 'true' if result.raster_arabic_recommended else 'false'
-    return response
+    return render(request, 'printing/printer_test.html', {
+        'printer': printer,
+        'test_protocol': result.protocol,
+    })
 
 
 @permission_required('printing.change_printerprofile')

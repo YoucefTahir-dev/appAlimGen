@@ -64,7 +64,7 @@ class PrinterDomainTests(TestCase):
         self.assertEqual(result.protocol, 'rpp02n_diagnostic')
         self.assertTrue(result.payload.startswith(b'\x1b\x40'))
 
-    def test_web_test_downloads_rpp02n_payload_with_custom_protocol(self):
+    def test_web_test_opens_printable_rpp02n_page_with_custom_protocol(self):
         admin = User.objects.create_superuser(username='printer-web-admin', password='StrongPass123!')
         printer = self.printer(
             model_name='thermal printer',
@@ -78,9 +78,10 @@ class PrinterDomainTests(TestCase):
         response = self.client.get(reverse('printer_test', args=[printer.pk]))
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response['Content-Type'], 'application/octet-stream')
-        self.assertEqual(response['X-Printer-Protocol'], 'rpp02n_diagnostic')
-        self.assertTrue(response.content.startswith(b'\x1b\x40'))
+        self.assertTemplateUsed(response, 'printing/printer_test.html')
+        self.assertContains(response, 'RPP02N')
+        self.assertContains(response, 'rpp02n_diagnostic')
+        self.assertContains(response, 'window.print()')
 
     def test_web_test_redirects_instead_of_500_for_unsupported_protocol(self):
         admin = User.objects.create_superuser(username='unsupported-web-admin', password='StrongPass123!')

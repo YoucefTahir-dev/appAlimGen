@@ -1,0 +1,82 @@
+{% load i18n %}
+<!doctype html>
+<html lang="{{ LANGUAGE_CODE|default:'fr' }}" dir="{% if LANGUAGE_CODE == 'ar' %}rtl{% else %}ltr{% endif %}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% trans "Test imprimante" %} — {{ printer.name }}</title>
+    <style>
+        :root { color-scheme: light; }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            background: #f1f3f5;
+            color: #000;
+            font-family: Arial, "Noto Sans Arabic", sans-serif;
+        }
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .6rem;
+            justify-content: center;
+            padding: 1rem;
+        }
+        button, a {
+            border: 1px solid #198754;
+            border-radius: .35rem;
+            padding: .65rem 1rem;
+            background: #198754;
+            color: #fff;
+            font: inherit;
+            text-decoration: none;
+        }
+        a { border-color: #6c757d; background: #6c757d; }
+        .ticket {
+            width: {{ printer.paper_width }}mm;
+            min-height: 80mm;
+            margin: 0 auto 1rem;
+            padding: 3mm;
+            background: #fff;
+            text-align: center;
+            font-family: "Courier New", "Noto Sans Arabic", monospace;
+            overflow-wrap: anywhere;
+        }
+        .ticket h1 { margin: 0 0 2mm; font-size: 16px; }
+        .ticket p { margin: 1.5mm 0; font-size: 12px; }
+        .separator { border-top: 1px dashed #000; margin: 2mm 0; }
+        .arabic { direction: rtl; font-family: "Noto Sans Arabic", Arial, sans-serif; }
+        @page { size: {{ printer.paper_width }}mm auto; margin: 2mm; }
+        @media print {
+            body { background: #fff; }
+            .controls { display: none !important; }
+            .ticket { width: 100%; min-height: 0; margin: 0; padding: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <button type="button" onclick="window.print()">{% trans "Imprimer" %}</button>
+        <a href="{% url 'printer_list' %}">{% trans "Retour" %}</a>
+    </div>
+    <main class="ticket" aria-label="{% trans 'Test imprimante' %}">
+        <h1>EL AMINE ERP</h1>
+        <p><strong>{% trans "Test imprimante" %}</strong></p>
+        <div class="separator"></div>
+        <p>{{ printer.name }}</p>
+        <p>{{ printer.bluetooth_name|default:printer.model_name }}</p>
+        <p>{{ printer.paper_width }} mm — {{ printer.characters_per_line }} caractères</p>
+        <p>ABCDEFGHIJKLMNOPQRSTUVWXYZ</p>
+        <p>0123456789</p>
+        <p>Français : test d’impression</p>
+        <p class="arabic" lang="ar">العربية: اختبار الطباعة</p>
+        <div class="separator"></div>
+        <p>{{ test_protocol }}</p>
+        <p>{% now "Y-m-d H:i:s" %}</p>
+    </main>
+    <script>
+        window.addEventListener('load', function () {
+            window.setTimeout(function () { window.print(); }, 300);
+        });
+    </script>
+</body>
+</html>
