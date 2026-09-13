@@ -4,6 +4,15 @@ Toutes les modifications notables de ce projet seront documentées ici.
 
 ## [Non publié]
 
+### Clients : sélection d'une position suffisamment précise
+
+- Suivi GPS limité à 12 secondes ; meilleure mesure retenue et un seul appel
+  de géocodage. Acceptation immédiate à 50 m, recours jusqu'à 100 m à l'échéance.
+- Position trop approximative refusée sans modifier l'adresse ni les coordonnées.
+- Arrêt du suivi à la saisie, soumission, sortie et fin de recherche.
+- Sélection d'une adresse Google proche et détaillée si disponible ; messages
+  FR/AR/EN et tests des mesures successives. Voir GPS_ACCURACY.md.
+
 ### Clients : diagnostic du géocodage et position fraîche
 
 - Position navigateur demandée sans réutilisation du cache GPS (maximumAge=0).

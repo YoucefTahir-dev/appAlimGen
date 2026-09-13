@@ -1197,3 +1197,11 @@ msgstr "تعذر الحصول على موقعك الحالي."
 
 msgid "Votre position a été détectée, mais l’adresse n’a pas pu être récupérée."
 msgstr "تم تحديد موقعك، لكن تعذر استرجاع العنوان."
+msgid "Recherche d’une position précise…"
+msgstr "جارٍ البحث عن موقع دقيق…"
+
+msgid "La localisation reçue est approximative. Vérifiez que la position précise est autorisée pour votre navigateur, puis réessayez ou saisissez l’adresse manuellement."
+msgstr "الموقع المستلم تقريبي. تحقق من السماح للمُتصفح باستخدام الموقع الدقيق، ثم أعد المحاولة أو أدخل العنوان يدويًا."
+
+msgid "Adresse détectée. Vérifiez l’adresse proposée."
+msgstr "تم تحديد العنوان. تحقق من العنوان المقترح."

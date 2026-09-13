@@ -317,3 +317,11 @@ msgstr "Unable to retrieve your current location."
 
 msgid "Votre position a été détectée, mais l’adresse n’a pas pu être récupérée."
 msgstr "Your location was detected, but the address could not be retrieved."
+msgid "Recherche d’une position précise…"
+msgstr "Searching for a precise location…"
+
+msgid "La localisation reçue est approximative. Vérifiez que la position précise est autorisée pour votre navigateur, puis réessayez ou saisissez l’adresse manuellement."
+msgstr "The received location is approximate. Check that precise location is allowed for your browser, then retry or enter the address manually."
+
+msgid "Adresse détectée. Vérifiez l’adresse proposée."
+msgstr "Address detected. Check the suggested address."

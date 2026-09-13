@@ -13,6 +13,13 @@
     let busy = false;
     let controller = null;
     let gpsTimer = null;
+    let watchId = null;
+
+    function stopGPS() {
+        clearTimeout(gpsTimer);
+        if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+    }
 
     function finish() {
         revision++;
@@ -21,7 +28,7 @@
         button.removeAttribute('aria-busy');
         spinner.hidden = true;
         icon.hidden = false;
-        clearTimeout(gpsTimer);
+        stopGPS();
         if (controller) controller.abort();
         controller = null;
     }
@@ -31,6 +38,7 @@
         status.textContent = '';
     });
     form.addEventListener('submit', finish);
+    window.addEventListener('pagehide', finish);
 
     button.addEventListener('click', function () {
         if (busy) return;
@@ -50,9 +58,18 @@
             status.textContent = ({1: panel.dataset.denied, 2: panel.dataset.unavailable, 3: panel.dataset.timeout})[error.code] || panel.dataset.unavailable;
             finish();
         };
-        gpsTimer = setTimeout(() => failure({code: 3}), 16000);
-        try {
-            navigator.geolocation.getCurrentPosition(async position => {
+        let bestPosition = null;
+        let selected = false;
+        const selectPosition = async () => {
+                if (selected || current !== revision) return;
+                selected = true;
+                stopGPS();
+                if (!bestPosition || bestPosition.coords.accuracy > 100) {
+                    status.textContent = bestPosition ? panel.dataset.imprecise : panel.dataset.timeout;
+                    finish();
+                    return;
+                }
+                const position = bestPosition;
                 if (current !== revision) return;
                 clearTimeout(gpsTimer);
                 const {latitude, longitude, accuracy} = position.coords;
@@ -86,9 +103,25 @@
                 if (current !== revision) return;
                 Object.entries(location).forEach(([name, value]) => { field(name).value = value; });
                 if (detected) address.value = detected;
-                status.textContent = detected ? (accuracy > 100 ? panel.dataset.weak : panel.dataset.found) : panel.dataset.fallback;
+                status.textContent = detected ? (accuracy > 50 ? panel.dataset.weak : panel.dataset.found) : panel.dataset.fallback;
                 finish();
-            }, failure, {enableHighAccuracy: true, timeout: 15000, maximumAge: 0});
+        };
+        gpsTimer = setTimeout(selectPosition, 12000);
+        try {
+            const id = navigator.geolocation.watchPosition(position => {
+                if (selected || current !== revision) return;
+                const {latitude, longitude, accuracy} = position.coords;
+                if (![latitude, longitude, accuracy].every(Number.isFinite)
+                    || Math.abs(latitude) > 90 || Math.abs(longitude) > 180 || accuracy < 0) return;
+                if (!bestPosition || accuracy < bestPosition.coords.accuracy) bestPosition = position;
+                if (accuracy <= 50) selectPosition();
+            }, error => {
+                if (selected || current !== revision) return;
+                if (error.code === 1) failure(error);
+                // Transient unavailability/timeout may be followed by a better fix.
+            }, {enableHighAccuracy: true, timeout: 12000, maximumAge: 0});
+            if (selected || current !== revision) navigator.geolocation.clearWatch(id);
+            else watchId = id;
         } catch (_error) {
             failure({code: 2});
         }

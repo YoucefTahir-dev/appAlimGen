@@ -11,6 +11,24 @@ from apps.inventory.geocoding import GeocodingService, GeocodingUnavailable
 
 @override_settings(GOOGLE_MAPS_API_KEY='private-test-key')
 class GeocodingDiagnosticsTests(SimpleTestCase):
+    def test_nearby_street_preferred_to_city_without_extra_request(self):
+        results = [
+            {'formatted_address': 'City', 'types': ['locality']},
+            {'formatted_address': 'Far street', 'types': ['street_address'],
+             'geometry': {'location': {'lat': 40, 'lng': 3}}},
+            {'formatted_address': 'Nearby street', 'types': ['street_address'],
+             'geometry': {'location': {'lat': 36.00001, 'lng': 3}, 'location_type': 'ROOFTOP'}},
+        ]
+        with patch('apps.inventory.geocoding.urlopen', return_value=self.response({'status': 'OK', 'results': results})) as request:
+            self.assertEqual(GeocodingService().reverse_geocode(36, 3)['formatted_address'], 'Nearby street')
+            request.assert_called_once()
+
+    def test_unusable_geometry_keeps_provider_order(self):
+        results = [{'formatted_address': 'Provider first'},
+                   {'formatted_address': 'Bad geometry', 'types': ['street_address'], 'geometry': {'location': {'lat': 'secret', 'lng': 3}}}]
+        with patch('apps.inventory.geocoding.urlopen', return_value=self.response({'status': 'OK', 'results': results})):
+            self.assertEqual(GeocodingService().reverse_geocode(36, 3)['formatted_address'], 'Provider first')
+
     def response(self, payload, status=200):
         response = MagicMock()
         response.status = status

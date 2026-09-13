@@ -23,6 +23,29 @@ from apps.inventory.geocoding import GeocodingUnavailable
     },
 )
 class ClientLocationBrowserTests(StaticLiveServerTestCase):
+    def test_poor_accuracy_preserves_existing_location_in_three_languages(self):
+        with sync_playwright() as playwright, patch('apps.inventory.views.GeocodingService.reverse_geocode') as provider:
+            browser = playwright.chromium.launch(channel=os.getenv('PLAYWRIGHT_CHANNEL', 'msedge'))
+            try:
+                for language in ('fr', 'ar', 'en'):
+                    context = self.context(browser, language, width=1366)
+                    context.set_geolocation({'latitude': 36, 'longitude': 3, 'accuracy': 1332})
+                    page = context.new_page()
+                    page.goto(self.live_server_url + '/inventory/clients/new/')
+                    page.locator('#id_address').fill('Adresse existante')
+                    page.evaluate("document.getElementById('id_latitude').value = '35'")
+                    page.locator('#detect-location').click()
+                    expect(page.locator('#location-status')).to_have_text(
+                        page.locator('#client-location').get_attribute('data-imprecise'), timeout=18000)
+                    expect(page.locator('#id_address')).to_have_value('Adresse existante')
+                    expect(page.locator('#id_latitude')).to_have_value('35')
+                    expect(page.locator('#detect-location')).to_be_enabled()
+                    self.assertFalse(page.locator('#location-status').inner_text().endswith('1332'))
+                    provider.assert_not_called()
+                    context.close()
+            finally:
+                browser.close()
+
     def test_manual_input_and_submit_ignore_late_gps(self):
         with sync_playwright() as playwright, patch('apps.inventory.views.GeocodingService.reverse_geocode') as provider:
             browser = playwright.chromium.launch(channel=os.getenv('PLAYWRIGHT_CHANNEL', 'msedge'))
@@ -31,7 +54,8 @@ class ClientLocationBrowserTests(StaticLiveServerTestCase):
                 context.add_init_script("""
                     window.gpsCalls = 0;
                     Object.defineProperty(navigator, 'geolocation', {value: {
-                        getCurrentPosition: (ok, fail, options) => { window.gpsCalls++; window.gpsOptions = options; window.delayedGPS = ok; }
+                        watchPosition: (ok, fail, options) => { window.gpsCalls++; window.gpsOptions = options; window.delayedGPS = ok; return 1; },
+                        clearWatch: () => {}
                     }});
                 """)
                 page = context.new_page()
@@ -81,7 +105,7 @@ class ClientLocationBrowserTests(StaticLiveServerTestCase):
                 for language in ('fr', 'ar', 'en'):
                     context = self.context(browser, language)
                     if language == 'en':
-                        context.set_geolocation({'latitude': 36.3745, 'longitude': 3.9012, 'accuracy': 180})
+                        context.set_geolocation({'latitude': 36.3745, 'longitude': 3.9012, 'accuracy': 80})
                     page = context.new_page()
                     errors = []
                     writes = []
@@ -99,7 +123,7 @@ class ClientLocationBrowserTests(StaticLiveServerTestCase):
                         expect(page.locator('#id_' + field)).not_to_be_visible()
                     expect(page.locator('#location-proposal')).to_have_count(0)
                     page.locator('#detect-location').click()
-                    expect(page.locator('#id_address')).to_have_value('Bouira, Algérie')
+                    expect(page.locator('#id_address')).to_have_value('Bouira, Algérie', timeout=18000)
                     expect(page.locator('#detect-location')).to_be_enabled()
                     if language == 'en':
                         expect(page.locator('#location-status')).to_have_text(page.locator('#client-location').get_attribute('data-weak'))
@@ -121,7 +145,7 @@ class ClientLocationBrowserTests(StaticLiveServerTestCase):
                     expect(page.locator('#id_latitude')).not_to_be_visible()
                     expect(page.locator('#id_address')).to_have_value('Magasin Ahmed, Bouira')
                     page.locator('#detect-location').click()
-                    expect(page.locator('#id_address')).to_have_value('Bouira, Algérie')
+                    expect(page.locator('#id_address')).to_have_value('Bouira, Algérie', timeout=18000)
                     self.assertEqual(len(writes), 1)
                     page.locator('#id_address').fill('Adresse corrigée ' + language)
                     page.locator('#client-form .form-actions button').click()
@@ -133,7 +157,7 @@ class ClientLocationBrowserTests(StaticLiveServerTestCase):
         for language in ('fr', 'ar', 'en'):
             customer = Client.objects.get(name='GPS ' + language)
             self.assertEqual(customer.latitude, 36.3745)
-            self.assertEqual(customer.location_accuracy, 180 if language == 'en' else 12)
+            self.assertEqual(customer.location_accuracy, 80 if language == 'en' else 12)
             self.assertEqual(customer.place_id, 'mock-place')
             self.assertEqual(customer.address, 'Adresse corrigée ' + language)
 
@@ -141,21 +165,21 @@ class ClientLocationBrowserTests(StaticLiveServerTestCase):
         with sync_playwright() as playwright, patch('apps.inventory.views.GeocodingService.reverse_geocode', side_effect=GeocodingUnavailable):
             browser = playwright.chromium.launch(channel=os.getenv('PLAYWRIGHT_CHANNEL', 'msedge'))
             try:
-                for code, key in ((1, 'denied'), (2, 'unavailable'), (3, 'timeout'), (0, 'unsupported')):
+                for code, key in ((1, 'denied'), (2, 'timeout'), (3, 'timeout'), (0, 'unsupported')):
                     context = self.context(browser)
-                    script = "Object.defineProperty(navigator, 'geolocation', {value: undefined});" if not code else f"Object.defineProperty(navigator, 'geolocation', {{value: {{getCurrentPosition: (ok, fail) => fail({{code:{code}}})}}}});"
+                    script = "Object.defineProperty(navigator, 'geolocation', {value: undefined});" if not code else f"Object.defineProperty(navigator, 'geolocation', {{value: {{watchPosition: (ok, fail) => {{fail({{code:{code}}}); return 1;}}, clearWatch: () => {{}}}}}});"
                     context.add_init_script(script)
                     page = context.new_page()
                     page.goto(self.live_server_url + '/inventory/clients/new/')
                     page.locator('#id_address').fill('Manuel')
                     page.locator('#detect-location').click()
                     message = page.locator('#client-location').get_attribute('data-' + key)
-                    expect(page.locator('#location-status')).to_have_text(message)
+                    expect(page.locator('#location-status')).to_have_text(message, timeout=18000)
                     expect(page.locator('#id_address')).to_have_value('Manuel')
                     expect(page.locator('#id_latitude')).to_have_value('')
                     context.close()
                 context = self.context(browser, width=1366)
-                context.set_geolocation({'latitude': 36.3745, 'longitude': 3.9012, 'accuracy': 180})
+                context.set_geolocation({'latitude': 36.3745, 'longitude': 3.9012, 'accuracy': 12})
                 page = context.new_page()
                 page.goto(self.live_server_url + '/inventory/clients/new/')
                 page.locator('#id_name').fill('GPS fallback')
@@ -172,4 +196,4 @@ class ClientLocationBrowserTests(StaticLiveServerTestCase):
                 browser.close()
         customer = Client.objects.get(name='GPS fallback')
         self.assertEqual(customer.address, 'Manuel')
-        self.assertEqual(customer.location_accuracy, 180)
+        self.assertEqual(customer.location_accuracy, 12)

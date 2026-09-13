@@ -1,6 +1,7 @@
 """Server-side reverse geocoding with safe, actionable diagnostics."""
 import json
 import logging
+from math import asin, cos, isfinite, radians, sin, sqrt
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import urlopen
@@ -45,6 +46,37 @@ def denial_reason(payload):
 
 
 class GoogleGeocoder:
+    @staticmethod
+    def select_result(results, latitude, longitude):
+        # Prefer a nearby street/building over broad political or postal results.
+        # Geometry describes the address, not the accuracy of the user's GPS fix.
+        candidates = []
+        for index, result in enumerate(results):
+            if not isinstance(result, dict):
+                continue
+            types = result.get('types', [])
+            if not isinstance(types, list) or not any(t in types for t in ('street_address', 'premise', 'subpremise')):
+                continue
+            geometry = result.get('geometry')
+            if not isinstance(geometry, dict):
+                continue
+            location = geometry.get('location')
+            if not isinstance(location, dict):
+                continue
+            lat, lng = location.get('lat'), location.get('lng')
+            if not all(isinstance(v, (int, float)) and not isinstance(v, bool) and isfinite(v) for v in (lat, lng)):
+                continue
+            if abs(lat) > 90 or abs(lng) > 180:
+                continue
+            address = result.get('formatted_address')
+            if not isinstance(address, str) or not address.strip():
+                continue
+            a = sin(radians(lat - float(latitude)) / 2) ** 2 + cos(radians(float(latitude))) * cos(radians(lat)) * sin(radians(lng - float(longitude)) / 2) ** 2
+            distance = 6371000 * 2 * asin(sqrt(min(1, max(0, a))))
+            if distance <= 150:
+                candidates.append((distance, index, result))
+        return min(candidates, key=lambda item: item[:2])[2] if candidates else results[0]
+
     def reverse_geocode(self, latitude, longitude):
         key = settings.GOOGLE_MAPS_API_KEY.strip()
         if not key:
@@ -82,7 +114,7 @@ class GoogleGeocoder:
         results = payload.get('results')
         if not isinstance(results, list) or not results or not isinstance(results[0], dict):
             unavailable('invalid_results', http_status, status)
-        result = results[0]
+        result = self.select_result(results, latitude, longitude)
         address, place_id = result.get('formatted_address'), result.get('place_id') or ''
         if not isinstance(address, str) or not address.strip():
             unavailable('empty_address', http_status, status)
