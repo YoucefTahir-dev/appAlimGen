@@ -63,9 +63,13 @@
                 option.id = `${list.id}_${index}`;
                 option.dataset.index = String(index);
                 const price = product.purchase_price ?? product.price;
-                option.textContent = picker.dataset.context === 'sale'
-                    ? `${product.name} · ${product.reference} · ${picker.dataset.stock}: ${product.stock} · ${picker.dataset.price}: ${price}`
-                    : `${product.name} · ${product.reference} · ${picker.dataset.price}: ${price}`;
+                if (picker.dataset.context === 'sale') {
+                    option.textContent = `${product.name} · ${product.reference} · ${picker.dataset.stock}: ${product.stock} · ${picker.dataset.price}: ${price}`;
+                } else if (picker.dataset.context === 'loading_order') {
+                    option.textContent = `${product.name} · ${product.reference} · ${picker.dataset.stockAvailable}: ${product.stock}`;
+                } else {
+                    option.textContent = `${product.name} · ${product.reference} · ${picker.dataset.price}: ${price}`;
+                }
                 list.appendChild(option);
             });
             list.hidden = !s.results.length;

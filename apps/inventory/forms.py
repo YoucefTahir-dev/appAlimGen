@@ -1,8 +1,9 @@
 from django import forms
 from django.core.exceptions import ValidationError
-from django.forms import inlineformset_factory
+from django.forms import BaseInlineFormSet, inlineformset_factory
 from django.utils.translation import gettext_lazy as _
 from apps.core.security import validate_excel_upload
+from apps.commerce.widgets import ProductAutocomplete
 from .models import Brand, Client, LoadingOrder, LoadingOrderLine, Product, ProductPackaging, StockMovement, Supplier
 
 class ProductForm(forms.ModelForm):
@@ -90,18 +91,70 @@ class LoadingOrderForm(forms.ModelForm):
 
 
 class LoadingOrderLineForm(forms.ModelForm):
+    quantity = forms.IntegerField(
+        min_value=1,
+        error_messages={'min_value': _('La quantité doit être strictement positive.')},
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['product'].error_messages['invalid_choice'] = _(
+            'Veuillez sélectionner un produit dans les résultats proposés.'
+        )
+
     class Meta:
         model = LoadingOrderLine
         fields = ('product', 'quantity')
         widgets = {
-            'product': forms.Select(attrs={'class': 'form-select'}),
-            'quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
+            'product': ProductAutocomplete(attrs={'search_context': 'loading_order'}),
         }
+
+
+class BaseLoadingOrderLineFormSet(BaseInlineFormSet):
+    default_error_messages = {
+        **BaseInlineFormSet.default_error_messages,
+        'too_few_forms': _('Le bon de chargement doit contenir au moins un produit.'),
+    }
+
+    def clean(self):
+        selected_product_ids = [
+            form.cleaned_data['product'].pk for form in self.forms
+            if getattr(form, 'cleaned_data', None)
+            and not form.cleaned_data.get('DELETE')
+            and form.cleaned_data.get('product')
+        ]
+        duplicate_product = len(selected_product_ids) != len(set(selected_product_ids))
+        try:
+            super().clean()
+        except ValidationError:
+            if duplicate_product:
+                raise ValidationError(_('Ce produit est déjà présent dans le bon de chargement.'))
+            if not selected_product_ids:
+                raise ValidationError(_('Le bon de chargement doit contenir au moins un produit.'))
+            raise
+        if any(self.errors):
+            if not selected_product_ids:
+                raise ValidationError(_('Le bon de chargement doit contenir au moins un produit.'))
+            return
+
+        active_lines = [
+            form.cleaned_data for form in self.forms
+            if getattr(form, 'cleaned_data', None)
+            and not form.cleaned_data.get('DELETE')
+            and form.cleaned_data.get('product')
+        ]
+        if not active_lines:
+            raise ValidationError(_('Le bon de chargement doit contenir au moins un produit.'))
+
+        if duplicate_product:
+            raise ValidationError(_('Ce produit est déjà présent dans le bon de chargement.'))
 
 
 LoadingOrderLineFormSet = inlineformset_factory(
     LoadingOrder, LoadingOrderLine, form=LoadingOrderLineForm,
-    extra=5, can_delete=True, min_num=1, validate_min=True,
+    formset=BaseLoadingOrderLineFormSet,
+    extra=0, can_delete=True, min_num=1, validate_min=True,
 )
 
 class QuickProductForm(ProductForm):

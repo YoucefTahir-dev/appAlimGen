@@ -14,6 +14,7 @@ from rest_framework import serializers
 from apps.accounts.permissions import has_permission
 
 from apps.commerce.models import Payment, Purchase, Sale
+from apps.commerce.product_search import search_products
 from apps.commerce.services import ensure_ticket_number
 from apps.commerce.utils import build_invoice_context, generate_invoice_pdf, qr_code_data_uri
 from apps.core.dashboard import DashboardPeriodError, dashboard_context
@@ -122,6 +123,28 @@ class ProductViewSet(AuditMutationMixin, viewsets.ModelViewSet):
         ).exists() and not has_permission(user, 'inventory.view_all_loadingorders'):
             queryset = queryset.filter(operator_stocks__operator=user, operator_stocks__quantity__gt=0)
         return queryset
+
+    @extend_schema(parameters=[
+        OpenApiParameter(
+            name='q', type=str, location=OpenApiParameter.QUERY, required=True,
+            description='Recherche partielle par nom, référence, code-barres ou marque (2 caractères minimum).',
+        ),
+        OpenApiParameter(
+            name='context', type=str, location=OpenApiParameter.QUERY, required=False,
+            description='Contexte de recherche ; loading_order par défaut.',
+        ),
+    ], responses=OpenApiTypes.OBJECT)
+    @action(detail=False, methods=('get',), url_path='search')
+    def search(self, request):
+        context = request.query_params.get('context', 'loading_order')
+        if context != 'loading_order':
+            raise ValidationError({'context': _('Contexte de recherche invalide.')})
+        query = request.query_params.get('q', '').strip()
+        if len(query) > 100:
+            raise ValidationError({'q': _('Recherche trop longue.')})
+        return Response({'results': search_products(
+            user=request.user, query=query, context='loading_order',
+        )})
 
     @action(detail=False, methods=('get',), url_path=r'barcode/(?P<barcode>[^/.]+)')
     def barcode(self, request, barcode=None):

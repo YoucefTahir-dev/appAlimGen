@@ -29,4 +29,4 @@ Les paiements exigent une vente ou un achat exactement, un montant positif, le d
 - Critical restant : **0**.
 - High restant : **0**.
 - Medium opérationnel : idempotence tolérée sans en-tête pour compatibilité ; recette d’infrastructure et matériel à effectuer.
-- Tests locaux : **274 OK, 5 ignorés** ; concurrence exécutée par la CI PostgreSQL 16.
+- Tests locaux : **281 OK, 5 ignorés** ; concurrence exécutée par la CI PostgreSQL 16.

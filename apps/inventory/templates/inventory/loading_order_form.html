@@ -1,25 +1,75 @@
 {% extends 'base/base.html' %}
-{% load i18n %}
+{% load i18n static %}
 {% block title %}{{ title }} - El Amine ERP{% endblock %}
 {% block page_title %}{{ title }}{% endblock %}
 {% block content %}
 <div class="card card-dashboard p-4 bg-white">
-  <form method="post">{% csrf_token %}
+  <form method="post" id="loading-order-form" novalidate>{% csrf_token %}
     {{ form.non_field_errors }}
     <div class="row g-3 mb-4">
       <div class="col-md-6">{{ form.operator.label_tag }}{{ form.operator }}{{ form.operator.errors }}</div>
       <div class="col-md-6">{{ form.notes.label_tag }}{{ form.notes }}{{ form.notes.errors }}</div>
     </div>
-    {{ formset.management_form }}{{ formset.non_form_errors }}
-    <div class="table-responsive"><table class="table table-bordered align-middle">
-      <thead><tr><th>{% trans "Produit" %}</th><th>{% trans "Quantité" %}</th><th>{% trans "Supprimer" %}</th></tr></thead>
-      <tbody>{% for line in formset %}<tr>
-        <td>{{ line.id }}{{ line.product }}{{ line.product.errors }}</td>
-        <td>{{ line.quantity }}{{ line.quantity.errors }}</td><td>{{ line.DELETE }}</td>
-      </tr>{% endfor %}</tbody>
-    </table></div>
-    <button class="btn btn-success">{% trans "Enregistrer le brouillon" %}</button>
-    <a href="{% url 'loading_order_list' %}" class="btn btn-secondary">{% trans "Retour" %}</a>
+
+    {{ formset.management_form }}
+    {% if formset.non_form_errors %}<div class="alert alert-danger" role="alert">{{ formset.non_form_errors }}</div>{% endif %}
+    <div class="table-responsive">
+      <table class="table table-bordered align-middle">
+        <thead><tr><th>{% trans "Produit" %}</th><th>{% trans "Quantité" %}</th><th>{% trans "Action" %}</th></tr></thead>
+        <tbody id="loading-lines-body">
+          {% for line in formset %}
+            <tr class="loading-line-row">
+              <td class="loading-product-cell" data-label="{% trans 'Produit' %}">
+                {% for hidden in line.hidden_fields %}{{ hidden }}{% endfor %}
+                {{ line.product }}
+                {{ line.product.errors }}
+              </td>
+              <td data-label="{% trans 'Quantité' %}">{{ line.quantity }}{{ line.quantity.errors }}</td>
+              <td data-label="{% trans 'Action' %}">
+                <span class="d-none">{{ line.DELETE }}</span>
+                <button type="button" class="btn btn-sm btn-outline-danger remove-loading-line">
+                  <i class="bi bi-trash" aria-hidden="true"></i>
+                  <span class="d-none d-sm-inline">{% trans "Supprimer" %}</span>
+                </button>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <template id="loading-line-template">
+      {% with line=formset.empty_form %}
+        <tr class="loading-line-row">
+          <td class="loading-product-cell" data-label="{% trans 'Produit' %}">
+            {% for hidden in line.hidden_fields %}{{ hidden }}{% endfor %}
+            {{ line.product }}
+          </td>
+          <td data-label="{% trans 'Quantité' %}">{{ line.quantity }}</td>
+          <td data-label="{% trans 'Action' %}">
+            <span class="d-none">{{ line.DELETE }}</span>
+            <button type="button" class="btn btn-sm btn-outline-danger remove-loading-line">
+              <i class="bi bi-trash" aria-hidden="true"></i>
+              <span class="d-none d-sm-inline">{% trans "Supprimer" %}</span>
+            </button>
+          </td>
+        </tr>
+      {% endwith %}
+    </template>
+
+    <div class="d-flex flex-column flex-sm-row gap-2 justify-content-between">
+      <button type="button" class="btn btn-outline-primary" id="add-loading-line">
+        <i class="bi bi-plus-circle me-1" aria-hidden="true"></i>{% trans "Ajouter un produit" %}
+      </button>
+      <div class="d-flex gap-2">
+        <button class="btn btn-success">{% trans "Enregistrer le brouillon" %}</button>
+        <a href="{% url 'loading_order_list' %}" class="btn btn-secondary">{% trans "Retour" %}</a>
+      </div>
+    </div>
   </form>
 </div>
+{% endblock %}
+{% block extra_js %}
+<script src="{% static 'js/product-autocomplete.js' %}" defer></script>
+<script src="{% static 'js/loading-order-formset.js' %}" defer></script>
 {% endblock %}

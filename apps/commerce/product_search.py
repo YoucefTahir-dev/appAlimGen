@@ -9,9 +9,12 @@ from apps.inventory.pricing import get_sale_price
 
 
 def commercial_products(user, context):
-    if context not in ('sale', 'purchase') or not any(
-        has_permission(user, f'commerce.{action}_{context}') for action in ('add', 'change')
-    ):
+    permissions = {
+        'sale': ('commerce.add_sale', 'commerce.change_sale'),
+        'purchase': ('commerce.add_purchase', 'commerce.change_purchase'),
+        'loading_order': ('inventory.add_loadingorder', 'inventory.change_loadingorder'),
+    }
+    if context not in permissions or not any(has_permission(user, permission) for permission in permissions[context]):
         raise PermissionDenied
     products = Product.objects.all()
     if context == 'sale':
@@ -25,6 +28,8 @@ def commercial_products(user, context):
             operator_loading_active=Exists(active_loading),
             operator_quantity=Coalesce(Subquery(operator_quantity, output_field=IntegerField()), Value(0)),
         ).filter(Q(operator_loading_active=False) | Q(operator_quantity__gt=0))
+    elif context == 'loading_order':
+        products = products.filter(quantity__gt=0)
     return products
 
 
@@ -44,9 +49,17 @@ def search_products(*, user, query, context, customer=None):
         When(name__istartswith=query, then=Value(2)),
         default=Value(3), output_field=IntegerField(),
     )).order_by('search_rank', 'name', 'pk')[:20]
-    return [dict(
-        id=product.pk, name=product.name, reference=product.reference,
-        stock=(product.operator_quantity if getattr(product, 'operator_loading_active', False) else product.quantity),
-        **({'purchase_price': f'{product.purchase_price:.2f}'} if context == 'purchase'
-           else {'price': f'{get_sale_price(product, customer):.2f}'}),
-    ) for product in products]
+    results = []
+    for product in products:
+        item = {
+            'id': product.pk,
+            'name': product.name,
+            'reference': product.reference,
+            'stock': product.operator_quantity if getattr(product, 'operator_loading_active', False) else product.quantity,
+        }
+        if context == 'purchase':
+            item['purchase_price'] = f'{product.purchase_price:.2f}'
+        elif context == 'sale':
+            item['price'] = f'{get_sale_price(product, customer):.2f}'
+        results.append(item)
+    return results

@@ -434,3 +434,25 @@ body.rtl .text-end {
 .product-results { max-height: 12rem; overflow-y: auto; margin-block-start: .25rem; }
 .product-result { text-align: start; white-space: normal; overflow-wrap: anywhere; }
 .product-picker { min-width: 0; }
+
+@media (max-width: 575.98px) {
+    #loading-order-form .table-responsive { overflow: visible; }
+    #loading-order-form table,
+    #loading-order-form tbody,
+    #loading-order-form tr,
+    #loading-order-form td { display: block; width: 100%; }
+    #loading-order-form thead { display: none; }
+    #loading-order-form .loading-line-row {
+        border: 1px solid var(--bs-border-color);
+        border-radius: .5rem;
+        margin-block-end: 1rem;
+        padding: .75rem;
+    }
+    #loading-order-form .loading-line-row td { border: 0; padding: .4rem 0; }
+    #loading-order-form .loading-line-row td::before {
+        content: attr(data-label);
+        display: block;
+        font-weight: 600;
+        margin-block-end: .25rem;
+    }
+}

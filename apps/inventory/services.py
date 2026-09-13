@@ -108,8 +108,8 @@ def record_stock_movements(changes):
             raise ValidationError(
                 {
                     'quantity': _(
-                        'Stock insuffisant : %(available)s unité(s) disponible(s).'
-                    ) % {'available': current_balance}
+                        'Stock insuffisant pour %(product)s. Disponible : %(available)s.'
+                    ) % {'product': product.name, 'available': current_balance}
                 }
             )
 

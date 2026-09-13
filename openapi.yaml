@@ -5251,6 +5251,74 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
+  /api/v1/products/search/:
+    get:
+      operationId: api_v1_products_search_retrieve
+      parameters:
+      - in: query
+        name: context
+        schema:
+          type: string
+        description: Contexte de recherche ; loading_order par défaut.
+      - in: query
+        name: q
+        schema:
+          type: string
+        description: Recherche partielle par nom, référence, code-barres ou marque
+          (2 caractères minimum).
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+          description: ''
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: Permission denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
   /api/v1/purchases/:
     get:
       operationId: api_v1_purchases_list

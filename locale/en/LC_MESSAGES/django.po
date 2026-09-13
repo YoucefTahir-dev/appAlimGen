@@ -432,3 +432,27 @@ msgstr "Print invoices"
 
 msgid "Imprimer les tickets"
 msgstr "Print receipts"
+
+msgid "Action"
+msgstr "Action"
+
+msgid "Stock disponible"
+msgstr "Available stock"
+
+msgid "Veuillez sélectionner un produit dans les résultats proposés."
+msgstr "Please select a product from the suggested results."
+
+msgid "Le bon de chargement doit contenir au moins un produit."
+msgstr "The loading order must contain at least one product."
+
+msgid "Ce produit est déjà présent dans le bon de chargement."
+msgstr "This product is already present in the loading order."
+
+msgid "La quantité doit être strictement positive."
+msgstr "The quantity must be greater than zero."
+
+msgid "Stock insuffisant pour %(product)s. Disponible : %(available)s."
+msgstr "Insufficient stock for %(product)s. Available: %(available)s."
+
+msgid "Contexte de recherche invalide."
+msgstr "Invalid search context."

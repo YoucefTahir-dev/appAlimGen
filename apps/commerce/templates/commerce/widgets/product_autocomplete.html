@@ -5,7 +5,7 @@
      data-loading="{% trans 'Recherche…' %}"
      data-empty="{% trans 'Aucun produit trouvé' %}"
      data-error="{% trans 'Recherche indisponible. Réessayez.' %}"
-     data-stock="{% trans 'Stock' %}" data-price="{% trans 'Prix' %}"
+     data-stock="{% trans 'Stock' %}" data-stock-available="{% trans 'Stock disponible' %}" data-price="{% trans 'Prix' %}"
      data-invalid="{% trans 'Veuillez sélectionner un produit dans les résultats proposés.' %}">
     <input type="hidden" name="{{ widget.name }}" id="{{ widget.attrs.id }}" class="product-id" value="{{ widget.value|default_if_none:'' }}">
     <input type="text" name="{{ widget.name }}_search" id="{{ widget.attrs.id }}_search"

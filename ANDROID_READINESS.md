@@ -28,7 +28,7 @@ Le stock de tournée est serveur : Android ne doit ni télécharger le stock glo
 - `manage.py check` : OK.
 - migrations : cohérentes, aucune migration manquante.
 - OpenAPI : génération et validation sans avertissement.
-- suite locale : **274 tests, OK, 5 ignorés** ; les tests ignorés dépendent de PostgreSQL ou d’une infrastructure externe.
+- suite locale : **281 tests, OK, 5 ignorés** ; les tests ignorés dépendent de PostgreSQL ou d’une infrastructure externe.
 - le workflow GitHub exécute PostgreSQL 16, migrations, `check --deploy`, OpenAPI, tests et audit de dépendances.
 
 ## Risques résiduels
