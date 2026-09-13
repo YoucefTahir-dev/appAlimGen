@@ -9,7 +9,7 @@ from django.db.models.deletion import ProtectedError
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.http import require_POST
 from django.shortcuts import render, get_object_or_404, redirect
-from apps.accounts.permissions import manager_required, seller_required, permission_required
+from apps.accounts.permissions import manager_required, seller_required, permission_required, has_permission
 from apps.core.security import log_security_event
 from apps.core.export_security import excel_safe_text
 from apps.core.pagination import paginate_queryset
@@ -378,7 +378,7 @@ def client_create(request):
 @manager_required
 def client_detail(request, pk):
     client_obj = get_object_or_404(Client, pk=pk)
-    sales = client_obj.sales.prefetch_related('lines__product').order_by('-created_at', '-pk')[:50]
+    sales = client_obj.sales.order_by('-created_at', '-pk')[:50] if has_permission(request.user, 'commerce.view_sale') else client_obj.sales.none()
     return render(
         request,
         'inventory/client_detail.html',

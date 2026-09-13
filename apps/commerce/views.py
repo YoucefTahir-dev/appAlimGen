@@ -20,7 +20,7 @@ from apps.inventory.pricing import get_sale_price_context
 
 from .forms import PaymentForm, PurchaseForm, PurchaseLineFormSet, SaleForm, SaleLineFormSet
 from .models import Payment, Purchase, Sale
-from .services import ensure_ticket_number, generate_invoice_number, generate_ticket_number
+from .services import create_sale, create_purchase, ensure_ticket_number
 from .utils import build_invoice_context, generate_invoice_pdf, qr_code_data_uri
 from .product_search import commercial_products, search_products
 
@@ -144,35 +144,22 @@ def sale_create(request):
     form = SaleForm(request.POST or None)
     formset = SaleLineFormSet(request.POST or None, prefix='lines')
     if form.is_valid() and formset.is_valid():
-        sale = form.save(commit=False)
-        sale.total = calculate_sale_total(sale, formset)
-        if sale.total < 0:
-            form.add_error('discount', _('La remise ne peut pas dépasser le total de la vente.'))
-        elif discount_exceeds_sale_margin(sale, formset):
-            form.add_error(
-                'discount',
-                _("Impossible de vendre un produit à un prix inférieur à son prix d'achat."),
+        try:
+            create_sale(
+                client=form.cleaned_data['client'],
+                lines=[line.cleaned_data for line in formset
+                       if line.cleaned_data and not line.cleaned_data.get('DELETE')],
+                discount=form.cleaned_data['discount'],
+                tax_rate=form.cleaned_data['tax_rate'],
+                payment_type=form.cleaned_data['payment_type'],
+                user=request.user,
+                pay_full=form.cleaned_data['settlement_action'] == SaleForm.PAY_FULL,
             )
+        except ValidationError as exc:
+            _add_stock_error(form, exc)
         else:
-            try:
-                with transaction.atomic():
-                    sale.invoice_number = generate_invoice_number()
-                    sale.ticket_number = generate_ticket_number()
-                    sale.payment_tracking_initialized = True
-                    sale.created_by = request.user
-                    sale.save()
-                    formset.instance = sale
-                    _set_formset_stock_user(formset, request.user)
-                    formset.save()
-                    if form.cleaned_data['settlement_action'] == SaleForm.PAY_FULL:
-                        _record_remaining_sale_payment(sale, request.user)
-            except ValidationError as exc:
-                _add_stock_error(form, exc)
-                sale.pk = None
-                sale._state.adding = True
-            else:
-                messages.success(request, 'Facture enregistrée avec succès.')
-                return redirect('sale_list')
+            messages.success(request, 'Facture enregistrée avec succès.')
+            return redirect('sale_list')
     return render(request, 'commerce/sale_form.html', {'form': form, 'formset': formset, 'title': _('Nouvelle facture')})
 
 
@@ -206,18 +193,17 @@ def purchase_create(request):
     form = PurchaseForm(request.POST or None)
     formset = PurchaseLineFormSet(request.POST or None, prefix='lines')
     if form.is_valid() and formset.is_valid():
-        purchase = form.save(commit=False)
         try:
-            with transaction.atomic():
-                purchase.total = calculate_purchase_total(purchase, formset)
-                purchase.save()
-                formset.instance = purchase
-                _set_formset_stock_user(formset, request.user)
-                formset.save()
+            create_purchase(
+                reference=form.cleaned_data['reference'],
+                supplier=form.cleaned_data['supplier'],
+                tax_rate=form.cleaned_data['tax_rate'],
+                lines=[line.cleaned_data for line in formset
+                       if line.cleaned_data and not line.cleaned_data.get('DELETE')],
+                user=request.user,
+            )
         except ValidationError as exc:
             _add_stock_error(form, exc)
-            purchase.pk = None
-            purchase._state.adding = True
         else:
             messages.success(request, "Bon d'achat enregistré avec succès.")
             return redirect('purchase_list')

@@ -18,6 +18,12 @@ def money(value):
     return Decimal(value).quantize(MONEY_QUANTUM, rounding=ROUND_HALF_UP)
 
 
+def validate_tax_rate(value):
+    if not Decimal(value).is_finite() or not 0 <= value <= 100:
+        raise ValidationError(_('Le taux de TVA doit être compris entre 0 et 100.'))
+    return value
+
+
 def generate_invoice_number():
     year = timezone.now().year
     sequence, _ = InvoiceSequence.objects.select_for_update().get_or_create(year=year)
@@ -139,9 +145,11 @@ def create_sale(*, client, lines, discount=0, tax_rate=0, payment_type=Sale.CASH
             )
 
     discount = money(discount)
-    tax_rate = money(tax_rate)
+    tax_rate = validate_tax_rate(money(tax_rate))
     if discount < 0:
         raise ValidationError({'discount': _('La remise ne peut pas être négative.')})
+    if discount > subtotal + subtotal * tax_rate / Decimal('100'):
+        raise ValidationError({'discount': _('La remise ne peut pas dépasser le total de la vente.')})
     if discount > margin:
         raise ValidationError(
             {'discount': ValidationError(
@@ -183,7 +191,7 @@ def create_sale(*, client, lines, discount=0, tax_rate=0, payment_type=Sale.CASH
 def create_purchase(*, reference, supplier, lines, tax_rate=0, user=None):
     lines = _normalized_lines(lines, 'purchase_price')
     subtotal = sum((line['quantity'] * line['purchase_price'] for line in lines), Decimal('0'))
-    tax_rate = money(tax_rate)
+    tax_rate = validate_tax_rate(money(tax_rate))
     total = money(subtotal + subtotal * tax_rate / Decimal('100'))
     purchase = Purchase.objects.create(
         reference=reference,

@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.db import transaction
 from django.core.exceptions import ValidationError as DjangoValidationError
 from apps.inventory.location import validate_location
@@ -180,8 +182,8 @@ class ProductSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def update(self, instance, validated_data):
-        target_quantity = validated_data.pop('quantity', instance.quantity)
         locked = Product.objects.select_for_update().get(pk=instance.pk)
+        target_quantity = validated_data.pop('quantity', locked.quantity)
         for field, value in validated_data.items():
             setattr(locked, field, value)
         locked.save()
@@ -236,6 +238,13 @@ class ProductSummarySerializer(serializers.ModelSerializer):
 class SaleLineReadSerializer(serializers.ModelSerializer):
     product = ProductSummarySerializer(read_only=True)
     line_total = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
+
+    def get_fields(self):
+        fields = super().get_fields()
+        request = self.context.get('request')
+        if not request or not has_permission(request.user, 'inventory.view_product_pricing'):
+            fields.pop('unit_cost', None)
+        return fields
 
     class Meta:
         model = SaleLine
@@ -382,6 +391,7 @@ class ExpenseCategorySerializer(serializers.ModelSerializer):
 
 
 class ExpenseSerializer(serializers.ModelSerializer):
+    amount = serializers.DecimalField(max_digits=14, decimal_places=2, min_value=Decimal('0.01'))
     created_by_name = serializers.CharField(source='created_by.username', read_only=True)
 
     class Meta:

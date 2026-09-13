@@ -16,6 +16,17 @@ from apps.core.dashboard import get_period_bounds
 
 
 class DashboardTests(TestCase):
+    def test_excel_export_escapes_category_formulas(self):
+        Category.objects.filter(pk=self.product.category_id).update(name='=1+1')
+        ExpenseCategory.objects.filter(pk=self.expense_category.pk).update(name='@SUM(1)')
+        response = self.client.get(reverse('dashboard_export_excel'))
+        self.assertEqual(response.status_code, 200)
+        workbook = openpyxl.load_workbook(io.BytesIO(response.content))
+        texts = [cell for sheet in workbook for row in sheet for cell in row if isinstance(cell.value, str)]
+        self.assertIn("'=1+1", [cell.value for cell in texts])
+        self.assertIn("'@SUM(1)", [cell.value for cell in texts])
+        self.assertFalse(any(cell.data_type == 'f' for cell in texts))
+
     def setUp(self):
         User = get_user_model()
         self.user = User.objects.create_user(

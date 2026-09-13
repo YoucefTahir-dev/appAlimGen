@@ -347,6 +347,10 @@ SPECTACULAR_SETTINGS = {
     'DESCRIPTION': 'API REST versionnée pour les clients mobiles autorisés.',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
+    'POSTPROCESSING_HOOKS': [
+        'drf_spectacular.hooks.postprocess_schema_enums',
+        'apps.api.schema.envelope_responses',
+    ],
 }
 
 LOGIN_URL = 'login'

@@ -8,6 +8,7 @@ from apps.inventory.models import ProductPackaging
 
 from .models import Payment, Purchase, PurchaseLine, Sale, SaleLine
 from .widgets import ProductAutocomplete
+from .services import validate_tax_rate
 
 
 class PurchaseForm(forms.ModelForm):
@@ -26,10 +27,7 @@ class PurchaseForm(forms.ModelForm):
         }
 
     def clean_tax_rate(self):
-        tax_rate = self.cleaned_data['tax_rate']
-        if tax_rate < 0 or tax_rate > 100:
-            raise ValidationError(_('Le taux de TVA doit être compris entre 0 et 100.'))
-        return tax_rate
+        return validate_tax_rate(self.cleaned_data['tax_rate'])
 
 
 class SaleForm(forms.ModelForm):
@@ -68,10 +66,7 @@ class SaleForm(forms.ModelForm):
         return discount
 
     def clean_tax_rate(self):
-        tax_rate = self.cleaned_data['tax_rate']
-        if tax_rate < 0 or tax_rate > 100:
-            raise ValidationError(_('Le taux de TVA doit être compris entre 0 et 100.'))
-        return tax_rate
+        return validate_tax_rate(self.cleaned_data['tax_rate'])
 
     def clean_settlement_action(self):
         selected = self.cleaned_data.get('settlement_action')

@@ -4,7 +4,10 @@ from rest_framework import permissions, serializers, status
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenRefreshSerializer
+from rest_framework_simplejwt.settings import api_settings
+from rest_framework.exceptions import AuthenticationFailed
+from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
@@ -52,7 +55,19 @@ class MobileTokenView(TokenObtainPairView):
         return get_user_model().objects.filter(username=username).first()
 
 
+class MobileTokenRefreshSerializer(TokenRefreshSerializer):
+    def validate(self, attrs):
+        refresh = self.token_class(attrs['refresh'])
+        user = get_user_model().objects.filter(
+            **{api_settings.USER_ID_FIELD: refresh.get(api_settings.USER_ID_CLAIM)}
+        ).first()
+        if user is None or not user.is_active or user.force_password_change:
+            raise AuthenticationFailed(_('Compte indisponible ou changement de mot de passe requis.'))
+        return super().validate(attrs)
+
+
 class MobileTokenRefreshView(TokenRefreshView):
+    serializer_class = MobileTokenRefreshSerializer
     permission_classes = (permissions.AllowAny,)
     throttle_classes = (ScopedRateThrottle,)
     throttle_scope = 'auth'
@@ -68,7 +83,10 @@ class LogoutView(APIView):
         if not refresh_value:
             raise serializers.ValidationError({'refresh': _('Le refresh token est obligatoire.')})
         try:
-            RefreshToken(refresh_value).blacklist()
+            token = RefreshToken(refresh_value)
+            if str(token.get(api_settings.USER_ID_CLAIM)) != str(getattr(request.user, api_settings.USER_ID_FIELD)):
+                raise serializers.ValidationError({'refresh': _('Refresh token invalide.')})
+            token.blacklist()
         except TokenError as exc:
             raise serializers.ValidationError({'refresh': _('Refresh token invalide.')}) from exc
         log_security_event(request, 'api.auth.logout', status_code=200)

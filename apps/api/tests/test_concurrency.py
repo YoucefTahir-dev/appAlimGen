@@ -8,7 +8,7 @@ from django.core.exceptions import ValidationError
 from django.db import close_old_connections, connection
 from django.test import TransactionTestCase
 
-from apps.commerce.models import Sale
+from apps.commerce.models import Sale, Payment
 from apps.commerce.services import create_sale
 from apps.inventory.models import Client, Product, StockMovement
 from apps.inventory.services import record_stock_movement
@@ -57,3 +57,42 @@ class ConcurrentSaleTests(TransactionTestCase):
         self.assertEqual(
             StockMovement.objects.filter(source_type=StockMovement.SOURCE_SALE).count(), 1,
         )
+
+    def test_concurrent_sales_on_different_products_have_unique_numbers(self):
+        other = Product.objects.create(name='Other concurrent product', purchase_price=10, sale_price=15, quantity=0)
+        record_stock_movement(product=other, movement_type=StockMovement.ENTRY, quantity=1, user=self.user)
+        barrier = Barrier(2)
+
+        def sell(product_id):
+            close_old_connections()
+            try:
+                barrier.wait(timeout=10)
+                sale = create_sale(client=self.customer, lines=[{'product': product_id, 'quantity': 1}], user=self.user)
+                return sale.invoice_number, sale.ticket_number
+            finally:
+                close_old_connections()
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            results = list(executor.map(sell, [self.product.pk, other.pk]))
+        self.assertEqual(len({number for number, _ in results}), 2)
+        self.assertEqual(len({number for _, number in results}), 2)
+
+    def test_concurrent_payments_cannot_overpay(self):
+        sale = create_sale(client=self.customer, lines=[{'product': self.product, 'quantity': 1}], user=self.user)
+        barrier = Barrier(2)
+
+        def pay(_):
+            close_old_connections()
+            try:
+                barrier.wait(timeout=10)
+                Payment.objects.create(sale_id=sale.pk, amount=15, payment_type=Payment.CASH, created_by=self.user)
+                return 'paid'
+            except ValidationError:
+                return 'rejected'
+            finally:
+                close_old_connections()
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            results = list(executor.map(pay, range(2)))
+        self.assertEqual(sorted(results), ['paid', 'rejected'])
+        self.assertEqual(sale.amount_paid, Decimal('15'))

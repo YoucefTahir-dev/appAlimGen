@@ -4,11 +4,14 @@ from django.http import HttpResponse
 from django.template.loader import render_to_string
 from django.utils.translation import gettext as _
 from drf_spectacular.utils import extend_schema
+from drf_spectacular.types import OpenApiTypes
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework import serializers
+from apps.accounts.permissions import has_permission
 
 from apps.commerce.models import Purchase, Sale
 from apps.commerce.services import ensure_ticket_number
@@ -64,6 +67,21 @@ class AuditMutationMixin:
         except ProtectedError as exc:
             raise ValidationError(_('Suppression impossible : cet élément est utilisé.')) from exc
         self._audit('delete', 204)
+
+
+def date_filters(request):
+    values = {}
+    field = serializers.DateField()
+    for name in ('start_date', 'end_date'):
+        value = request.query_params.get(name)
+        if value:
+            try:
+                values[name] = field.run_validation(value)
+            except ValidationError as exc:
+                raise ValidationError({name: exc.detail}) from exc
+    if values.get('start_date') and values.get('end_date') and values['start_date'] > values['end_date']:
+        raise ValidationError({'end_date': _('La date de fin doit être postérieure ou égale à la date de début.')})
+    return values.get('start_date'), values.get('end_date')
 
 
 class ProductViewSet(AuditMutationMixin, viewsets.ModelViewSet):
@@ -179,14 +197,14 @@ class ClientViewSet(AuditMutationMixin, viewsets.ModelViewSet):
     audit_name = 'client'
     required_permissions = {
         'list': 'inventory.view_client', 'retrieve': 'inventory.view_client',
-        'history': 'inventory.view_client', 'create': 'inventory.add_client',
+        'history': ('inventory.view_client', 'commerce.view_sale'), 'create': 'inventory.add_client',
         'update': 'inventory.change_client', 'partial_update': 'inventory.change_client',
         'destroy': 'inventory.delete_client',
     }
 
     @action(detail=True, methods=('get',))
     def history(self, request, pk=None):
-        sales = self.get_object().sales.prefetch_related('lines__product').order_by('-created_at')
+        sales = self.get_object().sales.select_related('created_by').prefetch_related('lines__product', 'payments').order_by('-created_at')
         page = self.paginate_queryset(sales)
         serializer = SaleSerializer(page if page is not None else sales, many=True, context={'request': request})
         return self.get_paginated_response(serializer.data) if page is not None else Response(serializer.data)
@@ -200,14 +218,14 @@ class SupplierViewSet(AuditMutationMixin, viewsets.ModelViewSet):
     audit_name = 'supplier'
     required_permissions = {
         'list': 'inventory.view_supplier', 'retrieve': 'inventory.view_supplier',
-        'history': 'inventory.view_supplier', 'create': 'inventory.add_supplier',
+        'history': ('inventory.view_supplier', 'commerce.view_purchase'), 'create': 'inventory.add_supplier',
         'update': 'inventory.change_supplier', 'partial_update': 'inventory.change_supplier',
         'destroy': 'inventory.delete_supplier',
     }
 
     @action(detail=True, methods=('get',))
     def history(self, request, pk=None):
-        purchases = self.get_object().purchases.prefetch_related('lines__product').order_by('-created_at')
+        purchases = self.get_object().purchases.prefetch_related('lines__product', 'payments').order_by('-created_at')
         page = self.paginate_queryset(purchases)
         serializer = PurchaseSerializer(page if page is not None else purchases, many=True, context={'request': request})
         return self.get_paginated_response(serializer.data) if page is not None else Response(serializer.data)
@@ -216,7 +234,7 @@ class SupplierViewSet(AuditMutationMixin, viewsets.ModelViewSet):
 class SaleViewSet(AuditMutationMixin, mixins.CreateModelMixin, mixins.ListModelMixin,
                   mixins.RetrieveModelMixin, mixins.DestroyModelMixin, viewsets.GenericViewSet):
     queryset = Sale.objects.select_related('client', 'created_by').prefetch_related(
-        'lines__product', 'lines__packaging',
+        'lines__product', 'lines__packaging', 'payments',
     ).order_by('-created_at', '-pk')
     serializer_class = SaleSerializer
     search_fields = ('invoice_number', 'ticket_number', 'client__name')
@@ -230,8 +248,7 @@ class SaleViewSet(AuditMutationMixin, mixins.CreateModelMixin, mixins.ListModelM
 
     def get_queryset(self):
         queryset = super().get_queryset()
-        start = self.request.query_params.get('start_date')
-        end = self.request.query_params.get('end_date')
+        start, end = date_filters(self.request)
         if start:
             queryset = queryset.filter(created_at__date__gte=start)
         if end:
@@ -245,7 +262,7 @@ class SaleViewSet(AuditMutationMixin, mixins.CreateModelMixin, mixins.ListModelM
 
 class PurchaseViewSet(AuditMutationMixin, mixins.CreateModelMixin, mixins.ListModelMixin,
                       mixins.RetrieveModelMixin, mixins.DestroyModelMixin, viewsets.GenericViewSet):
-    queryset = Purchase.objects.select_related('supplier').prefetch_related('lines__product').order_by('-created_at', '-pk')
+    queryset = Purchase.objects.select_related('supplier').prefetch_related('lines__product', 'payments').order_by('-created_at', '-pk')
     serializer_class = PurchaseSerializer
     search_fields = ('reference', 'supplier__name')
     ordering_fields = ('created_at', 'total', 'reference')
@@ -258,8 +275,7 @@ class PurchaseViewSet(AuditMutationMixin, mixins.CreateModelMixin, mixins.ListMo
 
     def get_queryset(self):
         queryset = super().get_queryset()
-        start = self.request.query_params.get('start_date')
-        end = self.request.query_params.get('end_date')
+        start, end = date_filters(self.request)
         if start:
             queryset = queryset.filter(created_at__date__gte=start)
         if end:
@@ -273,7 +289,7 @@ class PurchaseViewSet(AuditMutationMixin, mixins.CreateModelMixin, mixins.ListMo
 
 class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Sale.objects.select_related('client', 'created_by').prefetch_related(
-        'lines__product', 'lines__packaging',
+        'lines__product', 'lines__packaging', 'payments',
     ).order_by('-created_at', '-pk')
     serializer_class = SaleSerializer
     search_fields = ('invoice_number', 'ticket_number', 'client__name')
@@ -283,6 +299,7 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
         'print_data': 'accounts.print_invoice',
     }
 
+    @extend_schema(responses={(200, 'application/pdf'): OpenApiTypes.BINARY})
     @action(detail=True, methods=('get',))
     def pdf(self, request, pk=None):
         sale = self.get_object()
@@ -291,6 +308,7 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
         generate_invoice_pdf(response, sale)
         return response
 
+    @extend_schema(responses={(200, 'text/html'): OpenApiTypes.STR})
     @action(detail=True, methods=('get',))
     def ticket(self, request, pk=None):
         sale = self.get_object()
@@ -308,6 +326,7 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
         })
         return HttpResponse(render_to_string('commerce/sale_ticket.html', context, request=request))
 
+    @extend_schema(responses=OpenApiTypes.OBJECT)
     @action(detail=True, methods=('get',), url_path='print-data')
     def print_data(self, request, pk=None):
         sale = self.get_object()
@@ -412,6 +431,7 @@ class StockViewSet(viewsets.ReadOnlyModelViewSet):
         queryset = StockMovement.objects.select_related('product', 'created_by').order_by('-created_at', '-pk')
         product = request.query_params.get('product')
         if product:
+            product = serializers.IntegerField(min_value=1, max_value=9223372036854775807).run_validation(product)
             queryset = queryset.filter(product_id=product)
         page = self.paginate_queryset(queryset)
         serializer = StockMovementSerializer(page if page is not None else queryset, many=True)
@@ -440,8 +460,7 @@ class ExpenseViewSet(AuditMutationMixin, viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
-        start = self.request.query_params.get('start_date')
-        end = self.request.query_params.get('end_date')
+        start, end = date_filters(self.request)
         if start:
             queryset = queryset.filter(date__gte=start)
         if end:
@@ -504,21 +523,30 @@ class AlertsView(APIView):
                 'product': product.name, 'quantity': product.quantity,
                 'minimum_stock': product.minimum_stock,
             })
-        for sale in Sale.objects.filter(payment_tracking_initialized=True).select_related('client').order_by('-created_at')[:100]:
+        sales = Sale.objects.filter(payment_tracking_initialized=True).select_related('client').prefetch_related('payments')
+        if not has_permission(request.user, 'commerce.view_sale'):
+            sales = sales.none()
+        for sale in sales.order_by('-created_at')[:100]:
             if sale.balance_due > 0:
                 alerts.append({
                     'type': 'unpaid_invoice', 'level': 'warning', 'sale_id': sale.pk,
                     'reference': sale.invoice_number, 'partner': sale.client.name,
                     'amount_due': sale.balance_due,
                 })
-        for purchase in Purchase.objects.filter(payment_tracking_initialized=True).select_related('supplier').order_by('-created_at')[:100]:
+        purchases = Purchase.objects.filter(payment_tracking_initialized=True).select_related('supplier').prefetch_related('payments')
+        if not has_permission(request.user, 'commerce.view_purchase'):
+            purchases = purchases.none()
+        for purchase in purchases.order_by('-created_at')[:100]:
             if purchase.balance_due > 0:
                 alerts.append({
                     'type': 'supplier_payment', 'level': 'warning', 'purchase_id': purchase.pk,
                     'reference': purchase.reference, 'partner': purchase.supplier.name,
                     'amount_due': purchase.balance_due,
                 })
-        for expense in Expense.objects.filter(Q(receipt='') | Q(receipt__isnull=True)).order_by('-date')[:100]:
+        expenses = Expense.objects.filter(Q(receipt='') | Q(receipt__isnull=True))
+        if not has_permission(request.user, 'expenses.view_expense'):
+            expenses = expenses.none()
+        for expense in expenses.order_by('-date')[:100]:
             alerts.append({
                 'type': 'missing_receipt', 'level': 'info', 'expense_id': expense.pk,
                 'reference': expense.number, 'amount': expense.amount,

@@ -71,6 +71,9 @@ class CommercialDocumentQuerySet(StockAwareDeleteQuerySet):
 
 
 def _document_paid_amount(document):
+    cached = getattr(document, '_prefetched_objects_cache', {}).get('payments')
+    if cached is not None:
+        return sum((payment.amount for payment in cached), ZERO)
     return document.payments.aggregate(total=Sum('amount'))['total'] or ZERO
 
 

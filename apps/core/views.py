@@ -18,6 +18,7 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, Tabl
 
 from apps.accounts.permissions import seller_required
 from .dashboard import DashboardPeriodError, dashboard_context
+from .export_security import excel_safe_text, pdf_safe_text
 
 
 def health(request):
@@ -126,7 +127,7 @@ def dashboard_export_excel(request):
     sheet = workbook.active
     sheet.title = str(_("Tableau de bord"))[:31]
     sheet.append([_("Période"), context["start_date"].isoformat(), context["end_date"].isoformat()])
-    sheet.append([_("Utilisateur analysé"), context["selected_user"].get_username() if context["selected_user"] else _("Tous les utilisateurs")])
+    sheet.append([_("Utilisateur analysé"), excel_safe_text(context["selected_user"].get_username() if context["selected_user"] else _("Tous les utilisateurs"))])
     sheet.append([])
     sheet.append([_("Indicateur"), _("Valeur")])
     for label, value in [
@@ -186,7 +187,7 @@ def dashboard_export_excel(request):
     category_sheet.append([_("Catégorie de vente"), _("Total")])
     sales_categories = context["chart_data"]["sales_categories"]
     for label, value in zip(sales_categories["labels"], sales_categories["values"]):
-        category_sheet.append([label, value])
+        category_sheet.append([excel_safe_text(label), value])
     sales_end_row = category_sheet.max_row
 
     category_sheet.append([])
@@ -194,7 +195,7 @@ def dashboard_export_excel(request):
     category_sheet.append([_("Catégorie de charge"), _("Total")])
     expense_categories = context["chart_data"]["expense_categories"]
     for label, value in zip(expense_categories["labels"], expense_categories["values"]):
-        category_sheet.append([label, value])
+        category_sheet.append([excel_safe_text(label), value])
     expense_end_row = category_sheet.max_row
 
     if sales_categories["values"]:
@@ -239,7 +240,7 @@ def dashboard_export_pdf(request):
         Paragraph(f"{context['start_date']:%d/%m/%Y} - {context['end_date']:%d/%m/%Y}", styles["Normal"]),
         Paragraph(
             _("Utilisateur analysé") + ": " + (
-                context["selected_user"].get_username()
+                pdf_safe_text(context["selected_user"].get_username())
                 if context["selected_user"] else str(_("Tous les utilisateurs"))
             ),
             styles["Normal"],
