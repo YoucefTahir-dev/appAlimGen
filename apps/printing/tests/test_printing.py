@@ -35,6 +35,10 @@ class PrinterDomainTests(TestCase):
         with self.assertRaisesMessage(Exception, '42 caractères'):
             self.printer(name='Petit ticket', paper_width=58, characters_per_line=48)
 
+    def test_bluetooth_address_is_validated(self):
+        with self.assertRaises(Exception):
+            self.printer(name='Adresse invalide', bluetooth_address='not-a-mac')
+
     def test_rpp02n_diagnostic_is_transport_agnostic_and_testable(self):
         printer = self.printer()
         result = printer_test_payload(printer)
@@ -89,10 +93,13 @@ class PrintingApiTests(APITestCase):
             'name': 'RPP02N caisse', 'printer_type': 'thermal', 'manufacturer': 'Rongta',
             'model_name': 'RPP02N', 'connection_mode': 'bluetooth', 'paper_width': 80,
             'protocol': 'generic_escpos', 'characters_per_line': 48, 'encoding': 'cp858',
+            'bluetooth_name': 'RPP02N', 'bluetooth_address': 'AA:BB:CC:DD:EE:FF',
             'is_default': True, 'is_active': True,
         }, format='json')
         self.assertEqual(response.status_code, 201, response.data)
         printer = PrinterProfile.objects.get()
+        self.assertEqual(printer.bluetooth_name, 'RPP02N')
+        self.assertEqual(printer.bluetooth_address, 'AA:BB:CC:DD:EE:FF')
         default = self.client.get(reverse('api-printer-default'))
         self.assertEqual(default.status_code, 200, default.data)
         test_payload = self.client.get(reverse('api-printer-test-payload', args=[printer.pk]))
@@ -100,6 +107,8 @@ class PrintingApiTests(APITestCase):
         payload = test_payload.data.get('data', test_payload.data)
         self.assertEqual(payload['transport'], 'client-side')
         self.assertTrue(payload['raster_arabic_recommended'])
+        set_default = self.client.post(reverse('api-printer-set-default', args=[printer.pk]))
+        self.assertEqual(set_default.status_code, 200, set_default.data)
         disabled = self.client.patch(reverse('api-printer-detail', args=[printer.pk]), {'is_active': False}, format='json')
         self.assertEqual(disabled.status_code, 200, disabled.data)
 

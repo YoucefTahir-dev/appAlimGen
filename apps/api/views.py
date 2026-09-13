@@ -335,7 +335,8 @@ class PrinterProfileViewSet(AuditMutationMixin, viewsets.ModelViewSet):
         'list': 'printing.view_printerprofile', 'retrieve': 'printing.view_printerprofile',
         'default': 'printing.view_printerprofile', 'create': 'printing.add_printerprofile',
         'update': 'printing.change_printerprofile', 'partial_update': 'printing.change_printerprofile',
-        'destroy': 'printing.delete_printerprofile', 'test_payload': 'printing.test_printerprofile',
+        'destroy': 'printing.delete_printerprofile', 'set_default': 'printing.change_printerprofile',
+        'test_payload': 'printing.test_printerprofile',
     }
 
     @action(detail=False, methods=('get',))
@@ -346,6 +347,18 @@ class PrinterProfileViewSet(AuditMutationMixin, viewsets.ModelViewSet):
                 {'success': False, 'error': {'code': 'PRINTER_NOT_CONFIGURED', 'message': _('Aucune imprimante active configurée.')}},
                 status=status.HTTP_404_NOT_FOUND,
             )
+        return Response(self.get_serializer(printer).data)
+
+    @action(detail=True, methods=('post',), url_path='set-default')
+    def set_default(self, request, pk=None):
+        printer = self.get_object()
+        if not printer.is_active:
+            return Response(
+                {'success': False, 'error': {'code': 'PRINTER_INACTIVE', 'message': _('Une imprimante inactive ne peut pas être définie par défaut.')}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        printer.is_default = True
+        printer.save(update_fields=['is_default', 'updated_at'])
         return Response(self.get_serializer(printer).data)
 
     @action(detail=True, methods=('get',), url_path='test-payload')

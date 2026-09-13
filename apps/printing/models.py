@@ -3,6 +3,7 @@ from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
+import re
 
 
 class PrinterProfile(models.Model):
@@ -50,6 +51,8 @@ class PrinterProfile(models.Model):
         _('Identifiant local facultatif'), max_length=255, blank=True,
         help_text=_('Préférence non secrète uniquement. La découverte Bluetooth reste locale au terminal.'),
     )
+    bluetooth_name = models.CharField(_('Nom Bluetooth'), max_length=255, blank=True)
+    bluetooth_address = models.CharField(_('Adresse Bluetooth'), max_length=17, blank=True)
     ip_address = models.GenericIPAddressField(_('Adresse IP'), blank=True, null=True)
     network_port = models.PositiveIntegerField(_('Port réseau'), blank=True, null=True)
     paper_width = models.PositiveSmallIntegerField(_('Largeur papier'), choices=PAPER_CHOICES, default=80)
@@ -81,6 +84,8 @@ class PrinterProfile(models.Model):
 
     def clean(self):
         super().clean()
+        if self.bluetooth_address and not re.fullmatch(r'(?i)([0-9a-f]{2}[:-]){5}[0-9a-f]{2}', self.bluetooth_address):
+            raise ValidationError({'bluetooth_address': _('L’adresse Bluetooth doit être au format AA:BB:CC:DD:EE:FF.')})
         if self.connection_mode == self.NETWORK and (not self.ip_address or not self.network_port):
             raise ValidationError({'ip_address': _('Une adresse IP et un port sont requis pour une imprimante réseau.')})
         if self.paper_width == 58 and self.characters_per_line > 42:

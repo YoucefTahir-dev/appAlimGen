@@ -405,7 +405,7 @@ class PrinterProfileSerializer(serializers.ModelSerializer):
         model = PrinterProfile
         fields = (
             'id', 'name', 'description', 'printer_type', 'manufacturer', 'model_name',
-            'connection_mode', 'connection_mode_display', 'local_identifier', 'ip_address',
+            'connection_mode', 'connection_mode_display', 'local_identifier', 'bluetooth_name', 'bluetooth_address', 'ip_address',
             'network_port', 'paper_width', 'protocol', 'protocol_display',
             'characters_per_line', 'encoding', 'auto_print', 'is_default', 'is_active',
             'created_at', 'updated_at',

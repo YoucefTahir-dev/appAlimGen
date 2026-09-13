@@ -1,6 +1,6 @@
 from django.urls import path
 
-from .views import printer_create, printer_delete, printer_list, printer_test, printer_update
+from .views import printer_create, printer_delete, printer_list, printer_set_default, printer_test, printer_update
 
 
 urlpatterns = [
@@ -9,4 +9,5 @@ urlpatterns = [
     path('<int:pk>/edit/', printer_update, name='printer_update'),
     path('<int:pk>/delete/', printer_delete, name='printer_delete'),
     path('<int:pk>/test/', printer_test, name='printer_test'),
+    path('<int:pk>/set-default/', printer_set_default, name='printer_set_default'),
 ]

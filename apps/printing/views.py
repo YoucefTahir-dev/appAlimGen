@@ -55,3 +55,13 @@ def printer_test(request, pk):
     response['X-Printer-Protocol'] = result.protocol
     response['X-Arabic-Raster-Recommendation'] = 'true' if result.raster_arabic_recommended else 'false'
     return response
+
+
+@permission_required('printing.change_printerprofile')
+def printer_set_default(request, pk):
+    printer = get_object_or_404(PrinterProfile, pk=pk, is_active=True)
+    if request.method == 'POST':
+        printer.is_default = True
+        printer.save(update_fields=['is_default', 'updated_at'])
+        messages.success(request, _('Imprimante définie par défaut.'))
+    return redirect('printer_list')

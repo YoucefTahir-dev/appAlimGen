@@ -8,7 +8,7 @@ class PrinterProfileForm(forms.ModelForm):
         model = PrinterProfile
         fields = (
             'name', 'description', 'printer_type', 'manufacturer', 'model_name',
-            'connection_mode', 'local_identifier', 'ip_address', 'network_port',
+            'connection_mode', 'local_identifier', 'bluetooth_name', 'bluetooth_address', 'ip_address', 'network_port',
             'paper_width', 'protocol', 'characters_per_line', 'encoding',
             'auto_print', 'is_default', 'is_active',
         )
