@@ -9,7 +9,7 @@ from rest_framework.exceptions import PermissionDenied
 
 from apps.accounts.permissions import has_permission
 from apps.commerce.models import Payment, Purchase, PurchaseLine, Sale, SaleLine
-from apps.commerce.services import create_purchase, create_sale
+from apps.commerce.services import create_purchase, create_sale, update_sale
 from apps.expenses.models import Expense, ExpenseCategory
 from apps.inventory.models import (
     Brand,
@@ -317,6 +317,12 @@ class SaleSerializer(serializers.ModelSerializer):
     balance_due = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
     payment_status = serializers.CharField(read_only=True)
     created_by_name = serializers.CharField(source='created_by.username', read_only=True)
+    client_details = serializers.SerializerMethodField()
+    payments = serializers.SerializerMethodField()
+    subtotal = serializers.SerializerMethodField()
+    tax_amount = serializers.SerializerMethodField()
+    payment_type_display = serializers.CharField(source='get_payment_type_display', read_only=True)
+    capabilities = serializers.SerializerMethodField()
 
     class Meta:
         model = Sale
@@ -326,16 +332,98 @@ class SaleSerializer(serializers.ModelSerializer):
             'amount_paid', 'balance_due', 'payment_status', 'lines', 'items', 'pay_full',
             'created_by_name',
             'loading_order',
+            'client_details', 'payments', 'subtotal', 'tax_amount',
+            'payment_type_display', 'capabilities',
         )
         read_only_fields = (
-            'invoice_number', 'ticket_number', 'total', 'payment_tracking_initialized', 'created_at', 'loading_order',
+            'invoice_number', 'ticket_number', 'total',
+            'payment_tracking_initialized', 'created_at', 'loading_order',
         )
 
+    def get_client_details(self, obj) -> dict:
+        client = obj.client
+        return {
+            'id': client.pk,
+            'name': client.name,
+            'phone': client.phone,
+            'address': client.address,
+            'customer_type': client.customer_type,
+            'customer_type_display': client.get_customer_type_display(),
+        }
+
+    def get_payments(self, obj) -> list:
+        return [
+            {
+                'id': payment.pk,
+                'reference': payment.reference,
+                'amount': str(payment.amount),
+                'payment_type': payment.payment_type,
+                'payment_type_display': payment.get_payment_type_display(),
+                'created_at': payment.created_at,
+            }
+            for payment in obj.payments.all()
+        ]
+
+    def get_subtotal(self, obj) -> str:
+        value = sum((line.line_total() for line in obj.lines.all()), Decimal('0.00'))
+        return f'{value:.2f}'
+
+    def get_tax_amount(self, obj) -> str:
+        subtotal = sum((line.line_total() for line in obj.lines.all()), Decimal('0.00'))
+        value = subtotal * Decimal(str(obj.tax_rate or 0)) / Decimal('100')
+        return f'{value:.2f}'
+
+    def get_capabilities(self, obj) -> dict:
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        if not user or not user.is_authenticated:
+            return {}
+        return {
+            'can_view': has_permission(user, 'commerce.view_sale'),
+            'can_update': has_permission(user, 'commerce.change_sale'),
+            'can_delete': has_permission(user, 'commerce.delete_sale'),
+            'can_view_invoice': has_permission(user, 'accounts.view_invoices'),
+            'can_view_pdf': has_permission(user, 'accounts.download_invoice_pdf'),
+            'can_print': has_permission(user, 'accounts.print_invoice'),
+            'can_add_payment': has_permission(user, 'commerce.change_sale'),
+            'can_cancel': False,
+        }
     def create(self, validated_data):
         items = validated_data.pop('items')
         pay_full = validated_data.pop('pay_full', False)
         try:
             return create_sale(lines=items, user=self.context['request'].user, pay_full=pay_full, **validated_data)
+        except Exception as exc:
+            from django.core.exceptions import ValidationError as DjangoValidationError
+
+            if not isinstance(exc, DjangoValidationError):
+                raise
+            details = exc.message_dict if hasattr(exc, 'message_dict') else {'non_field_errors': exc.messages}
+            flattened = ' '.join(str(message) for messages in details.values() for message in messages)
+            error_codes = {
+                error.code
+                for errors in getattr(exc, 'error_dict', {}).values()
+                for error in errors
+            }
+            if 'insufficient_stock' in error_codes:
+                code = 'INSUFFICIENT_STOCK'
+            elif 'sale_price_below_cost' in error_codes:
+                code = 'SALE_PRICE_BELOW_COST'
+            else:
+                code = 'SALE_VALIDATION_ERROR'
+            raise BusinessAPIException(code, flattened, details) from exc
+
+    def update(self, instance, validated_data):
+        items = validated_data.pop('items', None)
+        pay_full = validated_data.pop('pay_full', False)
+        try:
+            return update_sale(
+                sale=instance,
+                lines=items,
+                user=self.context['request'].user,
+                pay_full=pay_full,
+                **validated_data,
+            )
         except Exception as exc:
             from django.core.exceptions import ValidationError as DjangoValidationError
 

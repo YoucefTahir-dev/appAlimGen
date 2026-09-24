@@ -295,6 +295,139 @@ class MobileApiTests(APITestCase):
         self.product.refresh_from_db()
         self.assertEqual(self.product.quantity, 20)
 
+    def test_sale_detail_exposes_invoice_actions_client_and_payments(self):
+        self.authenticate()
+        created = self.client.post(reverse('api-sale-list'), {
+            'client': self.client_record.pk, 'discount': '0', 'tax_rate': '0',
+            'payment_type': 'cash', 'pay_full': True,
+            'items': [{'product': self.product.pk, 'quantity': 2, 'unit_price': '80'}],
+        }, format='json')
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.data)
+        sale_id = created.data.get('data', created.data)['id']
+
+        response = self.client.get(reverse('api-sale-detail', args=[sale_id]))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        payload = response.data.get('data', response.data)
+        self.assertEqual(payload['client_details']['name'], self.client_record.name)
+        self.assertEqual(payload['subtotal'], '160.00')
+        self.assertEqual(payload['amount_paid'], '160.00')
+        self.assertEqual(len(payload['payments']), 1)
+        self.assertTrue(payload['capabilities']['can_update'])
+        self.assertTrue(payload['capabilities']['can_print'])
+        self.assertFalse(payload['capabilities']['can_cancel'])
+
+    def test_sale_patch_replaces_lines_and_updates_stock_atomically(self):
+        self.authenticate()
+        created = self.client.post(reverse('api-sale-list'), {
+            'client': self.client_record.pk, 'discount': '0', 'tax_rate': '0',
+            'payment_type': 'cash',
+            'items': [{'product': self.product.pk, 'quantity': 2, 'unit_price': '80'}],
+        }, format='json')
+        sale_id = created.data.get('data', created.data)['id']
+
+        updated = self.client.patch(
+            reverse('api-sale-detail', args=[sale_id]),
+            {
+                'discount': '5.00',
+                'items': [{'product': self.product.pk, 'quantity': 5, 'unit_price': '80'}],
+            },
+            format='json',
+            HTTP_IDEMPOTENCY_KEY='sale-update-1',
+        )
+
+        self.assertEqual(updated.status_code, status.HTTP_200_OK, updated.data)
+        sale = Sale.objects.get(pk=sale_id)
+        self.assertEqual(sale.lines.get().quantity, 5)
+        self.assertEqual(sale.total, Decimal('395.00'))
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.quantity, 15)
+
+    def test_sale_patch_idempotency_does_not_apply_stock_twice(self):
+        self.authenticate()
+        created = self.client.post(reverse('api-sale-list'), {
+            'client': self.client_record.pk, 'discount': '0', 'tax_rate': '0',
+            'items': [{'product': self.product.pk, 'quantity': 2, 'unit_price': '80'}],
+        }, format='json')
+        sale_id = created.data.get('data', created.data)['id']
+        payload = {
+            'items': [{'product': self.product.pk, 'quantity': 4, 'unit_price': '80'}],
+        }
+
+        first = self.client.patch(
+            reverse('api-sale-detail', args=[sale_id]), payload,
+            format='json', HTTP_IDEMPOTENCY_KEY='sale-update-replay',
+        )
+        second = self.client.patch(
+            reverse('api-sale-detail', args=[sale_id]), payload,
+            format='json', HTTP_IDEMPOTENCY_KEY='sale-update-replay',
+        )
+
+        self.assertEqual(first.status_code, status.HTTP_200_OK, first.data)
+        self.assertEqual(second.status_code, status.HTTP_200_OK, second.data)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.quantity, 16)
+        self.assertEqual(Sale.objects.get(pk=sale_id).lines.get().quantity, 4)
+
+    def test_sale_patch_insufficient_stock_rolls_back_sale_and_stock(self):
+        self.authenticate()
+        created = self.client.post(reverse('api-sale-list'), {
+            'client': self.client_record.pk, 'discount': '0', 'tax_rate': '0',
+            'payment_type': 'cash',
+            'items': [{'product': self.product.pk, 'quantity': 2, 'unit_price': '80'}],
+        }, format='json')
+        sale_id = created.data.get('data', created.data)['id']
+
+        updated = self.client.patch(
+            reverse('api-sale-detail', args=[sale_id]),
+            {'items': [{'product': self.product.pk, 'quantity': 999, 'unit_price': '80'}]},
+            format='json',
+        )
+
+        self.assertEqual(updated.status_code, status.HTTP_400_BAD_REQUEST, updated.data)
+        self.assertEqual(updated.data['error']['code'], 'INSUFFICIENT_STOCK')
+        sale = Sale.objects.get(pk=sale_id)
+        self.assertEqual(sale.lines.get().quantity, 2)
+        self.assertEqual(sale.total, Decimal('160.00'))
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.quantity, 18)
+
+    def test_sale_patch_requires_change_permission(self):
+        restricted = User.objects.create_user(
+            username='api-sale-readonly', password=self.password,
+        )
+        group = Group.objects.create(name='API ventes lecture seule')
+        group.permissions.add(Permission.objects.get(
+            content_type__app_label='commerce', codename='view_sale',
+        ))
+        restricted.groups.add(group)
+        self.authenticate()
+        created = self.client.post(reverse('api-sale-list'), {
+            'client': self.client_record.pk, 'discount': '0', 'tax_rate': '0',
+            'items': [{'product': self.product.pk, 'quantity': 1, 'unit_price': '80'}],
+        }, format='json')
+        sale_id = created.data.get('data', created.data)['id']
+        self.authenticate(restricted)
+
+        response = self.client.patch(
+            reverse('api-sale-detail', args=[sale_id]),
+            {'discount': '1.00'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN, response.data)
+
+    def test_sale_product_search_uses_sale_context(self):
+        self.authenticate()
+        response = self.client.get(
+            reverse('api-product-search'),
+            {'q': 'Produit', 'context': 'sale', 'client_id': self.client_record.pk},
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        payload = response.data.get('data', response.data)
+        self.assertEqual(payload['results'][0]['id'], self.product.pk)
+        self.assertEqual(payload['results'][0]['price'], '80.00')
+
     def test_sale_below_purchase_price_is_rejected_without_stock_change(self):
         self.authenticate()
         response = self.client.post(reverse('api-sale-list'), {

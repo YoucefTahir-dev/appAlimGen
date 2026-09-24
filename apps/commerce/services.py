@@ -203,6 +203,170 @@ def create_sale(*, client, lines, discount=0, tax_rate=0, payment_type=Sale.CASH
 
 
 @transaction.atomic
+def update_sale(
+    *, sale, client=None, lines=None, discount=None, tax_rate=None,
+    payment_type=None, user=None, pay_full=False,
+):
+    """Update a sale while leaving every stock mutation to the domain models.
+
+    API clients send the complete replacement line set.  Existing lines are
+    restored before the replacements are saved; the surrounding transaction
+    makes the operation all-or-nothing when stock or payment validation fails.
+    """
+    sale = Sale.objects.select_for_update().select_related('loading_order').get(pk=sale.pk)
+    client = client or sale.client
+    discount = money(sale.discount if discount is None else discount)
+    tax_rate = validate_tax_rate(money(sale.tax_rate if tax_rate is None else tax_rate))
+    payment_type = payment_type or sale.payment_type
+
+    if lines is None:
+        current_lines = list(sale.lines.select_related('product', 'packaging'))
+        subtotal = sum((line.line_total() for line in current_lines), Decimal('0'))
+        margin = sum(
+            (
+                line.packaging_quantity
+                * (line.unit_price - line.unit_cost * line.packaging_factor)
+                for line in current_lines
+            ),
+            Decimal('0'),
+        )
+        normalized_lines = None
+    else:
+        if not lines:
+            raise ValidationError({'lines': _('Une vente doit contenir au moins un produit.')})
+        product_ids = sorted({
+            line['product'].pk if isinstance(line['product'], Product) else int(line['product'])
+            for line in lines
+        })
+        products = {
+            product.pk: product
+            for product in Product.objects.select_for_update().filter(pk__in=product_ids).order_by('pk')
+        }
+        if len(products) != len(product_ids):
+            raise ValidationError({'lines': _('Un produit est introuvable.')})
+        packaging_ids = sorted({
+            line['packaging'].pk if isinstance(line.get('packaging'), ProductPackaging) else int(line['packaging'])
+            for line in lines if line.get('packaging')
+        })
+        packagings = {
+            packaging.pk: packaging
+            for packaging in ProductPackaging.objects.select_for_update().filter(pk__in=packaging_ids).order_by('pk')
+        }
+        if len(packagings) != len(packaging_ids):
+            raise ValidationError({'packaging': _('Conditionnement invalide ou inactif.')})
+
+        subtotal = Decimal('0')
+        margin = Decimal('0')
+        normalized_lines = []
+        requested = {}
+        for raw_line in lines:
+            product_id = raw_line['product'].pk if isinstance(raw_line['product'], Product) else int(raw_line['product'])
+            product = products[product_id]
+            packaging_value = raw_line.get('packaging')
+            packaging_id = packaging_value.pk if isinstance(packaging_value, ProductPackaging) else packaging_value
+            packaging = packagings.get(int(packaging_id)) if packaging_id else None
+            if packaging and (packaging.product_id != product.pk or not packaging.is_active):
+                raise ValidationError({'packaging': _('Conditionnement invalide ou inactif.')})
+            packaging_quantity = int(raw_line['quantity'])
+            if packaging_quantity <= 0:
+                raise ValidationError({'quantity': _('La quantité doit être strictement positive.')})
+            factor = packaging.conversion_factor if packaging else 1
+            package_price = raw_line.get('unit_price')
+            if package_price is None:
+                package_price = get_sale_price(product, client, packaging)
+            package_price = money(package_price)
+            minimum_price = product.purchase_price * factor
+            if package_price < minimum_price:
+                raise ValidationError({
+                    'unit_price': ValidationError(
+                        _("Impossible de vendre un produit à un prix inférieur à son prix d'achat."),
+                        code='sale_price_below_cost',
+                    )
+                })
+            subtotal += packaging_quantity * package_price
+            margin += packaging_quantity * (package_price - minimum_price)
+            normalized_lines.append({
+                'product': product,
+                'packaging': packaging,
+                'packaging_quantity': packaging_quantity,
+                'quantity': packaging_quantity * factor,
+                'unit_price': package_price,
+            })
+            requested[product.pk] = requested.get(product.pk, 0) + packaging_quantity * factor
+
+        old_quantities = {}
+        for old_line in sale.lines.all():
+            old_quantities[old_line.product_id] = (
+                old_quantities.get(old_line.product_id, 0) + old_line.quantity
+            )
+        operator_stocks = {}
+        if sale.loading_order_id:
+            operator_stocks = {
+                stock.product_id: stock
+                for stock in OperatorStock.objects.select_for_update().filter(
+                    operator_id=sale.loading_order.operator_id,
+                    product_id__in=requested,
+                ).order_by('product_id')
+            }
+        for product_id, quantity in requested.items():
+            current = (
+                operator_stocks.get(product_id).quantity
+                if product_id in operator_stocks
+                else (0 if sale.loading_order_id else products[product_id].quantity)
+            )
+            available = current + old_quantities.get(product_id, 0)
+            if available < quantity:
+                raise ValidationError({
+                    'quantity': ValidationError(
+                        _('%(label)s insuffisant : %(available)s unité(s) disponible(s).') % {
+                            'label': _('Stock opérateur') if sale.loading_order_id else _('Stock'),
+                            'available': available,
+                        },
+                        code='insufficient_stock',
+                    )
+                })
+
+    if discount < 0:
+        raise ValidationError({'discount': _('La remise ne peut pas être négative.')})
+    if discount > subtotal + subtotal * tax_rate / Decimal('100'):
+        raise ValidationError({'discount': _('La remise ne peut pas dépasser le total de la vente.')})
+    if discount > margin:
+        raise ValidationError({
+            'discount': ValidationError(
+                _("Impossible de vendre un produit à un prix inférieur à son prix d'achat."),
+                code='sale_price_below_cost',
+            )
+        })
+    total = money(subtotal + subtotal * tax_rate / Decimal('100') - discount)
+
+    sale.client = client
+    sale.discount = discount
+    sale.tax_rate = tax_rate
+    sale.payment_type = payment_type
+    sale.total = total
+    sale.payment_tracking_initialized = True
+    sale.save()
+
+    if normalized_lines is not None:
+        for old_line in list(sale.lines.select_for_update()):
+            old_line._stock_user = user
+            old_line.delete()
+        for line in normalized_lines:
+            replacement = SaleLine(sale=sale, **line)
+            replacement._stock_user = user
+            replacement.save()
+
+    if pay_full and sale.balance_due > 0:
+        Payment.objects.create(
+            sale=sale,
+            amount=sale.balance_due,
+            payment_type=payment_type,
+            created_by=user,
+        )
+    return sale
+
+
+@transaction.atomic
 def create_purchase(*, reference, supplier, lines, tax_rate=0, user=None):
     lines = _normalized_lines(lines, 'purchase_price')
     subtotal = sum((line['quantity'] * line['purchase_price'] for line in lines), Decimal('0'))

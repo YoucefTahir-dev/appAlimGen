@@ -131,19 +131,31 @@ class ProductViewSet(AuditMutationMixin, viewsets.ModelViewSet):
         ),
         OpenApiParameter(
             name='context', type=str, location=OpenApiParameter.QUERY, required=False,
-            description='Contexte de recherche ; loading_order par défaut.',
+            description='Contexte de recherche : sale, purchase ou loading_order.',
+        ),
+        OpenApiParameter(
+            name='client_id', type=int, location=OpenApiParameter.QUERY, required=False,
+            description='Client utilisé pour le tarif lorsque context=sale.',
         ),
     ], responses=OpenApiTypes.OBJECT)
     @action(detail=False, methods=('get',), url_path='search')
     def search(self, request):
         context = request.query_params.get('context', 'loading_order')
-        if context != 'loading_order':
+        if context not in {'sale', 'purchase', 'loading_order'}:
             raise ValidationError({'context': _('Contexte de recherche invalide.')})
         query = request.query_params.get('q', '').strip()
         if len(query) > 100:
             raise ValidationError({'q': _('Recherche trop longue.')})
+        customer = None
+        if context == 'sale':
+            client_id = request.query_params.get('client_id')
+            if client_id:
+                try:
+                    customer = Client.objects.get(pk=client_id)
+                except (Client.DoesNotExist, TypeError, ValueError) as exc:
+                    raise ValidationError({'client_id': _('Client invalide.')}) from exc
         return Response({'results': search_products(
-            user=request.user, query=query, context='loading_order',
+            user=request.user, query=query, context=context, customer=customer,
         )})
 
     @action(detail=False, methods=('get',), url_path=r'barcode/(?P<barcode>[^/.]+)')
@@ -283,7 +295,8 @@ class SupplierViewSet(AuditMutationMixin, viewsets.ModelViewSet):
 
 
 class SaleViewSet(AuditMutationMixin, mixins.CreateModelMixin, mixins.ListModelMixin,
-                  mixins.RetrieveModelMixin, mixins.DestroyModelMixin, viewsets.GenericViewSet):
+                  mixins.RetrieveModelMixin, mixins.UpdateModelMixin,
+                  mixins.DestroyModelMixin, viewsets.GenericViewSet):
     queryset = Sale.objects.select_related('client', 'created_by').prefetch_related(
         'lines__product', 'lines__packaging', 'payments',
     ).order_by('-created_at', '-pk')
@@ -294,12 +307,18 @@ class SaleViewSet(AuditMutationMixin, mixins.CreateModelMixin, mixins.ListModelM
     audit_name = 'sale'
     required_permissions = {
         'list': 'commerce.view_sale', 'retrieve': 'commerce.view_sale',
-        'create': 'commerce.add_sale', 'destroy': 'commerce.delete_sale',
+        'create': 'commerce.add_sale', 'update': 'commerce.change_sale',
+        'partial_update': 'commerce.change_sale', 'destroy': 'commerce.delete_sale',
     }
 
     @extend_schema(parameters=[IDEMPOTENCY_PARAMETER])
     def create(self, request, *args, **kwargs):
         return idempotent(request, 'sale.create', lambda: super(SaleViewSet, self).create(request, *args, **kwargs), required=False)
+
+    @extend_schema(parameters=[IDEMPOTENCY_PARAMETER])
+    def update(self, request, *args, **kwargs):
+        pk = kwargs.get('pk')
+        return idempotent(request, f'sale.{pk}.update', lambda: super(SaleViewSet, self).update(request, *args, **kwargs), required=False)
 
     def get_queryset(self):
         queryset = super().get_queryset()

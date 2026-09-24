@@ -68,6 +68,47 @@ class LoadingOrderFlowTests(APITestCase):
             )
         self.assertFalse(Sale.objects.exists())
 
+    def test_operator_sale_update_uses_only_loaded_stock_and_rolls_back_on_overflow(self):
+        validate_loading_order(self.order, user=self.admin)
+        self.operator.user_permissions.add(Permission.objects.get(
+            codename='change_sale', content_type__app_label='commerce',
+        ))
+        sale = create_sale(
+            client=self.client_record,
+            lines=[{'product': self.product, 'quantity': 3, 'unit_price': 20}],
+            user=self.operator,
+        )
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f'Bearer {MobileTokenSerializer.get_token(self.operator).access_token}'
+        )
+
+        accepted = self.client.patch(
+            reverse('api-sale-detail', args=[sale.pk]),
+            {'items': [{'product': self.product.pk, 'quantity': 8, 'unit_price': '20.00'}]},
+            format='json', HTTP_IDEMPOTENCY_KEY=str(uuid4()),
+        )
+        self.assertEqual(accepted.status_code, 200, accepted.data)
+        self.assertEqual(
+            OperatorStock.objects.get(operator=self.operator, product=self.product).quantity,
+            2,
+        )
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.quantity, 10, 'La modification ne doit pas toucher le depot.')
+
+        rejected = self.client.patch(
+            reverse('api-sale-detail', args=[sale.pk]),
+            {'items': [{'product': self.product.pk, 'quantity': 11, 'unit_price': '20.00'}]},
+            format='json', HTTP_IDEMPOTENCY_KEY=str(uuid4()),
+        )
+        self.assertEqual(rejected.status_code, 400, rejected.data)
+        self.assertEqual(rejected.json()['error']['code'], 'INSUFFICIENT_STOCK')
+        sale.refresh_from_db()
+        self.assertEqual(sale.lines.get().quantity, 8)
+        self.assertEqual(
+            OperatorStock.objects.get(operator=self.operator, product=self.product).quantity,
+            2,
+        )
+
     def test_api_current_only_exposes_authenticated_operator(self):
         validate_loading_order(self.order, user=self.admin)
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {MobileTokenSerializer.get_token(self.operator).access_token}')
