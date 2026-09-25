@@ -31,6 +31,120 @@ class LoadingOrderFlowTests(APITestCase):
         self.order = LoadingOrder.objects.create(number=f'CHG-TEST-{uuid4().hex[:8]}', operator=self.operator, created_by=self.admin)
         LoadingOrderLine.objects.create(loading_order=self.order, product=self.product, quantity=10)
 
+    def authenticate(self, user=None):
+        user = user or self.admin
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f'Bearer {MobileTokenSerializer.get_token(user).access_token}'
+        )
+
+    def test_api_validate_action_uses_post_and_transfers_stock(self):
+        self.authenticate()
+        response = self.client.post(
+            reverse('api-loading-order-validate', args=[self.order.pk]),
+            {},
+            format='json',
+            HTTP_IDEMPOTENCY_KEY=str(uuid4()),
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.json()['data']['status'], LoadingOrder.IN_PROGRESS)
+        self.order.refresh_from_db()
+        self.product.refresh_from_db()
+        self.assertEqual(self.order.status, LoadingOrder.IN_PROGRESS)
+        self.assertEqual(self.product.quantity, 10)
+        self.assertEqual(
+            OperatorStock.objects.get(operator=self.operator, product=self.product).quantity,
+            10,
+        )
+
+    def test_api_cancel_action_uses_post_without_changing_stock(self):
+        self.authenticate()
+        response = self.client.post(
+            reverse('api-loading-order-cancel', args=[self.order.pk]),
+            {},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.json()['data']['status'], LoadingOrder.CANCELLED)
+        self.order.refresh_from_db()
+        self.product.refresh_from_db()
+        self.assertEqual(self.order.status, LoadingOrder.CANCELLED)
+        self.assertEqual(self.product.quantity, 20)
+        self.assertFalse(OperatorStock.objects.filter(operator=self.operator).exists())
+
+    def test_api_close_action_returns_unsold_stock(self):
+        self.authenticate()
+        validated = self.client.post(
+            reverse('api-loading-order-validate', args=[self.order.pk]),
+            {},
+            format='json',
+            HTTP_IDEMPOTENCY_KEY=str(uuid4()),
+        )
+        self.assertEqual(validated.status_code, 200, validated.data)
+
+        response = self.client.post(
+            reverse('api-loading-order-close', args=[self.order.pk]),
+            {},
+            format='json',
+            HTTP_IDEMPOTENCY_KEY=str(uuid4()),
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.json()['data']['status'], LoadingOrder.CLOSED)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.quantity, 20)
+        self.assertEqual(
+            OperatorStock.objects.get(operator=self.operator, product=self.product).quantity,
+            0,
+        )
+
+    def test_api_actions_reject_invalid_transition_and_missing_permission(self):
+        self.authenticate()
+        cancelled = self.client.post(
+            reverse('api-loading-order-cancel', args=[self.order.pk]),
+            {},
+            format='json',
+        )
+        self.assertEqual(cancelled.status_code, 200, cancelled.data)
+        invalid = self.client.post(
+            reverse('api-loading-order-validate', args=[self.order.pk]),
+            {},
+            format='json',
+            HTTP_IDEMPOTENCY_KEY=str(uuid4()),
+        )
+        self.assertEqual(invalid.status_code, 400, invalid.data)
+
+        other_order = LoadingOrder.objects.create(
+            number=f'CHG-NO-PERM-{uuid4().hex[:8]}',
+            operator=self.operator,
+            created_by=self.admin,
+        )
+        LoadingOrderLine.objects.create(
+            loading_order=other_order,
+            product=self.product,
+            quantity=1,
+        )
+        user_without_permission = User.objects.create_user(
+            username=f'loading-no-perm-{uuid4().hex[:8]}',
+            password='StrongPass123!',
+        )
+        self.authenticate(user_without_permission)
+        forbidden = self.client.post(
+            reverse('api-loading-order-validate', args=[other_order.pk]),
+            {},
+            format='json',
+        )
+        self.assertEqual(forbidden.status_code, 403, forbidden.data)
+
+        self.client.credentials()
+        unauthenticated = self.client.post(
+            reverse('api-loading-order-cancel', args=[other_order.pk]),
+            {},
+            format='json',
+        )
+        self.assertEqual(unauthenticated.status_code, 401, unauthenticated.data)
+
     def test_validation_sale_and_close_isolate_depot_and_operator_stock(self):
         validate_loading_order(self.order, user=self.admin)
         self.product.refresh_from_db()

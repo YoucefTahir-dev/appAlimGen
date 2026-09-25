@@ -60,6 +60,22 @@ Si le créateur possède un chargement actif, Django rattache automatiquement la
 4. Créer les ventes avec une clé d’idempotence.
 5. `close` retourne atomiquement le reliquat au dépôt et historise vendu/retourné.
 
+### Contrat HTTP des actions
+
+Toutes les routes ci-dessous sont relatives à `/api/v1/`, exigent un jeton Bearer et se terminent par `/`.
+
+| Action | Méthode et route | Corps | Permission | Réponse attendue |
+|---|---|---|---|---|
+| Lister | `GET loading-orders/` | aucun | droit de consultation | `200`, page de bons |
+| Créer | `POST loading-orders/` | `operator`, `notes`, `lines` | `inventory.add_loadingorder` | `201`, bon brouillon |
+| Modifier | `PATCH loading-orders/{id}/` | champs modifiés | `inventory.change_loadingorder` | `200`, uniquement si brouillon |
+| Supprimer | `DELETE loading-orders/{id}/` | aucun | `inventory.delete_loadingorder` | `204`, uniquement si brouillon |
+| Valider | `POST loading-orders/{id}/validate/` | aucun (`{}` accepté) | `inventory.validate_loadingorder` | `200`, statut `in_progress`, stock transféré |
+| Annuler | `POST loading-orders/{id}/cancel/` | aucun (`{}` accepté) | `inventory.delete_loadingorder` | `200`, statut `cancelled`, uniquement si brouillon |
+| Clôturer | `POST loading-orders/{id}/close/` | aucun (`{}` accepté) | `inventory.close_loadingorder` | `200`, statut `closed`, reliquat retourné |
+
+`create`, `validate` et `close` doivent envoyer `Idempotency-Key`. Un `400` indique une transition ou des données invalides, `401` une session absente/expirée, `403` une permission absente, `405` un contrat serveur/client incompatible, `409` un conflit et `5xx` une erreur serveur. Après chaque succès, remplacer immédiatement le bon local par l’objet renvoyé puis rafraîchir les listes de stock concernées.
+
 ## Impression RPP02N
 
 Le serveur ne contacte jamais le Bluetooth. Android récupère `print-data`, l’imprimante par défaut et le `test-payload`, puis envoie localement les octets au RPP02N. Pour l’arabe, utiliser le rendu bitmap lorsque `raster_arabic_recommended=true`. Une recette physique reste indispensable.

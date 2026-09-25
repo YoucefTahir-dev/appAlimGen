@@ -2695,6 +2695,199 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
+  /api/v1/loading-orders/{id}/cancel/:
+    post:
+      operationId: api_v1_loading_orders_cancel_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) loading order.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/LoadingOrder'
+          description: ''
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: Permission denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+  /api/v1/loading-orders/{id}/close/:
+    post:
+      operationId: api_v1_loading_orders_close_create
+      parameters:
+      - in: header
+        name: Idempotency-Key
+        schema:
+          type: string
+        description: Clé unique recommandée pour rejouer une écriture sans la dupliquer.
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) loading order.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/LoadingOrder'
+          description: ''
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: Permission denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+  /api/v1/loading-orders/{id}/validate/:
+    post:
+      operationId: api_v1_loading_orders_validate_create
+      parameters:
+      - in: header
+        name: Idempotency-Key
+        schema:
+          type: string
+        description: Clé unique recommandée pour rejouer une écriture sans la dupliquer.
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) loading order.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/LoadingOrder'
+          description: ''
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: Permission denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
   /api/v1/loading-orders/current/:
     get:
       operationId: api_v1_loading_orders_current_retrieve
@@ -5256,10 +5449,15 @@ paths:
       operationId: api_v1_products_search_retrieve
       parameters:
       - in: query
+        name: client_id
+        schema:
+          type: integer
+        description: Client utilisé pour le tarif lorsque context=sale.
+      - in: query
         name: context
         schema:
           type: string
-        description: Contexte de recherche ; loading_order par défaut.
+        description: 'Contexte de recherche : sale, purchase ou loading_order.'
       - in: query
         name: q
         schema:
@@ -5759,6 +5957,154 @@ paths:
         required: true
       tags:
       - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/Sale'
+          description: ''
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: Permission denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+    put:
+      operationId: api_v1_sales_update
+      parameters:
+      - in: header
+        name: Idempotency-Key
+        schema:
+          type: string
+        description: Clé unique recommandée pour rejouer une écriture sans la dupliquer.
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Vente.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Sale'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Sale'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Sale'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/Sale'
+          description: ''
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: Permission denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+    patch:
+      operationId: api_v1_sales_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Vente.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSale'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSale'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSale'
       security:
       - jwtAuth: []
       responses:
@@ -7828,6 +8174,109 @@ components:
         is_active:
           type: boolean
           title: Actif
+    PatchedSale:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        invoice_number:
+          type: string
+          readOnly: true
+          title: Numéro facture
+        ticket_number:
+          type: string
+          readOnly: true
+          nullable: true
+          title: Numéro ticket
+        client:
+          type: integer
+        total:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          readOnly: true
+          title: Total TTC
+        discount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          title: Remise
+        tax_rate:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          title: TVA (%)
+        payment_type:
+          title: Mode de paiement
+          oneOf:
+          - $ref: '#/components/schemas/PaymentTypeEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        payment_tracking_initialized:
+          type: boolean
+          readOnly: true
+          title: Suivi des règlements initialisé
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Date
+        amount_paid:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          readOnly: true
+        balance_due:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          readOnly: true
+        payment_status:
+          type: string
+          readOnly: true
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/SaleLineRead'
+          readOnly: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SaleLineWrite'
+          writeOnly: true
+        pay_full:
+          type: boolean
+          writeOnly: true
+          default: false
+        created_by_name:
+          type: string
+          readOnly: true
+        loading_order:
+          type: integer
+          readOnly: true
+          nullable: true
+          title: Chargement opérateur
+        client_details:
+          type: object
+          additionalProperties: {}
+          readOnly: true
+        payments:
+          type: array
+          items: {}
+          readOnly: true
+        subtotal:
+          type: string
+          readOnly: true
+        tax_amount:
+          type: string
+          readOnly: true
+        payment_type_display:
+          type: string
+          readOnly: true
+        capabilities:
+          type: object
+          additionalProperties: {}
+          readOnly: true
     PatchedSupplier:
       type: object
       properties:
@@ -8456,10 +8905,33 @@ components:
           readOnly: true
           nullable: true
           title: Chargement opérateur
+        client_details:
+          type: object
+          additionalProperties: {}
+          readOnly: true
+        payments:
+          type: array
+          items: {}
+          readOnly: true
+        subtotal:
+          type: string
+          readOnly: true
+        tax_amount:
+          type: string
+          readOnly: true
+        payment_type_display:
+          type: string
+          readOnly: true
+        capabilities:
+          type: object
+          additionalProperties: {}
+          readOnly: true
       required:
       - amount_paid
       - balance_due
+      - capabilities
       - client
+      - client_details
       - created_at
       - created_by_name
       - id
@@ -8469,6 +8941,10 @@ components:
       - loading_order
       - payment_status
       - payment_tracking_initialized
+      - payment_type_display
+      - payments
+      - subtotal
+      - tax_amount
       - ticket_number
       - total
     SaleLineRead:

@@ -440,7 +440,7 @@ class LoadingOrderViewSet(AuditMutationMixin, viewsets.ModelViewSet):
         return Response(self.get_serializer(order).data)
 
     @extend_schema(request=None, responses=LoadingOrderSerializer, parameters=[IDEMPOTENCY_PARAMETER])
-    @action(detail=True, methods=('post'))
+    @action(detail=True, methods=('post',))
     def validate(self, request, pk=None):
         def operation():
             order = validate_loading_order(self.get_object(), user=request.user)
@@ -449,7 +449,7 @@ class LoadingOrderViewSet(AuditMutationMixin, viewsets.ModelViewSet):
         return idempotent(request, f'loading.{pk}.validate', operation, required=False)
 
     @extend_schema(request=None, responses=LoadingOrderSerializer, parameters=[IDEMPOTENCY_PARAMETER])
-    @action(detail=True, methods=('post'))
+    @action(detail=True, methods=('post',))
     def close(self, request, pk=None):
         def operation():
             order = close_loading_order(self.get_object(), user=request.user)
@@ -457,7 +457,8 @@ class LoadingOrderViewSet(AuditMutationMixin, viewsets.ModelViewSet):
             return Response(self.get_serializer(order).data)
         return idempotent(request, f'loading.{pk}.close', operation, required=False)
 
-    @action(detail=True, methods=('post'))
+    @extend_schema(request=None, responses=LoadingOrderSerializer)
+    @action(detail=True, methods=('post',))
     def cancel(self, request, pk=None):
         order = cancel_loading_order(self.get_object())
         self._audit('cancel')
