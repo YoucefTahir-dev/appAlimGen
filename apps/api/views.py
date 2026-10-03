@@ -18,6 +18,7 @@ from apps.commerce.product_search import search_products
 from apps.commerce.services import ensure_ticket_number
 from apps.commerce.utils import build_invoice_context, generate_invoice_pdf, qr_code_data_uri
 from apps.core.dashboard import DashboardPeriodError, dashboard_context
+from apps.core.models import CompanySettings
 from apps.core.security import log_security_event
 from apps.expenses.models import Expense, ExpenseCategory
 from apps.inventory.models import (
@@ -34,6 +35,7 @@ from .serializers import (
     BrandSerializer,
     CategorySerializer,
     ClientSerializer,
+    CompanySettingsSerializer,
     ExpenseCategorySerializer,
     ExpenseSerializer,
     LoadingOrderSerializer,
@@ -57,6 +59,44 @@ IDEMPOTENCY_PARAMETER = OpenApiParameter(
     name='Idempotency-Key', type=str, location=OpenApiParameter.HEADER,
     required=False, description='Clé unique recommandée pour rejouer une écriture sans la dupliquer.',
 )
+
+
+class CompanySettingsView(APIView):
+    required_permissions = {
+        'get': 'core.view_companysettings',
+        'patch': 'core.change_companysettings',
+        'put': 'core.change_companysettings',
+    }
+
+    @staticmethod
+    def _instance():
+        return CompanySettings.objects.order_by('pk').first() or CompanySettings.objects.create()
+
+    @extend_schema(responses=CompanySettingsSerializer)
+    def get(self, request):
+        return Response(CompanySettingsSerializer(self._instance(), context={'request': request}).data)
+
+    @extend_schema(request=CompanySettingsSerializer, responses=CompanySettingsSerializer)
+    def patch(self, request):
+        company = self._instance()
+        serializer = CompanySettingsSerializer(
+            company, data=request.data, partial=True, context={'request': request},
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        log_security_event(request, 'api.company_settings.update')
+        return Response(serializer.data)
+
+    @extend_schema(request=CompanySettingsSerializer, responses=CompanySettingsSerializer)
+    def put(self, request):
+        company = self._instance()
+        serializer = CompanySettingsSerializer(
+            company, data=request.data, context={'request': request},
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        log_security_event(request, 'api.company_settings.update')
+        return Response(serializer.data)
 
 
 class AuditMutationMixin:

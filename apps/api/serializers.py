@@ -8,6 +8,7 @@ from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 
 from apps.accounts.permissions import has_permission
+from apps.core.models import CompanySettings
 from apps.commerce.models import Payment, Purchase, PurchaseLine, Sale, SaleLine
 from apps.commerce.services import create_purchase, create_sale, update_sale
 from apps.expenses.models import Expense, ExpenseCategory
@@ -252,6 +253,25 @@ class ClientSerializer(serializers.ModelSerializer):
         read_only_fields = ('created_at',)
 
 
+class CompanySettingsSerializer(serializers.ModelSerializer):
+    logo_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CompanySettings
+        fields = (
+            'id', 'company_name', 'address', 'phone', 'email', 'rc_number',
+            'tax_number', 'nis', 'article_number', 'tax_rate', 'logo_url',
+            'updated_at',
+        )
+        read_only_fields = ('id', 'logo_url', 'updated_at')
+
+    def get_logo_url(self, obj) -> str | None:
+        if not obj.logo:
+            return None
+        request = self.context.get('request')
+        return request.build_absolute_uri(obj.logo.url) if request else obj.logo.url
+
+
 class SupplierSerializer(serializers.ModelSerializer):
     class Meta:
         model = Supplier
@@ -323,6 +343,7 @@ class SaleSerializer(serializers.ModelSerializer):
     tax_amount = serializers.SerializerMethodField()
     payment_type_display = serializers.CharField(source='get_payment_type_display', read_only=True)
     capabilities = serializers.SerializerMethodField()
+    company_details = serializers.SerializerMethodField()
 
     class Meta:
         model = Sale
@@ -333,7 +354,7 @@ class SaleSerializer(serializers.ModelSerializer):
             'created_by_name',
             'loading_order',
             'client_details', 'payments', 'subtotal', 'tax_amount',
-            'payment_type_display', 'capabilities',
+            'payment_type_display', 'capabilities', 'company_details',
         )
         read_only_fields = (
             'invoice_number', 'ticket_number', 'total',
@@ -354,6 +375,15 @@ class SaleSerializer(serializers.ModelSerializer):
             'customer_type': client.customer_type,
             'customer_type_display': client.get_customer_type_display(),
         }
+
+    def get_company_details(self, obj) -> dict:
+        request = self.context.get('request')
+        company = getattr(request, '_company_settings', None) if request else None
+        if company is None:
+            company = CompanySettings.objects.order_by('pk').first() or CompanySettings()
+            if request:
+                request._company_settings = company
+        return CompanySettingsSerializer(company, context=self.context).data
 
     def get_payments(self, obj) -> list:
         return [

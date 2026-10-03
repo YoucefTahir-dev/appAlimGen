@@ -1099,6 +1099,188 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
+  /api/v1/company-settings/:
+    get:
+      operationId: api_v1_company_settings_retrieve
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/CompanySettings'
+          description: ''
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: Permission denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+    put:
+      operationId: api_v1_company_settings_update
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompanySettings'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CompanySettings'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CompanySettings'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/CompanySettings'
+          description: ''
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: Permission denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+    patch:
+      operationId: api_v1_company_settings_partial_update
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedCompanySettings'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedCompanySettings'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedCompanySettings'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/CompanySettings'
+          description: ''
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: Permission denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
   /api/v1/dashboard/:
     get:
       operationId: api_v1_dashboard_retrieve
@@ -7152,6 +7334,61 @@ components:
       - created_at
       - id
       - name
+    CompanySettings:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        company_name:
+          type: string
+          title: Nom entreprise
+          maxLength: 200
+        address:
+          type: string
+          title: Adresse
+          maxLength: 255
+        phone:
+          type: string
+          title: Téléphone
+          maxLength: 50
+        email:
+          type: string
+          format: email
+          title: Courriel
+          maxLength: 254
+        rc_number:
+          type: string
+          title: RC
+          maxLength: 100
+        tax_number:
+          type: string
+          title: NIF
+          maxLength: 100
+        nis:
+          type: string
+          maxLength: 100
+        article_number:
+          type: string
+          title: Article d’imposition (AI)
+          maxLength: 100
+        tax_rate:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          title: TVA (%)
+        logo_url:
+          type: string
+          nullable: true
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - id
+      - logo_url
+      - updated_at
     ConnectionModeEnum:
       enum:
       - bluetooth
@@ -7845,6 +8082,57 @@ components:
           type: string
           format: date-time
           readOnly: true
+    PatchedCompanySettings:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        company_name:
+          type: string
+          title: Nom entreprise
+          maxLength: 200
+        address:
+          type: string
+          title: Adresse
+          maxLength: 255
+        phone:
+          type: string
+          title: Téléphone
+          maxLength: 50
+        email:
+          type: string
+          format: email
+          title: Courriel
+          maxLength: 254
+        rc_number:
+          type: string
+          title: RC
+          maxLength: 100
+        tax_number:
+          type: string
+          title: NIF
+          maxLength: 100
+        nis:
+          type: string
+          maxLength: 100
+        article_number:
+          type: string
+          title: Article d’imposition (AI)
+          maxLength: 100
+        tax_rate:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          title: TVA (%)
+        logo_url:
+          type: string
+          nullable: true
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
     PatchedExpense:
       type: object
       properties:
@@ -8296,6 +8584,10 @@ components:
           type: string
           readOnly: true
         capabilities:
+          type: object
+          additionalProperties: {}
+          readOnly: true
+        company_details:
           type: object
           additionalProperties: {}
           readOnly: true
@@ -8948,12 +9240,17 @@ components:
           type: object
           additionalProperties: {}
           readOnly: true
+        company_details:
+          type: object
+          additionalProperties: {}
+          readOnly: true
       required:
       - amount_paid
       - balance_due
       - capabilities
       - client
       - client_details
+      - company_details
       - created_at
       - created_by_name
       - id

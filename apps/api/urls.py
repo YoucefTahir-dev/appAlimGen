@@ -15,6 +15,7 @@ from .views import (
     BrandViewSet,
     CategoryViewSet,
     ClientViewSet,
+    CompanySettingsView,
     DashboardView,
     ExpenseCategoryViewSet,
     ExpenseViewSet,
@@ -66,5 +67,6 @@ urlpatterns = [
     path('v1/dashboard/', DashboardView.as_view(), name='api-dashboard'),
     path('v1/alerts/', AlertsView.as_view(), name='api-alerts'),
     path('v1/printing/', PrintingCapabilitiesView.as_view(), name='api-printing-capabilities'),
+    path('v1/company-settings/', CompanySettingsView.as_view(), name='api-company-settings'),
     path('v1/', include(router.urls)),
 ]

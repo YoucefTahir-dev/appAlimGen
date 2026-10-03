@@ -13,6 +13,7 @@ from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import AccessToken
 
 from apps.accounts.models import User
+from apps.core.models import CompanySettings
 from apps.commerce.models import Purchase, Sale
 from apps.expenses.models import ExpenseCategory
 from apps.inventory.models import (
@@ -131,6 +132,44 @@ class MobileApiTests(APITestCase):
         )
         user.denied_permissions.add(view_permission)
         self.assertEqual(self.client.get(reverse('api-product-list')).status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_company_settings_can_be_read_and_updated_from_mobile(self):
+        self.authenticate()
+        CompanySettings.objects.all().delete()
+
+        response = self.client.get(reverse('api-company-settings'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        payload = response.data.get('data', response.data)
+        self.assertIn('tax_rate', payload)
+
+        response = self.client.patch(reverse('api-company-settings'), {
+            'company_name': 'Entreprise mobile',
+            'tax_number': 'NIF-ANDROID',
+            'nis': 'NIS-ANDROID',
+            'rc_number': 'RC-ANDROID',
+            'article_number': 'AI-ANDROID',
+            'tax_rate': '19.00',
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        company = CompanySettings.objects.get()
+        self.assertEqual(company.company_name, 'Entreprise mobile')
+        self.assertEqual(company.article_number, 'AI-ANDROID')
+
+    def test_company_settings_mobile_endpoint_enforces_permissions(self):
+        role = Group.objects.create(name='Lecture parametres entreprise API')
+        view_permission = Permission.objects.get(
+            content_type__app_label='core', codename='view_companysettings'
+        )
+        role.permissions.add(view_permission)
+        user = User.objects.create_user(username='api-company-reader', password=self.password)
+        user.groups.add(role)
+        self.authenticate(user)
+
+        self.assertEqual(self.client.get(reverse('api-company-settings')).status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            self.client.patch(reverse('api-company-settings'), {'nis': 'DENIED'}, format='json').status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
 
     def test_product_list_search_barcode_and_sensitive_price_visibility(self):
         self.authenticate()
@@ -317,6 +356,11 @@ class MobileApiTests(APITestCase):
         self.assertEqual(payload['client_details']['nis'], 'NIS-MOBILE')
         self.assertEqual(payload['client_details']['article_number'], 'ARTICLE-MOBILE')
         self.assertEqual(payload['client_details']['trade_register_number'], 'RC-MOBILE')
+        self.assertIn('company_name', payload['company_details'])
+        self.assertIn('tax_number', payload['company_details'])
+        self.assertIn('nis', payload['company_details'])
+        self.assertIn('rc_number', payload['company_details'])
+        self.assertIn('article_number', payload['company_details'])
         self.assertEqual(payload['subtotal'], '160.00')
         self.assertEqual(payload['amount_paid'], '160.00')
         self.assertEqual(len(payload['payments']), 1)
