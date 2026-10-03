@@ -1,0 +1,44 @@
+{% extends 'base/base.html' %}
+{% load i18n access_tags %}
+
+{% block title %}{% trans "Informations de l’entreprise" %}{% endblock %}
+{% block page_title %}{% trans "Informations de l’entreprise" %}{% endblock %}
+
+{% block content %}
+{% has_access 'core.change_companysettings' as can_change_company_settings %}
+<div class="card card-dashboard bg-white p-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+            <h2 class="h5 mb-1">{% trans "Coordonnées et informations légales" %}</h2>
+            <p class="text-muted mb-0">{% trans "Ces informations apparaissent sur vos factures et tickets." %}</p>
+        </div>
+        {% if can_change_company_settings %}
+            <a class="btn btn-primary" href="{% url 'company_settings_update' %}">
+                <i class="bi bi-pencil-square me-1"></i>{% trans "Modifier" %}
+            </a>
+        {% endif %}
+    </div>
+
+    <div class="row g-4">
+        <div class="col-12 col-lg-6">
+            <h3 class="h6 text-uppercase text-muted">{% trans "Entreprise" %}</h3>
+            <dl class="row mb-0">
+                <dt class="col-sm-4">{% trans "Nom" %}</dt><dd class="col-sm-8">{{ company.company_name|default:"—" }}</dd>
+                <dt class="col-sm-4">{% trans "Adresse" %}</dt><dd class="col-sm-8">{{ company.address|default:"—" }}</dd>
+                <dt class="col-sm-4">{% trans "Téléphone" %}</dt><dd class="col-sm-8">{{ company.phone|default:"—" }}</dd>
+                <dt class="col-sm-4">{% trans "Email" %}</dt><dd class="col-sm-8">{{ company.email|default:"—" }}</dd>
+                <dt class="col-sm-4">{% trans "TVA (%)" %}</dt><dd class="col-sm-8">{{ company.tax_rate|floatformat:2 }}%</dd>
+            </dl>
+        </div>
+        <div class="col-12 col-lg-6">
+            <h3 class="h6 text-uppercase text-muted">{% trans "Informations légales" %}</h3>
+            <dl class="row mb-0">
+                <dt class="col-sm-4">NIF</dt><dd class="col-sm-8">{{ company.tax_number|default:"—" }}</dd>
+                <dt class="col-sm-4">NIS</dt><dd class="col-sm-8">{{ company.nis|default:"—" }}</dd>
+                <dt class="col-sm-4">RC</dt><dd class="col-sm-8">{{ company.rc_number|default:"—" }}</dd>
+                <dt class="col-sm-4">AI</dt><dd class="col-sm-8">{{ company.article_number|default:"—" }}</dd>
+            </dl>
+        </div>
+    </div>
+</div>
+{% endblock %}

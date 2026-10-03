@@ -220,7 +220,7 @@
 
     <section>
         <div class="row"><span>{% trans "Total" %} HT</span><span>{{ total_ht|floatformat:2 }} DZD</span></div>
-        <div class="row"><span>{% trans "TVA" %}</span><span>{{ tax_amount|floatformat:2 }} DZD</span></div>
+        <div class="row"><span>{% trans "TVA" %} ({{ tax_rate|floatformat:2 }}%)</span><span>{{ tax_amount|floatformat:2 }} DZD</span></div>
         <div class="row"><span>{% trans "Remise" %}</span><span>{{ discount|floatformat:2 }} DZD</span></div>
         <div class="row total"><span>{% trans "Total" %} TTC</span><span>{{ total_ttc|floatformat:2 }} DZD</span></div>
         <div class="row"><span>{% trans "Paiement" %}</span><span>{{ sale.get_payment_type_display }}</span></div>

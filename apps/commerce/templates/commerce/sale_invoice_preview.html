@@ -112,7 +112,7 @@
         <div class="col-md-5">
             <div class="totals-card">
                 <div class="d-flex justify-content-between p-2 border-bottom"><span>{% trans "Total" %} HT</span><strong>{{ total_ht|floatformat:2 }} DZD</strong></div>
-                <div class="d-flex justify-content-between p-2 border-bottom"><span>{% trans "TVA" %}</span><strong>{{ tax_amount|floatformat:2 }} DZD</strong></div>
+                <div class="d-flex justify-content-between p-2 border-bottom"><span>{% trans "TVA" %} ({{ tax_rate|floatformat:2 }}%)</span><strong>{{ tax_amount|floatformat:2 }} DZD</strong></div>
                 <div class="d-flex justify-content-between p-2 border-bottom"><span>{% trans "Remise" %}</span><strong>{{ sale.discount|floatformat:2 }} DZD</strong></div>
                 <div class="d-flex justify-content-between p-3 total-final"><span>Net à payer</span><strong>{{ total_ttc|floatformat:2 }} DZD</strong></div>
             </div>

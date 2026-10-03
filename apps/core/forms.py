@@ -3,6 +3,8 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
+from .models import CompanySettings
+
 
 PERIOD_CHOICES = [
     ("today", _("Aujourd'hui")),
@@ -12,6 +14,29 @@ PERIOD_CHOICES = [
     ("year", _("Cette année")),
     ("custom", _("Période personnalisée")),
 ]
+
+
+class CompanySettingsForm(forms.ModelForm):
+    class Meta:
+        model = CompanySettings
+        fields = (
+            'company_name', 'address', 'phone', 'email', 'tax_number', 'nis',
+            'rc_number', 'article_number', 'tax_rate', 'logo',
+        )
+        widgets = {
+            'company_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'address': forms.TextInput(attrs={'class': 'form-control'}),
+            'phone': forms.TextInput(attrs={'class': 'form-control'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control'}),
+            'tax_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'nis': forms.TextInput(attrs={'class': 'form-control'}),
+            'rc_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'article_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'tax_rate': forms.NumberInput(attrs={
+                'class': 'form-control', 'min': '0', 'max': '100', 'step': '0.01',
+            }),
+            'logo': forms.ClearableFileInput(attrs={'class': 'form-control'}),
+        }
 
 
 class DashboardPeriodForm(forms.Form):

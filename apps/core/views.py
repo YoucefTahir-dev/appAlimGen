@@ -1,9 +1,10 @@
 import io
 
 import openpyxl
+from django.contrib import messages
 from django.db import DatabaseError, connection
 from django.http import HttpResponse, JsonResponse
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.utils.translation import gettext as _
 from openpyxl.chart import LineChart as ExcelLineChart
 from openpyxl.chart import PieChart as ExcelPieChart
@@ -16,9 +17,11 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-from apps.accounts.permissions import seller_required
+from apps.accounts.permissions import permission_required, seller_required
 from .dashboard import DashboardPeriodError, dashboard_context
 from .export_security import excel_safe_text, pdf_safe_text
+from .forms import CompanySettingsForm
+from .models import CompanySettings
 
 
 def health(request):
@@ -38,6 +41,29 @@ def readiness(request):
         response = JsonResponse({'status': 'ready'})
     response['Cache-Control'] = 'no-store'
     return response
+
+
+def get_company_settings():
+    company = CompanySettings.objects.order_by('pk').first()
+    return company or CompanySettings.objects.create()
+
+
+@permission_required('core.view_companysettings')
+def company_settings(request):
+    return render(request, 'core/company_settings.html', {
+        'company': get_company_settings(),
+    })
+
+
+@permission_required('core.change_companysettings')
+def company_settings_update(request):
+    company = get_company_settings()
+    form = CompanySettingsForm(request.POST or None, request.FILES or None, instance=company)
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        messages.success(request, _('Informations de l’entreprise mises à jour.'))
+        return redirect('company_settings')
+    return render(request, 'core/company_settings_form.html', {'form': form})
 
 
 def money(value):

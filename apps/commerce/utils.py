@@ -324,7 +324,7 @@ def generate_invoice_pdf(response, sale):
     totals_table = Table(
         [
             ['Total HT', money(context['total_ht'])],
-            ['TVA', money(context['tax_amount'])],
+            [f"TVA ({context['tax_rate']:.2f}%)", money(context['tax_amount'])],
             ['Remise', money(sale.discount)],
             ['Net à payer', money(context['total_ttc'])],
         ],

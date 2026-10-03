@@ -1,0 +1,41 @@
+{% extends 'base/base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "Modifier les informations de l’entreprise" %}{% endblock %}
+{% block page_title %}{% trans "Modifier les informations de l’entreprise" %}{% endblock %}
+
+{% block content %}
+<form method="post" enctype="multipart/form-data" class="card card-dashboard bg-white p-4">
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+
+    <fieldset>
+        <legend class="h5 mb-3">{% trans "Coordonnées" %}</legend>
+        <div class="row g-3">
+            {% for field in form %}
+                {% if field.name != 'tax_number' and field.name != 'nis' and field.name != 'rc_number' and field.name != 'article_number' %}
+                    <div class="col-12 {% if field.name != 'logo' %}col-md-6{% endif %}">
+                        {{ field.label_tag }}{{ field }}{{ field.errors }}
+                        {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                    </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </fieldset>
+
+    <fieldset class="border rounded-3 p-3 mt-4">
+        <legend class="float-none w-auto px-2 h6 text-uppercase">{% trans "Informations légales" %}</legend>
+        <div class="row g-3">
+            <div class="col-12 col-md-6">{{ form.tax_number.label_tag }}{{ form.tax_number }}{{ form.tax_number.errors }}</div>
+            <div class="col-12 col-md-6">{{ form.nis.label_tag }}{{ form.nis }}{{ form.nis.errors }}</div>
+            <div class="col-12 col-md-6">{{ form.rc_number.label_tag }}{{ form.rc_number }}{{ form.rc_number.errors }}</div>
+            <div class="col-12 col-md-6">{{ form.article_number.label_tag }}{{ form.article_number }}{{ form.article_number.errors }}</div>
+        </div>
+    </fieldset>
+
+    <div class="d-flex gap-2 mt-4">
+        <button class="btn btn-success" type="submit">{% trans "Enregistrer" %}</button>
+        <a class="btn btn-outline-secondary" href="{% url 'company_settings' %}">{% trans "Annuler" %}</a>
+    </div>
+</form>
+{% endblock %}

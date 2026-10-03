@@ -607,7 +607,7 @@ class CommerceTests(TestCase):
         self.client_obj.save()
         sale = Sale.objects.create(
             invoice_number='FAC-2026-LEGAL', client=self.client_obj,
-            total='0', discount='0', tax_rate='0',
+            total='0', discount='0', tax_rate='20.00',
         )
         SaleLine.objects.create(
             sale=sale, product=self.product, quantity=1, unit_price='15.00',
@@ -629,6 +629,7 @@ class CommerceTests(TestCase):
         ):
             response = self.client.get(route)
             self.assertEqual(response.status_code, 200)
+            self.assertContains(response, 'TVA (20')
             for value in (
                 'NIF-INVOICE-01', 'NIS-INVOICE-02',
                 'ARTICLE-INVOICE-03', 'RC-INVOICE-04',
