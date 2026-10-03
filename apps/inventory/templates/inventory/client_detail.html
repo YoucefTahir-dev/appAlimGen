@@ -26,9 +26,18 @@
         </div>
         {% endif %}
         <div class="col-12 col-md-6"><strong>{% trans "Wilaya" %} :</strong> {{ client_obj.wilaya|default:"-" }}</div>
-        <div class="col-12 col-md-6"><strong>{% trans "NIF" %} :</strong> {{ client_obj.tax_number|default:"-" }}</div>
         <div class="col-12 col-md-6"><strong>{% trans "Solde" %} :</strong> {{ client_obj.balance|floatformat:2 }} DZD</div>
         {% if client_obj.notes %}<div class="col-12"><strong>{% trans "Notes" %} :</strong> {{ client_obj.notes|linebreaksbr }}</div>{% endif %}
+    </div>
+</div>
+
+<div class="card card-dashboard p-4 bg-white mb-4">
+    <h3 class="h5 mb-3">{% trans "Informations légales" %}</h3>
+    <div class="row g-3">
+        <div class="col-12 col-md-6"><strong>{% trans "NIF" %} :</strong> {{ client_obj.tax_number|default:"—" }}</div>
+        <div class="col-12 col-md-6"><strong>{% trans "NIS" %} :</strong> {{ client_obj.nis|default:"—" }}</div>
+        <div class="col-12 col-md-6"><strong>{% trans "N° article" %} :</strong> {{ client_obj.article_number|default:"—" }}</div>
+        <div class="col-12 col-md-6"><strong>{% trans "RC" %} :</strong> {{ client_obj.trade_register_number|default:"—" }}</div>
     </div>
 </div>
 

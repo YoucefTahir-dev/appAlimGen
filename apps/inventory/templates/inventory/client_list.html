@@ -18,7 +18,7 @@
         </div>
     </div>
     <form method="get" class="mb-3 search-form">
-        <input type="search" name="q" class="form-control" placeholder="{% trans 'Rechercher nom, téléphone ou NIF...' %}" value="{{ request.GET.q }}">
+        <input type="search" name="q" class="form-control" placeholder="{% trans 'Rechercher nom, téléphone, NIF, NIS, article ou RC...' %}" value="{{ request.GET.q }}">
         <select name="customer_type" class="form-select">
             <option value="">{% trans "Tous les types" %}</option>
             {% for value, label in customer_types %}<option value="{{ value }}" {% if selected_customer_type == value %}selected{% endif %}>{{ label }}</option>{% endfor %}

@@ -7126,6 +7126,17 @@ components:
           type: string
           title: NIF
           maxLength: 100
+        nis:
+          type: string
+          maxLength: 100
+        article_number:
+          type: string
+          title: Numéro d’article
+          maxLength: 100
+        trade_register_number:
+          type: string
+          title: Numéro de registre de commerce
+          maxLength: 100
         balance:
           type: string
           format: decimal
@@ -7811,6 +7822,17 @@ components:
         tax_number:
           type: string
           title: NIF
+          maxLength: 100
+        nis:
+          type: string
+          maxLength: 100
+        article_number:
+          type: string
+          title: Numéro d’article
+          maxLength: 100
+        trade_register_number:
+          type: string
+          title: Numéro de registre de commerce
           maxLength: 100
         balance:
           type: string

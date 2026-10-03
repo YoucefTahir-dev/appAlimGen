@@ -82,7 +82,10 @@ class StockMovementAdmin(admin.ModelAdmin):
 class ClientAdmin(admin.ModelAdmin):
     list_display = ('name', 'phone', 'wilaya', 'customer_type', 'balance')
     list_filter = ('customer_type', 'wilaya')
-    search_fields = ('name', 'phone')
+    search_fields = (
+        'name', 'phone', 'tax_number', 'nis',
+        'article_number', 'trade_register_number',
+    )
 
 @admin.register(Supplier)
 class SupplierAdmin(admin.ModelAdmin):

@@ -251,7 +251,10 @@ class ClientViewSet(AuditMutationMixin, viewsets.ModelViewSet):
 
     queryset = Client.objects.order_by('name')
     serializer_class = ClientSerializer
-    search_fields = ('name', 'phone', 'email', 'tax_number')
+    search_fields = (
+        'name', 'phone', 'email', 'tax_number', 'nis',
+        'article_number', 'trade_register_number',
+    )
     ordering_fields = ('name', 'created_at', 'balance')
     audit_name = 'client'
     required_permissions = {

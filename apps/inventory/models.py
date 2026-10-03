@@ -590,6 +590,11 @@ class Client(models.Model):
     )
     email = models.EmailField(_('Email'), blank=True)
     tax_number = models.CharField(_('NIF'), max_length=100, blank=True)
+    nis = models.CharField(_('NIS'), max_length=100, blank=True)
+    article_number = models.CharField(_('Numéro d’article'), max_length=100, blank=True)
+    trade_register_number = models.CharField(
+        _('Numéro de registre de commerce'), max_length=100, blank=True,
+    )
     balance = models.DecimalField(_('Solde'), max_digits=12, decimal_places=2, default=0)
     notes = models.TextField(_('Notes'), blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -626,6 +631,9 @@ class Client(models.Model):
         self.phone = normalize_business_text(self.phone)
         self.email = normalize_business_text(self.email).lower()
         self.tax_number = normalize_business_text(self.tax_number)
+        self.nis = normalize_business_text(self.nis)
+        self.article_number = normalize_business_text(self.article_number)
+        self.trade_register_number = normalize_business_text(self.trade_register_number)
         super().save(*args, **kwargs)
 
     def __str__(self):

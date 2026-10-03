@@ -191,7 +191,8 @@ ProductPackagingFormSet = inlineformset_factory(
 class ClientForm(forms.ModelForm):
     class Meta:
         model = Client
-        fields = ['name', 'phone', 'address', 'wilaya', 'customer_type', 'email', 'tax_number', 'balance', 'notes',
+        fields = ['name', 'phone', 'address', 'wilaya', 'customer_type', 'email', 'tax_number',
+                  'nis', 'article_number', 'trade_register_number', 'balance', 'notes',
                   'latitude', 'longitude', 'location_accuracy', 'formatted_address', 'place_id']
         widgets = {
             'latitude': forms.HiddenInput(),
@@ -206,6 +207,9 @@ class ClientForm(forms.ModelForm):
             'customer_type': forms.Select(attrs={'class': 'form-select'}),
             'email': forms.HiddenInput(),
             'tax_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'nis': forms.TextInput(attrs={'class': 'form-control'}),
+            'article_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'trade_register_number': forms.TextInput(attrs={'class': 'form-control'}),
             'balance': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         }

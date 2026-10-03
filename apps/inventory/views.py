@@ -401,6 +401,9 @@ def client_list(request):
             | Q(phone__icontains=query)
             | Q(email__icontains=query)
             | Q(tax_number__icontains=query)
+            | Q(nis__icontains=query)
+            | Q(article_number__icontains=query)
+            | Q(trade_register_number__icontains=query)
         )
     if customer_type in Client.CustomerType.values:
         clients = clients.filter(customer_type=customer_type)

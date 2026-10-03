@@ -22,8 +22,8 @@ from django.test import TransactionTestCase
 class ClientLocationMigrationTests(TransactionTestCase):
     def test_existing_client_survives_additive_migration(self):
         previous = [('inventory', '0013_customer_type_pricing')]
-        current = [('inventory', '0014_client_location')]
         executor = MigrationExecutor(connection)
+        current = executor.loader.graph.leaf_nodes('inventory')
         executor.migrate(previous)
         try:
             old_client = executor.loader.project_state(previous).apps.get_model('inventory', 'Client')
@@ -40,6 +40,8 @@ class ClientLocationMigrationTests(TransactionTestCase):
         self.assertEqual(migrated.customer_type, 'WHOLESALE')
         for field in ('latitude', 'longitude', 'location_accuracy', 'formatted_address', 'place_id'):
             self.assertIsNone(getattr(migrated, field))
+        for field in ('nis', 'article_number', 'trade_register_number'):
+            self.assertEqual(getattr(migrated, field), '')
 
 
 class ClientLocationTests(TestCase):
