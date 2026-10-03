@@ -58,7 +58,12 @@ def format_arabic(text):
 
 
 def money(value):
-    return f'{Decimal(value):,.2f}'.replace(',', ' ') + ' DZD'
+    return money_value(value) + ' DZD'
+
+
+def money_value(value):
+    """Format a monetary value without repeating the currency in table cells."""
+    return f'{Decimal(value):,.2f}'.replace(',', ' ')
 
 
 def amount_to_french_words(amount):
@@ -199,8 +204,8 @@ def generate_invoice_pdf(response, sale):
     doc = SimpleDocTemplate(
         response,
         pagesize=A4,
-        rightMargin=14 * mm,
-        leftMargin=14 * mm,
+        rightMargin=12 * mm,
+        leftMargin=12 * mm,
         topMargin=12 * mm,
         bottomMargin=12 * mm,
         title=f"Facture {sale.invoice_number}",
@@ -282,30 +287,37 @@ def generate_invoice_pdf(response, sale):
     ]))
     story.extend([client_table, Spacer(1, 7 * mm)])
 
-    table_data = [['N°', 'Produit', 'Qté', 'PU', 'TVA', 'Montant HT', 'TTC']]
+    table_data = [['N°', 'Produit', 'Qté', 'PU (DZD)', 'TVA', 'Montant HT (DZD)', 'TTC (DZD)']]
     for index, line in enumerate(context['lines'], start=1):
         table_data.append([
             str(index),
-            Paragraph(pdf_safe_text(f'{line.product.name} — {line.packaging_name}'), styles['ERPSmall']),
+            Paragraph(pdf_safe_text(f'{line.product.name} - {line.packaging_name}'), styles['ERPSmall']),
             str(line.packaging_quantity),
-            money(line.unit_price),
+            money_value(line.unit_price),
             f"{context['tax_rate']}%",
-            money(line.line_total()),
-            money(line.line_total() + (line.line_total() * context['tax_rate'] / Decimal('100'))),
+            money_value(line.line_total()),
+            money_value(line.line_total() + (line.line_total() * context['tax_rate'] / Decimal('100'))),
         ])
 
-    products_table = Table(table_data, colWidths=[9 * mm, 63 * mm, 15 * mm, 25 * mm, 18 * mm, 34 * mm, 20 * mm], repeatRows=1)
+    products_table = Table(
+        table_data,
+        colWidths=[8 * mm, 65 * mm, 14 * mm, 24 * mm, 16 * mm, 29.5 * mm, 29.5 * mm],
+        repeatRows=1,
+    )
     products_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), BRAND_COLOR),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
         ('FONTNAME', (0, 0), (-1, -1), font_name),
-        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('FONTSIZE', (0, 0), (-1, -1), 7.5),
         ('GRID', (0, 0), (-1, -1), 0.3, colors.HexColor('#cbd5dc')),
         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#fbfcfd')]),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('ALIGN', (0, 1), (0, -1), 'CENTER'),
         ('ALIGN', (2, 1), (-1, -1), 'RIGHT'),
-        ('PADDING', (0, 0), (-1, -1), 5),
+        ('LEFTPADDING', (0, 0), (-1, -1), 3),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 3),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
     ]))
     story.extend([products_table, Spacer(1, 7 * mm)])
 

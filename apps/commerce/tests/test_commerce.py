@@ -13,6 +13,7 @@ from apps.commerce.utils import (
     COMPANY_NAME_AR,
     client_legal_identifiers,
     format_arabic,
+    money_value,
     register_unicode_font,
 )
 from apps.core.models import CompanySettings
@@ -574,6 +575,10 @@ class CommerceTests(TestCase):
     def test_invoice_pdf_has_bundled_unicode_font_and_arabic_shaping(self):
         self.assertEqual(register_unicode_font(), 'ERPUnicode')
         self.assertNotEqual(format_arabic(COMPANY_NAME_AR), COMPANY_NAME_AR)
+
+    def test_invoice_pdf_uses_compact_amounts_without_repeated_currency(self):
+        self.assertEqual(money_value(Decimal('42600')), '42 600.00')
+        self.assertNotIn('DZD', money_value(Decimal('42600')))
 
     def test_sale_invoice_preview(self):
         sale = Sale.objects.create(invoice_number='FAC-2026-000100', client=self.client_obj, total='0', discount='0', tax_rate='10')
