@@ -11,6 +11,8 @@ class CompanySettings(models.Model):
     email = models.EmailField(_('Email'), blank=True)
     rc_number = models.CharField(_('RC'), max_length=100, blank=True)
     tax_number = models.CharField(_('NIF'), max_length=100, blank=True)
+    nis = models.CharField(_('NIS'), max_length=100, blank=True)
+    article_number = models.CharField(_('Article d’imposition (AI)'), max_length=100, blank=True)
     tax_rate = models.DecimalField(_('TVA (%)'), max_digits=5, decimal_places=2, default=19.00)
     logo = models.ImageField(_('Logo entreprise'), upload_to=company_logo_upload_to, validators=[validate_image_upload], blank=True, null=True)
     updated_at = models.DateTimeField(auto_now=True)

@@ -55,7 +55,8 @@
             <div class="small text-muted mt-2">
                 {% trans "Adresse" %} : {{ company.address|default:"" }}<br>
                 Téléphone : {{ company.phone|default:"" }} | {% trans "Email" %} : {{ company.email|default:"" }}<br>
-                {% trans "RC" %} : {{ company.rc_number|default:"" }} | NIF : {{ company.tax_number|default:"" }}
+                NIF : {{ company.tax_number|default:"" }} | NIS : {{ company.nis|default:"" }}<br>
+                {% trans "RC" %} : {{ company.rc_number|default:"" }} | AI : {{ company.article_number|default:"" }}
             </div>
         </div>
         <div class="col-md-4">

@@ -7,6 +7,7 @@ from rest_framework.test import APITestCase
 
 from apps.accounts.models import User
 from apps.commerce.models import Sale, SaleLine
+from apps.core.models import CompanySettings
 from apps.inventory.models import Client, Product, ProductPackaging, StockMovement
 from apps.inventory.services import record_stock_movement
 
@@ -114,6 +115,15 @@ class PrintingApiTests(APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.admin = User.objects.create_superuser(username='print-admin', password=cls.password)
+        CompanySettings.objects.update_or_create(
+            pk=1,
+            defaults={
+                'nis': '002610010000282',
+                'tax_number': '002610028552077',
+                'rc_number': '10/00-0285520 B26',
+                'article_number': '10018109008',
+            },
+        )
         cls.client_record = Client.objects.create(
             name='Client impression', phone='0555000000', address='Alger',
             tax_number='NIF-PRINT-01', nis='NIS-PRINT-02',
@@ -202,6 +212,10 @@ class PrintingApiTests(APITestCase):
             self.assertEqual(payload['paper_width'], 80)
             self.assertEqual(payload['language'], language)
             self.assertEqual(payload['printer']['id'], printer.pk)
+            self.assertEqual(payload['company']['tax_number'], '002610028552077')
+            self.assertEqual(payload['company']['nis'], '002610010000282')
+            self.assertEqual(payload['company']['rc_number'], '10/00-0285520 B26')
+            self.assertEqual(payload['company']['article_number'], '10018109008')
             self.assertEqual(payload['customer']['tax_number'], 'NIF-PRINT-01')
             self.assertEqual(payload['customer']['nis'], 'NIS-PRINT-02')
             self.assertEqual(payload['customer']['article_number'], 'ARTICLE-PRINT-03')

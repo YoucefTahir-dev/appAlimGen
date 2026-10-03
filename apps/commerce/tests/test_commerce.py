@@ -15,6 +15,7 @@ from apps.commerce.utils import (
     format_arabic,
     register_unicode_font,
 )
+from apps.core.models import CompanySettings
 
 
 class CommerceTests(TestCase):
@@ -585,6 +586,15 @@ class CommerceTests(TestCase):
         self.assertContains(response, 'Télécharger PDF')
 
     def test_invoice_outputs_display_non_empty_client_legal_identifiers(self):
+        CompanySettings.objects.update_or_create(
+            pk=1,
+            defaults={
+                'nis': '002610010000282',
+                'tax_number': '002610028552077',
+                'rc_number': '10/00-0285520 B26',
+                'article_number': '10018109008',
+            },
+        )
         self.client_obj.tax_number = 'NIF-INVOICE-01'
         self.client_obj.nis = 'NIS-INVOICE-02'
         self.client_obj.article_number = 'ARTICLE-INVOICE-03'
@@ -617,6 +627,8 @@ class CommerceTests(TestCase):
             for value in (
                 'NIF-INVOICE-01', 'NIS-INVOICE-02',
                 'ARTICLE-INVOICE-03', 'RC-INVOICE-04',
+                '002610010000282', '002610028552077',
+                '10/00-0285520 B26', '10018109008',
             ):
                 self.assertContains(response, value)
 

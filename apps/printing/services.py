@@ -135,6 +135,8 @@ def invoice_print_data(sale, *, paper_width=80, language='bilingual'):
                 'phone': company.phone,
                 'rc_number': company.rc_number,
                 'tax_number': company.tax_number,
+                'nis': company.nis,
+                'article_number': company.article_number,
                 'logo_url': company.logo.url if company.logo else None,
             },
             'customer': ({

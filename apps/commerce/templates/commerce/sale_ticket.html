@@ -170,7 +170,8 @@
         <div class="company-ar">الأمين للمواد الغذائية و غير الغذائية</div>
         <div class="muted">{{ company.address|default:"" }}</div>
         <div>Tél : {{ company.phone|default:"" }}</div>
-        <div>{% trans "RC" %} : {{ company.rc_number|default:"-" }} | NIF : {{ company.tax_number|default:"-" }}</div>
+        <div>NIF : {{ company.tax_number|default:"-" }} | NIS : {{ company.nis|default:"-" }}</div>
+        <div>{% trans "RC" %} : {{ company.rc_number|default:"-" }} | AI : {{ company.article_number|default:"-" }}</div>
     </header>
 
     <div class="separator"></div>

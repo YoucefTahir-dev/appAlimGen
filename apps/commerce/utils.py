@@ -226,8 +226,13 @@ def generate_invoice_pdf(response, sale):
             styles['ERPSubTitle'],
         ),
         Paragraph(
+            f"NIF : {pdf_safe_text(company.tax_number if company else '')} | "
+            f"NIS : {pdf_safe_text(company.nis if company else '')}",
+            styles['ERPSubTitle'],
+        ),
+        Paragraph(
             f"RC : {pdf_safe_text(company.rc_number if company else '')} | "
-            f"NIF : {pdf_safe_text(company.tax_number if company else '')}",
+            f"AI : {pdf_safe_text(company.article_number if company else '')}",
             styles['ERPSubTitle'],
         ),
     ]

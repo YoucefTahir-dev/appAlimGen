@@ -3,7 +3,9 @@ from .models import CompanySettings, AuditLog
 
 @admin.register(CompanySettings)
 class CompanySettingsAdmin(admin.ModelAdmin):
-    list_display = ('company_name', 'tax_number', 'rc_number', 'phone')
+    list_display = (
+        'company_name', 'tax_number', 'nis', 'rc_number', 'article_number', 'phone',
+    )
 
 @admin.register(AuditLog)
 class AuditLogAdmin(admin.ModelAdmin):
