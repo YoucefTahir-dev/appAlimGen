@@ -137,7 +137,16 @@ def invoice_print_data(sale, *, paper_width=80, language='bilingual'):
                 'tax_number': company.tax_number,
                 'logo_url': company.logo.url if company.logo else None,
             },
-            'customer': ({'id': sale.client_id, 'name': sale.client.name, 'phone': sale.client.phone} if sale.client else None),
+            'customer': ({
+                'id': sale.client_id,
+                'name': sale.client.name,
+                'phone': sale.client.phone,
+                'address': sale.client.address,
+                'tax_number': sale.client.tax_number,
+                'nis': sale.client.nis,
+                'article_number': sale.client.article_number,
+                'trade_register_number': sale.client.trade_register_number,
+            } if sale.client else None),
             'items': [
                 {
                     'product_id': line.product_id,

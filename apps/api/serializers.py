@@ -347,6 +347,10 @@ class SaleSerializer(serializers.ModelSerializer):
             'name': client.name,
             'phone': client.phone,
             'address': client.address,
+            'tax_number': client.tax_number,
+            'nis': client.nis,
+            'article_number': client.article_number,
+            'trade_register_number': client.trade_register_number,
             'customer_type': client.customer_type,
             'customer_type_display': client.get_customer_type_display(),
         }

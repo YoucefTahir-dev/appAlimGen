@@ -114,7 +114,12 @@ class PrintingApiTests(APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.admin = User.objects.create_superuser(username='print-admin', password=cls.password)
-        cls.client_record = Client.objects.create(name='Client impression', phone='0555000000')
+        cls.client_record = Client.objects.create(
+            name='Client impression', phone='0555000000', address='Alger',
+            tax_number='NIF-PRINT-01', nis='NIS-PRINT-02',
+            article_number='ARTICLE-PRINT-03',
+            trade_register_number='RC-PRINT-04',
+        )
         cls.product = Product.objects.create(
             name='Boisson', purchase_price=Decimal('50'), sale_price=Decimal('80'), quantity=0,
         )
@@ -197,6 +202,10 @@ class PrintingApiTests(APITestCase):
             self.assertEqual(payload['paper_width'], 80)
             self.assertEqual(payload['language'], language)
             self.assertEqual(payload['printer']['id'], printer.pk)
+            self.assertEqual(payload['customer']['tax_number'], 'NIF-PRINT-01')
+            self.assertEqual(payload['customer']['nis'], 'NIS-PRINT-02')
+            self.assertEqual(payload['customer']['article_number'], 'ARTICLE-PRINT-03')
+            self.assertEqual(payload['customer']['trade_register_number'], 'RC-PRINT-04')
 
     def test_print_data_rejects_invalid_width_and_language(self):
         sale = Sale.objects.create(

@@ -74,7 +74,9 @@
             <div class="col-md-6"><strong>{{ sale.client.name }}</strong></div>
             <div class="col-md-6">Téléphone : {{ sale.client.phone }}</div>
             <div class="col-md-6">{% trans "Adresse" %} : {{ sale.client.address }}</div>
-            <div class="col-md-6">NIF : {{ sale.client.tax_number }}</div>
+            {% for label, value in client_legal_identifiers %}
+                <div class="col-md-6"><strong>{{ label }}</strong> : {{ value }}</div>
+            {% endfor %}
         </div>
     </section>
 

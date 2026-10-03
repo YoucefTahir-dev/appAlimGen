@@ -9,7 +9,12 @@ from django.contrib.auth import get_user_model
 from apps.inventory.models import Product, ProductPackaging, Category, Brand, Unit, Client, StockMovement, Supplier
 from apps.commerce.forms import SaleForm
 from apps.commerce.models import InvoiceSequence, Payment, Purchase, PurchaseLine, Sale, SaleLine, TicketSequence
-from apps.commerce.utils import COMPANY_NAME_AR, format_arabic, register_unicode_font
+from apps.commerce.utils import (
+    COMPANY_NAME_AR,
+    client_legal_identifiers,
+    format_arabic,
+    register_unicode_font,
+)
 
 
 class CommerceTests(TestCase):
@@ -578,6 +583,57 @@ class CommerceTests(TestCase):
         self.assertContains(response, sale.invoice_number)
         self.assertContains(response, 'الأمين للمواد الغذائية و غير الغذائية')
         self.assertContains(response, 'Télécharger PDF')
+
+    def test_invoice_outputs_display_non_empty_client_legal_identifiers(self):
+        self.client_obj.tax_number = 'NIF-INVOICE-01'
+        self.client_obj.nis = 'NIS-INVOICE-02'
+        self.client_obj.article_number = 'ARTICLE-INVOICE-03'
+        self.client_obj.trade_register_number = 'RC-INVOICE-04'
+        self.client_obj.save()
+        sale = Sale.objects.create(
+            invoice_number='FAC-2026-LEGAL', client=self.client_obj,
+            total='0', discount='0', tax_rate='0',
+        )
+        SaleLine.objects.create(
+            sale=sale, product=self.product, quantity=1, unit_price='15.00',
+        )
+
+        self.assertEqual(
+            client_legal_identifiers(self.client_obj),
+            [
+                ('NIF', 'NIF-INVOICE-01'),
+                ('NIS', 'NIS-INVOICE-02'),
+                ('N° article', 'ARTICLE-INVOICE-03'),
+                ('RC', 'RC-INVOICE-04'),
+            ],
+        )
+        for route in (
+            reverse('sale_invoice_preview', args=[sale.pk]),
+            reverse('sale_ticket_preview', args=[sale.pk, 80]),
+            reverse('sale_ticket_preview', args=[sale.pk, 58]),
+        ):
+            response = self.client.get(route)
+            self.assertEqual(response.status_code, 200)
+            for value in (
+                'NIF-INVOICE-01', 'NIS-INVOICE-02',
+                'ARTICLE-INVOICE-03', 'RC-INVOICE-04',
+            ):
+                self.assertContains(response, value)
+
+        pdf = self.client.get(reverse('sale_invoice_pdf', args=[sale.pk]))
+        self.assertEqual(pdf.status_code, 200)
+        self.assertTrue(pdf.content.startswith(b'%PDF'))
+
+    def test_invoice_outputs_omit_empty_client_legal_identifiers(self):
+        sale = Sale.objects.create(
+            invoice_number='FAC-2026-NO-LEGAL', client=self.client_obj,
+            total='0', discount='0', tax_rate='0',
+        )
+
+        self.assertEqual(client_legal_identifiers(self.client_obj), [])
+        preview = self.client.get(reverse('sale_invoice_preview', args=[sale.pk]))
+        self.assertEqual(preview.status_code, 200)
+        self.assertNotContains(preview, '<strong>NIS</strong>')
 
     def test_sale_ticket_preview_generates_missing_ticket_number_and_supports_thermal_widths(self):
         sale = Sale.objects.create(invoice_number='FAC-2026-000101', client=self.client_obj, total='0', discount='0', tax_rate='10')

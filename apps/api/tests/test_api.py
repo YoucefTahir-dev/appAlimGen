@@ -35,7 +35,10 @@ class MobileApiTests(APITestCase):
         cls.admin = User.objects.create_superuser(
             username='api-admin', email='api@example.com', password=cls.password
         )
-        cls.client_record = Client.objects.create(name='Client mobile')
+        cls.client_record = Client.objects.create(
+            name='Client mobile', tax_number='NIF-MOBILE', nis='NIS-MOBILE',
+            article_number='ARTICLE-MOBILE', trade_register_number='RC-MOBILE',
+        )
         cls.supplier = Supplier.objects.create(name='Fournisseur mobile')
         cls.category = Category.objects.create(name='Alimentaire API')
         cls.brand = Brand.objects.create(name='Marque API')
@@ -310,6 +313,10 @@ class MobileApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         payload = response.data.get('data', response.data)
         self.assertEqual(payload['client_details']['name'], self.client_record.name)
+        self.assertEqual(payload['client_details']['tax_number'], 'NIF-MOBILE')
+        self.assertEqual(payload['client_details']['nis'], 'NIS-MOBILE')
+        self.assertEqual(payload['client_details']['article_number'], 'ARTICLE-MOBILE')
+        self.assertEqual(payload['client_details']['trade_register_number'], 'RC-MOBILE')
         self.assertEqual(payload['subtotal'], '160.00')
         self.assertEqual(payload['amount_paid'], '160.00')
         self.assertEqual(len(payload['payments']), 1)

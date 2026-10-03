@@ -183,6 +183,9 @@
         <div class="row"><span>{% trans "Caissier" %}</span><span>{{ cashier_name }}</span></div>
         {% if sale.client %}
             <div class="row"><span>{% trans "Client" %}</span><span>{{ sale.client.name }}</span></div>
+            {% for label, value in client_legal_identifiers %}
+                <div class="row"><span>{{ label }}</span><span>{{ value }}</span></div>
+            {% endfor %}
         {% endif %}
     </section>
 

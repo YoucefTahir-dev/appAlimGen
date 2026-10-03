@@ -131,6 +131,17 @@ def get_company_logo_path(company):
     return static_logo
 
 
+def client_legal_identifiers(client):
+    """Return the non-empty legal identifiers displayed on invoices."""
+    identifiers = (
+        ('NIF', client.tax_number),
+        ('NIS', client.nis),
+        ("N° article", client.article_number),
+        ('RC', client.trade_register_number),
+    )
+    return [(label, value) for label, value in identifiers if value]
+
+
 def build_invoice_context(sale):
     company = CompanySettings.objects.first()
     lines = list(sale.lines.select_related('product', 'packaging').all())
@@ -144,6 +155,7 @@ def build_invoice_context(sale):
         'company_name_fr': company.company_name if company and company.company_name else COMPANY_NAME_FR,
         'company_name_ar': COMPANY_NAME_AR,
         'sale': sale,
+        'client_legal_identifiers': client_legal_identifiers(sale.client),
         'lines': lines,
         'tax_rate': tax_rate,
         'discount': discount,
@@ -239,13 +251,20 @@ def generate_invoice_pdf(response, sale):
     story.extend([header, Spacer(1, 10 * mm)])
 
     client = sale.client
+    client_lines = [
+        '<b>Client</b>',
+        pdf_safe_text(client.name),
+        f'Téléphone : {pdf_safe_text(client.phone)}',
+        f'Adresse : {pdf_safe_text(client.address)}',
+    ]
+    client_lines.extend(
+        f'{pdf_safe_text(label)} : {pdf_safe_text(value)}'
+        for label, value in context['client_legal_identifiers']
+    )
     client_table = Table(
         [[
             Paragraph(
-                f"<b>Client</b><br/>{pdf_safe_text(client.name)}"
-                f"<br/>Téléphone : {pdf_safe_text(client.phone)}"
-                f"<br/>Adresse : {pdf_safe_text(client.address)}"
-                f"<br/>NIF : {pdf_safe_text(client.tax_number)}",
+                '<br/>'.join(client_lines),
                 styles['ERPSubTitle'],
             )
         ]],
