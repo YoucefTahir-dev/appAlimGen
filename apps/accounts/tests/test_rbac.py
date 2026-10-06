@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
+from django.core import mail
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
@@ -230,26 +231,27 @@ class DynamicRoleTests(TestCase):
             ).exists()
         )
 
-    def test_admin_reset_password_hashes_value_and_can_force_change(self):
+    def test_admin_reset_sends_link_without_changing_password(self):
         target = self.User.objects.create_user(
-            username='reset-target', password='OldPassword123!'
+            username='reset-target', email='reset@example.test', password='OldPassword123!'
         )
         self.client.force_login(self.admin)
 
-        response = self.client.post(
-            reverse('user_password_reset_admin', args=[target.pk]),
-            {
-                'password1': 'NewPassword456!',
-                'password2': 'NewPassword456!',
-                'force_password_change': 'on',
-            },
-        )
+        with self.settings(
+            EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
+            PASSWORD_RESET_PUBLIC_BASE_URL='https://erp.example.test',
+        ):
+            response = self.client.post(
+                reverse('user_password_reset_admin', args=[target.pk]),
+                {'channel': 'email'},
+            )
 
         self.assertRedirects(response, reverse('user_list'))
         target.refresh_from_db()
-        self.assertTrue(target.check_password('NewPassword456!'))
-        self.assertFalse(target.check_password('OldPassword123!'))
-        self.assertTrue(target.force_password_change)
+        self.assertTrue(target.check_password('OldPassword123!'))
+        self.assertFalse(target.force_password_change)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('https://erp.example.test/reset/', mail.outbox[0].body)
 
     def test_admin_can_disable_reactivate_and_delete_safe_account(self):
         role = Group.objects.create(name='Compte temporaire')
