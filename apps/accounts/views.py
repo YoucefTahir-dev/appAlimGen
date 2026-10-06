@@ -42,13 +42,14 @@ from .permissions import (
 )
 from apps.core.security import (
     LOGIN_FAILURE_EVENT,
-    PASSWORD_RESET_EVENT,
     is_authentication_rate_limited,
-    is_rate_limited,
+    is_password_reset_rate_limited,
     log_security_event,
     rate_limit_action,
+    password_reset_rate_limit_action,
     sanitize_log_value,
 )
+from .services import PasswordResetDeliveryError
 
 class UserLoginView(LoginView):
     template_name = 'accounts/login.html'
@@ -141,19 +142,12 @@ class UserPasswordChangeDoneView(LoginRequiredMixin, PasswordChangeDoneView):
 
 class UserPasswordResetView(PasswordResetView):
     template_name = 'accounts/password_reset.html'
-    email_template_name = 'accounts/password_reset_email.html'
-    subject_template_name = 'accounts/password_reset_subject.txt'
     success_url = reverse_lazy('password_reset_done')
     form_class = StyledPasswordResetForm
 
     def post(self, request, *args, **kwargs):
-        action = rate_limit_action(PASSWORD_RESET_EVENT)
-        if is_rate_limited(
-            request,
-            action,
-            getattr(settings, 'PASSWORD_RESET_LIMIT', 5),
-            getattr(settings, 'PASSWORD_RESET_WINDOW_SECONDS', 3600),
-        ):
+        email = request.POST.get('email', '')
+        if is_password_reset_rate_limited(request, email):
             log_security_event(request, 'auth.password_reset.blocked', level='warning', status_code=429)
             form = self.get_form()
             form.add_error(None, _('Trop de demandes. Réessayez plus tard.'))
@@ -163,8 +157,20 @@ class UserPasswordResetView(PasswordResetView):
         return super().post(request, *args, **kwargs)
 
     def form_valid(self, form):
-        log_security_event(self.request, rate_limit_action(PASSWORD_RESET_EVENT))
-        return super().form_valid(form)
+        action = password_reset_rate_limit_action(form.cleaned_data['email'])
+        log_security_event(self.request, action)
+        try:
+            dispatched = form.save(request=self.request)
+        except PasswordResetDeliveryError:
+            log_security_event(
+                self.request, 'auth.password_reset.delivery_failed',
+                level='error', status_code=503,
+            )
+            form.add_error(None, _('Le service d’envoi est temporairement indisponible.'))
+            return self.render_to_response(self.get_context_data(form=form), status=503)
+        if dispatched:
+            log_security_event(self.request, 'auth.password_reset.email_dispatched')
+        return redirect(self.success_url)
 
 class UserPasswordResetDoneView(PasswordResetDoneView):
     template_name = 'accounts/password_reset_done.html'
@@ -173,6 +179,11 @@ class UserPasswordResetConfirmView(PasswordResetConfirmView):
     template_name = 'accounts/password_reset_confirm.html'
     form_class = StyledSetPasswordForm
     success_url = reverse_lazy('password_reset_complete')
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        log_security_event(self.request, 'auth.password_reset.completed', user=form.user)
+        return response
 
 class UserPasswordResetCompleteView(PasswordResetCompleteView):
     template_name = 'accounts/password_reset_complete.html'
@@ -409,16 +420,32 @@ def user_password_reset_admin(request, pk):
     target = get_object_or_404(User, pk=pk)
     if not _may_manage_target(request.user, target):
         raise PermissionDenied
-    form = AdminPasswordResetForm(request.POST or None)
+    form = AdminPasswordResetForm(request.POST or None, initial={'channel': 'email'})
     if request.method == 'POST' and form.is_valid():
-        form.save(target)
-        log_security_event(
-            request,
-            _('Réinitialisation du mot de passe: %(username)s')
-            % {'username': target.username},
-        )
-        messages.success(request, _('Mot de passe réinitialisé avec succès.'))
-        return redirect('user_list')
+        if not target.email:
+            form.add_error(None, _('Cet utilisateur ne possède aucune adresse e-mail.'))
+        elif is_password_reset_rate_limited(request, target.email):
+            form.add_error(None, _('Trop de demandes. Réessayez plus tard.'))
+        else:
+            try:
+                form.save(target, request=request)
+            except (PasswordResetDeliveryError, ValueError):
+                log_security_event(
+                    request, 'auth.password_reset.admin_delivery_failed',
+                    level='error', status_code=503, user=target,
+                )
+                form.add_error(
+                    None, _('Le service d’envoi est temporairement indisponible.'),
+                )
+            else:
+                log_security_event(
+                    request, 'auth.password_reset.admin_email_dispatched', user=target,
+                )
+                messages.success(
+                    request,
+                    _('Les instructions de réinitialisation ont été envoyées par e-mail.'),
+                )
+                return redirect('user_list')
     return render(
         request,
         'accounts/user_password_reset_admin.html',

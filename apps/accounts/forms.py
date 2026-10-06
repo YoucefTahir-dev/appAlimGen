@@ -6,13 +6,13 @@ from django.contrib.auth.forms import (
     UserCreationForm,
     UserChangeForm,
     PasswordChangeForm,
-    PasswordResetForm,
     SetPasswordForm,
 )
 from django.utils.translation import gettext_lazy as _
 
 from .models import User
 from .permissions import get_managed_permissions
+from .services import PasswordResetService
 
 
 LEGACY_ROLE_BY_GROUP = {
@@ -297,7 +297,7 @@ class StyledPasswordChangeForm(PasswordChangeForm):
         return user
 
 
-class StyledPasswordResetForm(PasswordResetForm):
+class StyledPasswordResetForm(forms.Form):
     email = forms.EmailField(
         label=_('Adresse email'),
         max_length=254,
@@ -309,6 +309,12 @@ class StyledPasswordResetForm(PasswordResetForm):
             }
         ),
     )
+
+    def save(self, **kwargs):
+        return PasswordResetService().request(
+            self.cleaned_data['email'],
+            request=kwargs.get('request'),
+        )
 
 
 class StyledSetPasswordForm(SetPasswordForm):
@@ -337,49 +343,23 @@ class StyledSetPasswordForm(SetPasswordForm):
     )
 
     def save(self, commit=True):
-        user = super().save(commit=commit)
-        if commit:
-            user.revoke_api_tokens()
-        return user
+        if not commit:
+            user = super().save(commit=False)
+            user.force_password_change = False
+            return user
+        return PasswordResetService.complete_for_user(
+            self.user,
+            self.cleaned_data['new_password1'],
+        )
 
 
 class AdminPasswordResetForm(forms.Form):
-    password1 = forms.CharField(
-        label=_('Nouveau mot de passe'),
-        strip=False,
-        widget=forms.PasswordInput(
-            attrs={'class': 'form-control', 'placeholder': _('Nouveau mot de passe')}
-        ),
-    )
-    password2 = forms.CharField(
-        label=_('Confirmation du nouveau mot de passe'),
-        strip=False,
-        widget=forms.PasswordInput(
-            attrs={
-                'class': 'form-control',
-                'placeholder': _('Confirmation du mot de passe'),
-            }
-        ),
-    )
-    force_password_change = forms.BooleanField(
-        label=_("Forcer l'utilisateur à changer son mot de passe à la prochaine connexion"),
-        required=False,
-        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+    channel = forms.ChoiceField(
+        label=_('Canal d’envoi'),
+        choices=(('email', _('E-mail')),),
+        widget=forms.RadioSelect,
     )
 
-    def clean(self):
-        cleaned_data = super().clean()
-        password1 = cleaned_data.get('password1')
-        password2 = cleaned_data.get('password2')
-        if password1 and password2 and password1 != password2:
-            raise forms.ValidationError(_('Les deux mots de passe ne correspondent pas.'))
-        password_validation.validate_password(password1)
-        return cleaned_data
-
-    def save(self, user):
-        password = self.cleaned_data['password1']
-        user.set_password(password)
-        user.force_password_change = self.cleaned_data['force_password_change']
-        user.save()
-        user.revoke_api_tokens()
+    def save(self, user, *, request=None):
+        PasswordResetService().request_for_user(user, request=request)
         return user

@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.utils.translation import gettext as _
 from drf_spectacular.utils import extend_schema, inline_serializer
 from rest_framework import permissions, serializers, status
@@ -6,14 +7,19 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenRefreshSerializer
 from rest_framework_simplejwt.settings import api_settings
-from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.exceptions import APIException, AuthenticationFailed, Throttled
 from django.contrib.auth import get_user_model
 from django.contrib.auth import password_validation
 from django.db import transaction
 from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
-from apps.core.security import log_security_event
+from apps.accounts.services import PasswordResetDeliveryError, PasswordResetService
+from apps.core.security import (
+    is_password_reset_rate_limited,
+    log_security_event,
+    password_reset_rate_limit_action,
+)
 from .jwt_auth import TOKEN_VERSION_CLAIM, TokenRevoked
 
 
@@ -156,3 +162,84 @@ class PasswordChangeView(APIView):
         user.revoke_api_tokens()
         log_security_event(request, 'api.auth.password_change', status_code=200)
         return Response({'message': _('Mot de passe modifié. Reconnectez-vous.')})
+
+
+class PasswordResetDeliveryUnavailable(APIException):
+    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    business_code = 'PASSWORD_RESET_DELIVERY_UNAVAILABLE'
+    business_message = _('Le service d’envoi est temporairement indisponible.')
+    default_detail = business_message
+
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField(max_length=254)
+
+
+class PasswordResetRequestView(APIView):
+    permission_classes = (permissions.AllowAny,)
+    throttle_classes = (ScopedRateThrottle,)
+    throttle_scope = 'password_reset'
+
+    @extend_schema(
+        request=PasswordResetRequestSerializer,
+        responses=inline_serializer(
+            'PasswordResetRequestResponse', {'message': serializers.CharField()},
+        ),
+    )
+    def post(self, request):
+        serializer = PasswordResetRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data['email']
+        if is_password_reset_rate_limited(request, email):
+            log_security_event(
+                request, 'api.auth.password_reset.blocked',
+                level='warning', status_code=429,
+            )
+            raise Throttled(
+                wait=getattr(settings, 'PASSWORD_RESET_WINDOW_SECONDS', 3600),
+                detail=_('Trop de demandes. Réessayez plus tard.'),
+            )
+        log_security_event(request, password_reset_rate_limit_action(email))
+        try:
+            dispatched = PasswordResetService().request(email, request=request)
+        except PasswordResetDeliveryError as exc:
+            log_security_event(
+                request, 'api.auth.password_reset.delivery_failed',
+                level='error', status_code=503,
+            )
+            raise PasswordResetDeliveryUnavailable() from exc
+        if dispatched:
+            log_security_event(request, 'api.auth.password_reset.email_dispatched')
+        return Response({
+            'message': _(
+                'Si une adresse correspond à un compte, un lien de réinitialisation a été envoyé.'
+            ),
+        })
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    uid = serializers.CharField(max_length=128)
+    token = serializers.CharField(max_length=256, write_only=True)
+    new_password = serializers.CharField(write_only=True, trim_whitespace=False)
+    new_password_confirm = serializers.CharField(write_only=True, trim_whitespace=False)
+
+
+class PasswordResetConfirmView(APIView):
+    permission_classes = (permissions.AllowAny,)
+    throttle_classes = (ScopedRateThrottle,)
+    throttle_scope = 'password_reset'
+
+    @extend_schema(
+        request=PasswordResetConfirmSerializer,
+        responses=inline_serializer(
+            'PasswordResetConfirmResponse', {'message': serializers.CharField()},
+        ),
+    )
+    def post(self, request):
+        serializer = PasswordResetConfirmSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = PasswordResetService().confirm(**serializer.validated_data)
+        log_security_event(
+            request, 'api.auth.password_reset.completed', user=user, status_code=200,
+        )
+        return Response({'message': _('Mot de passe réinitialisé. Vous pouvez vous connecter.')})

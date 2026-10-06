@@ -112,7 +112,10 @@ LOGIN_FAILURE_LIMIT = env_int('LOGIN_FAILURE_LIMIT', 5)
 LOGIN_FAILURE_IP_LIMIT = env_int('LOGIN_FAILURE_IP_LIMIT', 20)
 LOGIN_FAILURE_WINDOW_SECONDS = env_int('LOGIN_FAILURE_WINDOW_SECONDS', 15 * 60)
 PASSWORD_RESET_LIMIT = env_int('PASSWORD_RESET_LIMIT', 5)
+PASSWORD_RESET_IP_LIMIT = env_int('PASSWORD_RESET_IP_LIMIT', 10)
 PASSWORD_RESET_WINDOW_SECONDS = env_int('PASSWORD_RESET_WINDOW_SECONDS', 60 * 60)
+PASSWORD_RESET_TIMEOUT = env_int('PASSWORD_RESET_TIMEOUT', 60 * 60)
+PASSWORD_RESET_PUBLIC_BASE_URL = os.getenv('PASSWORD_RESET_PUBLIC_BASE_URL', '').strip()
 MAX_IMAGE_UPLOAD_SIZE = env_int('MAX_IMAGE_UPLOAD_SIZE', 5 * 1024 * 1024)
 MAX_EXCEL_UPLOAD_SIZE = env_int('MAX_EXCEL_UPLOAD_SIZE', 10 * 1024 * 1024)
 MAX_RECEIPT_UPLOAD_SIZE = env_int('MAX_RECEIPT_UPLOAD_SIZE', 10 * 1024 * 1024)
@@ -329,6 +332,7 @@ REST_FRAMEWORK = {
         'anon': os.getenv('API_ANON_THROTTLE_RATE', '60/minute'),
         'user': os.getenv('API_USER_THROTTLE_RATE', '1200/hour'),
         'auth': os.getenv('API_AUTH_THROTTLE_RATE', '10/minute'),
+        'password_reset': os.getenv('API_PASSWORD_RESET_THROTTLE_RATE', '10/hour'),
     },
 }
 
@@ -364,12 +368,14 @@ LOGIN_REDIRECT_URL = 'dashboard'
 LOGOUT_REDIRECT_URL = 'login'
 
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'no-reply@elamine.dz')
+DEFAULT_FROM_NAME = os.getenv('DEFAULT_FROM_NAME', 'El Amine')
 EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
 EMAIL_HOST = os.getenv('EMAIL_HOST', 'localhost')
 EMAIL_PORT = int(os.getenv('EMAIL_PORT', '25'))
 EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'False') == 'True'
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+EMAIL_TIMEOUT = env_int('EMAIL_TIMEOUT', 10)
 
 LOGGING = {
     'version': 1,

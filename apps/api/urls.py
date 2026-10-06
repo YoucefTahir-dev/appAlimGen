@@ -9,6 +9,8 @@ from .authentication import (
     MobileTokenRefreshView,
     MobileTokenView,
     PasswordChangeView,
+    PasswordResetConfirmView,
+    PasswordResetRequestView,
 )
 from .views import (
     AlertsView,
@@ -64,6 +66,8 @@ urlpatterns = [
     path('v1/auth/logout/', LogoutView.as_view(), name='api-logout'),
     path('v1/auth/me/', CurrentUserView.as_view(), name='api-me'),
     path('v1/auth/password/change/', PasswordChangeView.as_view(), name='api-password-change'),
+    path('v1/auth/password-reset/request/', PasswordResetRequestView.as_view(), name='api-password-reset-request'),
+    path('v1/auth/password-reset/confirm/', PasswordResetConfirmView.as_view(), name='api-password-reset-confirm'),
     path('v1/dashboard/', DashboardView.as_view(), name='api-dashboard'),
     path('v1/alerts/', AlertsView.as_view(), name='api-alerts'),
     path('v1/printing/', PrintingCapabilitiesView.as_view(), name='api-printing-capabilities'),

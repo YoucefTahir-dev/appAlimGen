@@ -1,3 +1,4 @@
+import hashlib
 import logging
 import uuid
 import warnings
@@ -75,6 +76,27 @@ def sanitize_log_value(value, max_length=80):
 def rate_limit_action(event, identifier=''):
     identifier = sanitize_log_value(identifier)
     return f'{event} identifier={identifier}' if identifier else event
+
+
+def password_reset_rate_limit_action(email):
+    normalized = str(email or '').strip().casefold().encode('utf-8')
+    digest = hashlib.sha256(normalized).hexdigest()[:24]
+    return rate_limit_action(PASSWORD_RESET_EVENT, digest)
+
+
+def is_password_reset_rate_limited(request, email):
+    window = getattr(settings, 'PASSWORD_RESET_WINDOW_SECONDS', 3600)
+    return is_rate_limited(
+        request,
+        password_reset_rate_limit_action(email),
+        getattr(settings, 'PASSWORD_RESET_LIMIT', 5),
+        window,
+    ) or is_event_rate_limited(
+        request,
+        PASSWORD_RESET_EVENT,
+        getattr(settings, 'PASSWORD_RESET_IP_LIMIT', 10),
+        window,
+    )
 
 
 def is_rate_limited(request, action, limit, window_seconds):
