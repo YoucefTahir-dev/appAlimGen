@@ -425,6 +425,54 @@ class MobileApiTests(APITestCase):
         self.assertEqual(payload['lines'][0]['quantity'], 3)
         self.assertEqual(payload['tax_rate'], '19.00')
 
+    def test_sale_patch_adds_and_removes_lines_and_restores_stock(self):
+        from apps.inventory.services import record_stock_movement
+
+        second_product = Product.objects.create(
+            name='Second produit API', category=self.category, brand=self.brand,
+            unit=self.unit, purchase_price='20.00', sale_price='35.00', quantity=0,
+        )
+        record_stock_movement(
+            product=second_product, movement_type=StockMovement.ENTRY, quantity=10,
+            reason='Fixture ajout ligne', user=self.admin,
+            source_type=StockMovement.SOURCE_PRODUCT,
+            source_reference=second_product.reference,
+        )
+        self.authenticate()
+        created = self.client.post(reverse('api-sale-list'), {
+            'client': self.client_record.pk,
+            'items': [{'product_id': self.product.pk, 'quantity': 2, 'unit_price': '80.00'}],
+        }, format='json')
+        sale_id = created.data.get('data', created.data)['id']
+
+        added = self.client.patch(
+            reverse('api-sale-detail', args=[sale_id]),
+            {'items': [
+                {'product_id': self.product.pk, 'quantity': 2, 'unit_price': '80.00'},
+                {'product_id': second_product.pk, 'quantity': 3, 'unit_price': '35.00'},
+            ]},
+            format='json', HTTP_IDEMPOTENCY_KEY='sale-add-line',
+        )
+        self.assertEqual(added.status_code, status.HTTP_200_OK, added.data)
+        self.assertEqual(Sale.objects.get(pk=sale_id).lines.count(), 2)
+
+        removed = self.client.patch(
+            reverse('api-sale-detail', args=[sale_id]),
+            {'items': [
+                {'product_id': second_product.pk, 'quantity': 1, 'unit_price': '35.00'},
+            ]},
+            format='json', HTTP_IDEMPOTENCY_KEY='sale-remove-line',
+        )
+        self.assertEqual(removed.status_code, status.HTTP_200_OK, removed.data)
+        sale = Sale.objects.get(pk=sale_id)
+        self.assertEqual(sale.lines.count(), 1)
+        self.assertEqual(sale.lines.get().product_id, second_product.pk)
+        self.assertEqual(sale.lines.get().quantity, 1)
+        self.product.refresh_from_db()
+        second_product.refresh_from_db()
+        self.assertEqual(self.product.quantity, 20)
+        self.assertEqual(second_product.quantity, 9)
+
     def test_sale_patch_idempotency_does_not_apply_stock_twice(self):
         self.authenticate()
         created = self.client.post(reverse('api-sale-list'), {
