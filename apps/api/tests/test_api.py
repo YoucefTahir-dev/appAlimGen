@@ -394,6 +394,37 @@ class MobileApiTests(APITestCase):
         self.product.refresh_from_db()
         self.assertEqual(self.product.quantity, 15)
 
+    def test_sale_patch_accepts_the_exact_flutter_payload_contract(self):
+        self.authenticate()
+        created = self.client.post(reverse('api-sale-list'), {
+            'client': self.client_record.pk, 'discount': '0.00', 'tax_rate': '19.00',
+            'payment_type': 'cash', 'pay_full': False,
+            'items': [{'product_id': self.product.pk, 'quantity': 2, 'unit_price': '80.00'}],
+        }, format='json')
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.data)
+        sale_id = created.data.get('data', created.data)['id']
+
+        updated = self.client.patch(
+            reverse('api-sale-detail', args=[sale_id]),
+            {
+                'client': self.client_record.pk,
+                'discount': '0.00',
+                'tax_rate': '19.00',
+                'payment_type': 'cash',
+                'pay_full': False,
+                'items': [
+                    {'product_id': self.product.pk, 'quantity': 3, 'unit_price': '80.00'},
+                ],
+            },
+            format='json',
+            HTTP_IDEMPOTENCY_KEY='flutter-sale-update-contract',
+        )
+
+        self.assertEqual(updated.status_code, status.HTTP_200_OK, updated.data)
+        payload = updated.data.get('data', updated.data)
+        self.assertEqual(payload['lines'][0]['quantity'], 3)
+        self.assertEqual(payload['tax_rate'], '19.00')
+
     def test_sale_patch_idempotency_does_not_apply_stock_twice(self):
         self.authenticate()
         created = self.client.post(reverse('api-sale-list'), {
