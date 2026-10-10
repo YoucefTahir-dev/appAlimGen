@@ -9,7 +9,7 @@ from django.db import close_old_connections, connection
 from django.test import TransactionTestCase
 
 from apps.commerce.models import Sale, Payment
-from apps.commerce.services import create_sale
+from apps.commerce.services import create_sale, update_sale
 from apps.inventory.models import Client, Product, StockMovement
 from apps.inventory.services import record_stock_movement
 
@@ -96,3 +96,42 @@ class ConcurrentSaleTests(TransactionTestCase):
             results = list(executor.map(pay, range(2)))
         self.assertEqual(sorted(results), ['paid', 'rejected'])
         self.assertEqual(sale.amount_paid, Decimal('15'))
+
+    def test_concurrent_sale_updates_preserve_the_final_stock_balance(self):
+        sale = create_sale(
+            client=self.customer,
+            lines=[{'product': self.product, 'quantity': 1, 'unit_price': Decimal('15')}],
+            user=self.user,
+        )
+        record_stock_movement(
+            product=self.product, movement_type=StockMovement.ENTRY, quantity=5,
+            reason='Stock modification concurrente', user=self.user,
+        )
+        barrier = Barrier(2)
+
+        def update(quantity):
+            close_old_connections()
+            try:
+                barrier.wait(timeout=10)
+                updated = update_sale(
+                    sale=Sale.objects.get(pk=sale.pk),
+                    client=Client.objects.get(pk=self.customer.pk),
+                    lines=[{
+                        'product': Product.objects.get(pk=self.product.pk),
+                        'quantity': quantity,
+                        'unit_price': Decimal('15'),
+                    }],
+                    user=get_user_model().objects.get(pk=self.user.pk),
+                )
+                return updated.lines.get().quantity
+            finally:
+                close_old_connections()
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            results = list(executor.map(update, (2, 3)))
+
+        self.assertEqual(sorted(results), [2, 3])
+        final_quantity = Sale.objects.get(pk=sale.pk).lines.get().quantity
+        self.product.refresh_from_db()
+        self.assertIn(final_quantity, (2, 3))
+        self.assertEqual(self.product.quantity, 6 - final_quantity)

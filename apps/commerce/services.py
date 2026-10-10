@@ -5,7 +5,7 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
-from apps.inventory.models import OperatorStock, Product, ProductPackaging
+from apps.inventory.models import LoadingOrder, OperatorStock, Product, ProductPackaging
 from apps.inventory.pricing import get_sale_price
 from apps.inventory.services import active_loading_for_operator
 
@@ -213,7 +213,15 @@ def update_sale(
     restored before the replacements are saved; the surrounding transaction
     makes the operation all-or-nothing when stock or payment validation fails.
     """
-    sale = Sale.objects.select_for_update().select_related('loading_order').get(pk=sale.pk)
+    # Lock the sale without joining its nullable loading order. PostgreSQL
+    # rejects FOR UPDATE on the nullable side of the LEFT OUTER JOIN generated
+    # by select_related('loading_order'). Keep the loading-order lock explicit:
+    # an operator sale must not race with closing that order.
+    sale = Sale.objects.select_for_update().get(pk=sale.pk)
+    if sale.loading_order_id:
+        sale.loading_order = LoadingOrder.objects.select_for_update().get(
+            pk=sale.loading_order_id,
+        )
     client = client or sale.client
     discount = money(sale.discount if discount is None else discount)
     tax_rate = validate_tax_rate(money(sale.tax_rate if tax_rate is None else tax_rate))

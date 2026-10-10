@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
+from unittest import skipUnless
 from uuid import uuid4
 
 from django.contrib.auth.models import Permission
@@ -262,6 +263,89 @@ class LoadingOrderFlowTests(APITestCase):
         )
         self.assertEqual(response.status_code, 403)
         self.assertFalse(Payment.objects.filter(sale=foreign_sale).exists())
+
+
+@skipUnless(connection.vendor == 'postgresql', 'Ce test reproduit un verrouillage propre à PostgreSQL.')
+class PostgreSQLSalePatchLockingTests(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.admin = User.objects.create_superuser(
+            username='sale-patch-lock-admin', password='StrongPass123!'
+        )
+        cls.operator = User.objects.create_user(
+            username='sale-patch-lock-operator', password='StrongPass123!'
+        )
+        cls.operator.user_permissions.add(Permission.objects.get(
+            codename='change_sale', content_type__app_label='commerce',
+        ))
+        cls.customer = Client.objects.create(name='Client verrou PATCH')
+        cls.product = Product.objects.create(
+            name='Produit verrou PATCH', purchase_price=10, sale_price=20, quantity=0,
+        )
+        record_stock_movement(
+            product=cls.product, movement_type=StockMovement.ENTRY, quantity=20,
+            user=cls.admin,
+        )
+
+    def authenticate(self, user):
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f'Bearer {MobileTokenSerializer.get_token(user).access_token}'
+        )
+
+    def test_patch_sale_without_loading_order_succeeds_on_postgresql(self):
+        sale = create_sale(
+            client=self.customer,
+            lines=[{'product': self.product, 'quantity': 2, 'unit_price': 20}],
+            user=self.admin,
+        )
+        self.assertIsNone(sale.loading_order_id)
+        self.authenticate(self.admin)
+
+        response = self.client.patch(
+            reverse('api-sale-detail', args=[sale.pk]),
+            {'items': [{'product': self.product.pk, 'quantity': 3, 'unit_price': '20.00'}]},
+            format='json', HTTP_IDEMPOTENCY_KEY=str(uuid4()),
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        sale.refresh_from_db()
+        self.product.refresh_from_db()
+        self.assertEqual(sale.lines.get().quantity, 3)
+        self.assertEqual(self.product.quantity, 17)
+
+    def test_patch_sale_with_loading_order_succeeds_on_postgresql(self):
+        order = LoadingOrder.objects.create(
+            number=f'CHG-PATCH-{uuid4().hex[:8]}',
+            operator=self.operator,
+            created_by=self.admin,
+        )
+        LoadingOrderLine.objects.create(
+            loading_order=order, product=self.product, quantity=10,
+        )
+        validate_loading_order(order, user=self.admin)
+        sale = create_sale(
+            client=self.customer,
+            lines=[{'product': self.product, 'quantity': 3, 'unit_price': 20}],
+            user=self.operator,
+        )
+        self.assertEqual(sale.loading_order_id, order.pk)
+        self.authenticate(self.operator)
+
+        response = self.client.patch(
+            reverse('api-sale-detail', args=[sale.pk]),
+            {'items': [{'product': self.product.pk, 'quantity': 5, 'unit_price': '20.00'}]},
+            format='json', HTTP_IDEMPOTENCY_KEY=str(uuid4()),
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        sale.refresh_from_db()
+        self.product.refresh_from_db()
+        self.assertEqual(sale.lines.get().quantity, 5)
+        self.assertEqual(self.product.quantity, 10)
+        self.assertEqual(
+            OperatorStock.objects.get(operator=self.operator, product=self.product).quantity,
+            5,
+        )
 
 
 class IdempotencyTests(APITestCase):
