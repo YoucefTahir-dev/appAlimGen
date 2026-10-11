@@ -53,6 +53,20 @@ services:
         value: "5"
       - key: PASSWORD_RESET_WINDOW_SECONDS
         value: "3600"
+      - key: PASSWORD_RESET_TIMEOUT
+        value: "3600"
+      - key: PASSWORD_RESET_PUBLIC_BASE_URL
+        sync: false
+      - key: PASSWORD_RESET_EMAIL_PROVIDER
+        value: brevo_api
+      - key: BREVO_API_KEY
+        sync: false
+      - key: DEFAULT_FROM_EMAIL
+        sync: false
+      - key: DEFAULT_FROM_NAME
+        value: El Amine
+      - key: EMAIL_TIMEOUT
+        value: "10"
       - key: WEB_CONCURRENCY
         value: "2"
       - key: WEB_TIMEOUT

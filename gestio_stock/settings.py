@@ -376,6 +376,19 @@ EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'False') == 'True'
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
 EMAIL_TIMEOUT = env_int('EMAIL_TIMEOUT', 10)
+PASSWORD_RESET_EMAIL_PROVIDER = os.getenv(
+    'PASSWORD_RESET_EMAIL_PROVIDER', 'django',
+).strip().lower()
+if PASSWORD_RESET_EMAIL_PROVIDER not in {'django', 'brevo_api'}:
+    raise ImproperlyConfigured(
+        'PASSWORD_RESET_EMAIL_PROVIDER doit valoir django ou brevo_api.'
+    )
+BREVO_API_KEY = os.getenv('BREVO_API_KEY', '').strip()
+BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email'
+if not DEBUG and PASSWORD_RESET_EMAIL_PROVIDER == 'brevo_api' and not BREVO_API_KEY:
+    raise ImproperlyConfigured(
+        'BREVO_API_KEY est obligatoire avec PASSWORD_RESET_EMAIL_PROVIDER=brevo_api.'
+    )
 
 LOGGING = {
     'version': 1,

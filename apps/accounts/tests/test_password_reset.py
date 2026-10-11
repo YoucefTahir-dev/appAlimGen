@@ -1,4 +1,7 @@
-from unittest.mock import patch
+import io
+import json
+from urllib.error import HTTPError
+from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
@@ -77,6 +80,128 @@ class PasswordResetFlowTests(TestCase):
         )
         self.assertEqual(response.status_code, 503)
         self.assertNotIn('secret provider detail', str(response.data))
+
+    @override_settings(
+        PASSWORD_RESET_EMAIL_PROVIDER='brevo_api',
+        BREVO_API_KEY='test-brevo-api-key',
+        DEFAULT_FROM_EMAIL='verified-sender@example.com',
+        DEFAULT_FROM_NAME='El Amine',
+    )
+    @patch('apps.accounts.services.password_reset.urlopen')
+    def test_brevo_https_api_sends_password_reset_email(self, urlopen):
+        response = MagicMock()
+        response.getcode.return_value = 201
+        urlopen.return_value.__enter__.return_value = response
+
+        result = PasswordResetService().request(self.user.email)
+
+        self.assertEqual(result, 1)
+        request = urlopen.call_args.args[0]
+        self.assertEqual(request.full_url, 'https://api.brevo.com/v3/smtp/email')
+        self.assertEqual(urlopen.call_args.kwargs['timeout'], 10)
+        headers = dict(request.header_items())
+        self.assertEqual(headers['Api-key'], 'test-brevo-api-key')
+        payload = json.loads(request.data)
+        self.assertEqual(payload['sender']['email'], 'verified-sender@example.com')
+        self.assertEqual(payload['to'], [{'email': self.user.email}])
+        self.assertIn('https://erp.example.test/reset/', payload['textContent'])
+
+    @override_settings(
+        PASSWORD_RESET_EMAIL_PROVIDER='brevo_api',
+        BREVO_API_KEY='test-brevo-api-key',
+        DEFAULT_FROM_EMAIL='verified-sender@example.com',
+    )
+    @patch('apps.accounts.services.password_reset.urlopen')
+    def test_brevo_timeout_returns_503_and_logs_safe_diagnostics(self, urlopen):
+        urlopen.side_effect = TimeoutError('contains-secret-and-recipient')
+
+        with self.assertLogs('security', level='ERROR') as logs:
+            response = self.client.post(
+                reverse('password_reset'), {'email': self.user.email},
+            )
+
+        self.assertEqual(response.status_code, 503)
+        diagnostic = '\n'.join(logs.output)
+        self.assertIn('provider=brevo', diagnostic)
+        self.assertIn('transport=https_api', diagnostic)
+        self.assertIn('exception=TimeoutError', diagnostic)
+        self.assertIn('timeout=true', diagnostic)
+        self.assertNotIn('contains-secret', diagnostic)
+        self.assertNotIn(self.user.email, diagnostic)
+        self.assertNotIn('test-brevo-api-key', diagnostic)
+
+    @override_settings(
+        PASSWORD_RESET_EMAIL_PROVIDER='brevo_api',
+        BREVO_API_KEY='invalid-test-key',
+        DEFAULT_FROM_EMAIL='verified-sender@example.com',
+    )
+    @patch('apps.accounts.services.password_reset.urlopen')
+    def test_brevo_rejection_logs_only_http_status_and_provider_code(self, urlopen):
+        urlopen.side_effect = HTTPError(
+            'https://api.brevo.com/v3/smtp/email',
+            401,
+            'Unauthorized secret detail',
+            {},
+            io.BytesIO(b'{"code":"unauthorized","message":"secret provider detail"}'),
+        )
+
+        with self.assertLogs('security', level='ERROR') as logs:
+            response = self.client.post(
+                reverse('password_reset'), {'email': self.user.email},
+            )
+
+        self.assertEqual(response.status_code, 503)
+        diagnostic = '\n'.join(logs.output)
+        self.assertIn('status=401', diagnostic)
+        self.assertIn('code=unauthorized', diagnostic)
+        self.assertNotIn('secret provider detail', diagnostic)
+        self.assertNotIn('invalid-test-key', diagnostic)
+
+    @override_settings(
+        PASSWORD_RESET_EMAIL_PROVIDER='brevo_api',
+        BREVO_API_KEY='test-brevo-api-key',
+        DEFAULT_FROM_EMAIL='unverified-sender@example.com',
+    )
+    @patch('apps.accounts.services.password_reset.urlopen')
+    def test_brevo_unverified_sender_returns_503(self, urlopen):
+        urlopen.side_effect = HTTPError(
+            'https://api.brevo.com/v3/smtp/email',
+            400,
+            'Bad Request',
+            {},
+            io.BytesIO(b'{"code":"invalid_parameter","message":"sender rejected"}'),
+        )
+        response = self.client.post(
+            reverse('password_reset'), {'email': self.user.email},
+        )
+        self.assertEqual(response.status_code, 503)
+        self.assertNotContains(response, 'sender rejected', status_code=503)
+
+    @override_settings(
+        PASSWORD_RESET_EMAIL_PROVIDER='brevo_api',
+        BREVO_API_KEY='',
+        DEFAULT_FROM_EMAIL='verified-sender@example.com',
+    )
+    def test_missing_brevo_api_key_returns_503_without_network_call(self):
+        with patch('apps.accounts.services.password_reset.urlopen') as urlopen:
+            response = self.client.post(
+                reverse('password_reset'), {'email': self.user.email},
+            )
+        self.assertEqual(response.status_code, 503)
+        urlopen.assert_not_called()
+
+    @override_settings(
+        PASSWORD_RESET_EMAIL_PROVIDER='brevo_api',
+        BREVO_API_KEY='test-brevo-api-key',
+        DEFAULT_FROM_EMAIL='',
+    )
+    def test_missing_sender_returns_503_without_network_call(self):
+        with patch('apps.accounts.services.password_reset.urlopen') as urlopen:
+            response = self.client.post(
+                reverse('password_reset'), {'email': self.user.email},
+            )
+        self.assertEqual(response.status_code, 503)
+        urlopen.assert_not_called()
 
     @override_settings(PASSWORD_RESET_LIMIT=1)
     def test_rate_limit_is_applied_per_normalized_email(self):
