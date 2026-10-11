@@ -1,17 +1,30 @@
 import uuid
 from pathlib import Path
 
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import AbstractUser, UserManager as DjangoUserManager
+from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import F
+from django.db.models import F, Q
+from django.db.models.functions import Lower, Trim
 from django.utils.translation import gettext_lazy as _
 
 from apps.core.security import validate_image_upload
+
+from .email_policy import normalize_user_email, validate_user_email
 
 
 def profile_photo_upload_to(instance, filename):
     """Store profile photos under an opaque name, never a user supplied path."""
     return f"profiles/{uuid.uuid4().hex}{Path(filename).suffix.lower()}"
+
+
+class UserManager(DjangoUserManager):
+    """Normalize accounts created through Django's supported manager API."""
+
+    @classmethod
+    def normalize_email(cls, email):
+        return normalize_user_email(email)
+
 
 class User(AbstractUser):
     ADMIN = 'admin'
@@ -48,6 +61,8 @@ class User(AbstractUser):
         help_text=_('Ces refus priment sur les permissions du rôle et les permissions directes.'),
     )
 
+    objects = UserManager()
+
     class Meta:
         verbose_name = _('Utilisateur')
         verbose_name_plural = _('Utilisateurs')
@@ -65,6 +80,24 @@ class User(AbstractUser):
             ('create_backups', _('Peut créer des sauvegardes')),
             ('restore_backups', _('Peut restaurer des sauvegardes')),
         ]
+        constraints = [
+            models.UniqueConstraint(
+                Lower(Trim('email')),
+                condition=~Q(email=''),
+                name='uniq_user_email_ci_trim',
+            ),
+        ]
+
+    def clean(self):
+        super().clean()
+        try:
+            self.email = validate_user_email(
+                self.email,
+                queryset=type(self)._default_manager.all(),
+                exclude_pk=self.pk,
+            )
+        except ValidationError as exc:
+            raise ValidationError({'email': exc}) from exc
 
     @property
     def primary_role(self):
