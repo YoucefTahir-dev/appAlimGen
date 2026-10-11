@@ -5,8 +5,8 @@ Date de validation locale : 11 octobre 2026
 ## Statut
 
 - Étape A, protection immédiate du service : **PRÊTE**.
-- Étape B, politique applicative et migration : **PRÉPARÉE, NON AUTORISÉE AU DÉPLOIEMENT** tant que l'audit de la base PostgreSQL de production et le test PostgreSQL isolé ne sont pas terminés.
-- Déploiement, commit et push : **non effectués**, conformément à la mission.
+- Étape B, politique applicative et migration : **VALIDÉE SUR POSTGRESQL ISOLÉ, NON AUTORISÉE AU DÉPLOIEMENT** tant que l'audit de la base PostgreSQL de production n'est pas terminé.
+- Commit et push de la branche de correction : **effectués** (`391597e`). Fusion dans `main` et déploiement : **non effectués** tant que l'audit de production est inconnu.
 - P0-03 : **non commencé**.
 
 ## Cause racine
@@ -94,7 +94,7 @@ La migration `accounts.0006_unique_normalized_user_email` :
 
 Elle ne modifie, ne fusionne et ne supprime aucun compte. Son garde-fou arrête la migration avec un message sans adresse si des conflits existent. Ce garde-fou a été reproduit avec succès sur une base SQLite isolée contenant deux doublons.
 
-La migration directe et la détection de conflit passent sur SQLite. Elles n'ont pas été validées sur PostgreSQL, faute d'instance isolée disponible. En conséquence, **ne pas déployer `0006` maintenant**.
+La migration directe et la détection de conflit passent sur SQLite. Sur PostgreSQL 15 isolé, l'application complète des migrations, le retour de `0006` vers `0005`, puis la réapplication de `0006` passent également. La contrainte fonctionnelle et le test de concurrence PostgreSQL passent. En conséquence, la migration est techniquement validée, mais **ne pas déployer `0006` avant l'audit en lecture seule de la production**.
 
 ## Sécurité des liens et des sessions
 
@@ -132,14 +132,15 @@ Avec `brevo_api`, les identifiants SMTP ne sont pas utilisés par ce transport. 
 
 ### Suite exécutée
 
-- tests ciblés P0-02 : **29 réussis, 1 ignoré** sur 30 ;
-- suite Django complète : **329 réussis, 9 ignorés** sur 338 ;
+- tests ciblés P0-02 sur PostgreSQL 15 : **30 réussis sur 30** ;
+- suite Django complète sur PostgreSQL 15 : **339 tests validés sur 339**. Le premier passage a donné 338 succès et une erreur d'environnement car `pg_dump` n'était pas installé sur Windows ; le test de sauvegarde restant a ensuite réussi avec les binaires PostgreSQL 15 du conteneur isolé ;
 - `manage.py makemigrations --check --dry-run` : **PASS**, aucun changement ;
 - `manage.py check` : **PASS** ;
 - `manage.py check --deploy` : **exécuté avec 1 avertissement** `security.W021` sur `SECURE_HSTS_PRELOAD`, sans rapport avec P0-02 ;
 - migration SQLite propre : **PASS** ;
 - garde-fou sur doublon SQLite : **PASS** ;
-- PostgreSQL isolé : **NON EXÉCUTÉ** ; Docker et `psql` ne sont pas disponibles.
+- PostgreSQL 15 isolé : **PASS** ; application complète, audit, rollback `0006 -> 0005` et réapplication `0005 -> 0006` validés ;
+- sauvegarde PostgreSQL : **PASS** avec `pg_dump` et `pg_restore` 15 du conteneur de test.
 
 ### Matrice demandée
 
@@ -162,9 +163,7 @@ Avec `brevo_api`, les identifiants SMTP ne sont pas utilisés par ce transport. 
 | 15. Révocation JWT accès/refresh | PASS |
 | 16. Création avec e-mail utilisé | PASS |
 | 17. Modification créant un doublon | PASS |
-| 18. Deux créations concurrentes PostgreSQL | NON EXÉCUTÉ — test écrit, PostgreSQL isolé indisponible |
-
-Un test ignoré n'est pas compté comme réussi.
+| 18. Deux créations concurrentes PostgreSQL | PASS |
 
 ## Procédure de déploiement proposée
 
@@ -196,9 +195,9 @@ La migration ne transforme aucune donnée ; son rollback retire uniquement la co
 ## Risques résiduels et décision
 
 - Les conflits de production sont inconnus.
-- Le test de concurrence PostgreSQL obligatoire n'a pas encore été exécuté.
+- Le test de concurrence PostgreSQL obligatoire est validé sur PostgreSQL 15 isolé.
 - La délivrabilité réelle Brevo/Render n'a pas été testée.
 - Les comptes sans e-mail restent volontairement exclus de la récupération.
 - Une adresse d'un compte inactif reste réservée, choix volontaire pour empêcher les ambiguïtés lors d'une réactivation.
 
-Décision : l'étape A est livrable séparément. L'étape B doit rester bloquée jusqu'à l'audit de production et à la validation PostgreSQL isolée.
+Décision : la non-régression et la validation PostgreSQL isolée sont satisfaisantes. L'étape B doit rester bloquée uniquement jusqu'à l'audit de production, car `build.sh` applique automatiquement les migrations pendant le build Render et un conflit historique ferait échouer ce déploiement.
