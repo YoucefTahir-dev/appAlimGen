@@ -15,6 +15,11 @@ from rest_framework.test import APIClient
 from apps.accounts.services import PasswordResetService
 
 
+class _FakeMatches(list):
+    def order_by(self, *args):
+        return self
+
+
 @override_settings(
     EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
     PASSWORD_RESET_PUBLIC_BASE_URL='https://erp.example.test',
@@ -60,6 +65,38 @@ class PasswordResetFlowTests(TestCase):
             reverse('password_reset'), {'email': self.user.email},
         )
         self.assertRedirects(response, reverse('password_reset_done'))
+        self.assertEqual(mail.outbox, [])
+
+    @patch('apps.accounts.services.password_reset.users_with_normalized_email')
+    def test_duplicate_active_email_sends_no_link_and_keeps_response_neutral(
+        self, normalized_matches,
+    ):
+        duplicate = get_user_model()(
+            pk=self.user.pk + 1000,
+            username='duplicate-reset-user',
+            email=' PERSON@example.com ',
+            is_active=True,
+        )
+        duplicate.set_password('Other-password-2040!')
+        normalized_matches.return_value = _FakeMatches([self.user, duplicate])
+
+        with self.assertLogs('security', level='WARNING') as logs:
+            response = self.client.post(
+                reverse('password_reset'), {'email': 'person@example.com'},
+            )
+
+        self.assertRedirects(response, reverse('password_reset_done'))
+        self.assertEqual(mail.outbox, [])
+        diagnostic = '\n'.join(logs.output)
+        self.assertIn('reason=duplicate_active_email', diagnostic)
+        self.assertNotIn('person@example.com', diagnostic.lower())
+
+    def test_account_without_email_dispatches_nothing(self):
+        user = get_user_model().objects.create_user(
+            username='reset-without-email',
+            password='Old-password-2040!',
+        )
+        self.assertEqual(PasswordResetService().request(user.email), 0)
         self.assertEqual(mail.outbox, [])
 
     def test_api_rejects_malformed_email(self):

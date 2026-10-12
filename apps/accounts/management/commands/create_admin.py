@@ -6,6 +6,8 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.management.base import BaseCommand
 from django.utils.translation import gettext as _
 
+from apps.accounts.email_policy import validate_user_email
+
 
 class Command(BaseCommand):
     help = _('Créer un superutilisateur de secours')
@@ -30,6 +32,8 @@ class Command(BaseCommand):
         if User.objects.filter(username=username).exists():
             self.stdout.write(self.style.ERROR(_('Un utilisateur avec ce nom existe déjà.')))
             return
+
+        email = validate_user_email(email, queryset=User.objects.all())
 
         user = User.objects.create_superuser(username=username, email=email, password=password)
         administrator = Group.objects.filter(name='Administrateur').first()

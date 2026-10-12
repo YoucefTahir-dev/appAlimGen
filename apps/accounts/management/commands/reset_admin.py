@@ -9,6 +9,8 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils.translation import gettext as _
 
+from apps.accounts.email_policy import validate_user_email
+
 
 class Command(BaseCommand):
     help = _('Réinitialiser le mot de passe du compte administrateur avec le hash Django standard.')
@@ -52,6 +54,7 @@ class Command(BaseCommand):
         with transaction.atomic():
             created = False
             if admin_user is None:
+                email = validate_user_email(email, queryset=User.objects.all())
                 admin_user = User(username=username, email=email)
                 created = True
             elif admin_user.username != username and User.objects.filter(username=username).exclude(pk=admin_user.pk).exists():
@@ -61,7 +64,12 @@ class Command(BaseCommand):
                 )
 
             admin_user.username = username
-            admin_user.email = admin_user.email or email
+            if not admin_user.email:
+                admin_user.email = validate_user_email(
+                    email,
+                    queryset=User.objects.all(),
+                    exclude_pk=admin_user.pk,
+                )
             admin_user.is_active = True
             admin_user.is_staff = True
             admin_user.is_superuser = True

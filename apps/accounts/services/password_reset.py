@@ -18,6 +18,11 @@ from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.utils.translation import gettext as _
 
+from apps.accounts.email_policy import (
+    normalize_user_email,
+    users_with_normalized_email,
+)
+
 
 logger = logging.getLogger('security')
 
@@ -231,18 +236,29 @@ class PasswordResetService:
         self.token_generator = token_generator or default_token_generator
 
     def request(self, email: str, *, request=None) -> int:
-        normalized = get_user_model().objects.normalize_email(email).strip()
-        users = get_user_model()._default_manager.filter(
-            email__iexact=normalized,
-            is_active=True,
+        normalized = normalize_user_email(email)
+        if not normalized:
+            return 0
+        active_users = list(
+            users_with_normalized_email(
+                get_user_model()._default_manager.filter(is_active=True),
+                normalized,
+            ).order_by('pk')[:2]
         )
-        dispatched = 0
-        for user in users:
-            if not user.has_usable_password() or not user.email:
-                continue
-            self.request_for_user(user, request=request)
-            dispatched += 1
-        return dispatched
+        if len(active_users) > 1:
+            logger.warning(
+                'Password reset suppressed reason=duplicate_active_email '
+                'matched_user_ids=%s',
+                ','.join(str(user.pk) for user in active_users),
+            )
+            return 0
+        if not active_users:
+            return 0
+        user = active_users[0]
+        if not user.has_usable_password() or not user.email:
+            return 0
+        self.request_for_user(user, request=request)
+        return 1
 
     def request_for_user(self, user, *, request=None) -> None:
         if not user.is_active or not user.email or not user.has_usable_password():
