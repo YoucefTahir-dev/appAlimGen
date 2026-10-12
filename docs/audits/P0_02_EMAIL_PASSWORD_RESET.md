@@ -141,6 +141,7 @@ Avec `brevo_api`, les identifiants SMTP ne sont pas utilisés par ce transport. 
 - garde-fou sur doublon SQLite : **PASS** ;
 - PostgreSQL 15 isolé : **PASS** ; application complète, audit, rollback `0006 -> 0005` et réapplication `0005 -> 0006` validés ;
 - sauvegarde PostgreSQL : **PASS** avec `pg_dump` et `pg_restore` 15 du conteneur de test.
+- garde-fou du build Render : **PASS** sur base neuve et redéploiement ; avec deux doublons historiques simulés, l'audit bloque avant `0006`, conserve les deux lignes intactes et laisse la migration non appliquée.
 
 ### Matrice demandée
 
@@ -200,4 +201,4 @@ La migration ne transforme aucune donnée ; son rollback retire uniquement la co
 - Les comptes sans e-mail restent volontairement exclus de la récupération.
 - Une adresse d'un compte inactif reste réservée, choix volontaire pour empêcher les ambiguïtés lors d'une réactivation.
 
-Décision : la non-régression et la validation PostgreSQL isolée sont satisfaisantes. L'étape B doit rester bloquée uniquement jusqu'à l'audit de production, car `build.sh` applique automatiquement les migrations pendant le build Render et un conflit historique ferait échouer ce déploiement.
+Décision : la non-régression et la validation PostgreSQL isolée sont satisfaisantes. Sur l'offre gratuite Render, `build.sh` exécute désormais automatiquement l'audit en lecture seule avant la première application de `0006`. Un conflit historique arrête le build avant la contrainte SQL ; Render conserve alors le dernier déploiement réussi. Une base neuve est amenée jusqu'à `0005` avant l'audit, tandis qu'un déploiement où `0006` est déjà appliquée ne retire ni ne recrée la contrainte.
