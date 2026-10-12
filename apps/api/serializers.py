@@ -11,6 +11,7 @@ from apps.accounts.permissions import has_permission
 from apps.core.models import CompanySettings
 from apps.commerce.models import Payment, Purchase, PurchaseLine, Sale, SaleLine
 from apps.commerce.services import create_purchase, create_sale, update_sale
+from apps.commerce.utils import legacy_snapshot_warning
 from apps.expenses.models import Expense, ExpenseCategory
 from apps.inventory.models import (
     Brand,
@@ -286,8 +287,18 @@ class ProductSummarySerializer(serializers.ModelSerializer):
 
 
 class SaleLineReadSerializer(serializers.ModelSerializer):
-    product = ProductSummarySerializer(read_only=True)
+    product = serializers.SerializerMethodField()
     line_total = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
+
+    def get_product(self, obj) -> dict:
+        if obj.sale.has_certified_snapshot:
+            return {
+                'id': obj.product_id,
+                'reference': obj.product_reference_snapshot,
+                'barcode': obj.product.barcode,
+                'name': obj.product_name_snapshot,
+            }
+        return ProductSummarySerializer(obj.product, context=self.context).data
 
     def get_fields(self):
         fields = super().get_fields()
@@ -301,6 +312,8 @@ class SaleLineReadSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'product', 'packaging', 'packaging_name', 'packaging_factor',
             'packaging_quantity', 'quantity', 'unit_price', 'unit_cost', 'line_total',
+            'product_name_snapshot', 'product_reference_snapshot', 'unit_name_snapshot',
+            'line_total_ht_snapshot',
         )
 
 
@@ -344,6 +357,7 @@ class SaleSerializer(serializers.ModelSerializer):
     payment_type_display = serializers.CharField(source='get_payment_type_display', read_only=True)
     capabilities = serializers.SerializerMethodField()
     company_details = serializers.SerializerMethodField()
+    historical_document = serializers.SerializerMethodField()
 
     class Meta:
         model = Sale
@@ -355,14 +369,35 @@ class SaleSerializer(serializers.ModelSerializer):
             'loading_order',
             'client_details', 'payments', 'subtotal', 'tax_amount',
             'payment_type_display', 'capabilities', 'company_details',
+            'issued_at', 'snapshot_version', 'snapshot_integrity_status',
+            'currency_snapshot', 'subtotal_ht_snapshot', 'tax_amount_snapshot',
+            'historical_document',
         )
         read_only_fields = (
             'invoice_number', 'ticket_number', 'total',
             'payment_tracking_initialized', 'created_at', 'loading_order',
+            'issued_at', 'snapshot_version', 'snapshot_integrity_status',
+            'currency_snapshot', 'subtotal_ht_snapshot', 'tax_amount_snapshot',
         )
 
     def get_client_details(self, obj) -> dict:
         client = obj.client
+        if obj.has_certified_snapshot:
+            customer_type = obj.client_customer_type_snapshot
+            return {
+                'id': obj.client_id,
+                'name': obj.client_name_snapshot,
+                'phone': obj.client_phone_snapshot,
+                'address': obj.client_address_snapshot,
+                'tax_number': obj.client_tax_number_snapshot,
+                'nis': obj.client_nis_snapshot,
+                'article_number': obj.client_article_number_snapshot,
+                'trade_register_number': obj.client_trade_register_number_snapshot,
+                'customer_type': customer_type,
+                'customer_type_display': str(
+                    dict(Client.CustomerType.choices).get(customer_type, '')
+                ),
+            }
         return {
             'id': client.pk,
             'name': client.name,
@@ -377,6 +412,21 @@ class SaleSerializer(serializers.ModelSerializer):
         }
 
     def get_company_details(self, obj) -> dict:
+        if obj.has_certified_snapshot:
+            company = CompanySettings(
+                company_name=obj.company_name_snapshot,
+                address=obj.company_address_snapshot,
+                phone=obj.company_phone_snapshot,
+                email=obj.company_email_snapshot,
+                rc_number=obj.company_rc_number_snapshot,
+                tax_number=obj.company_tax_number_snapshot,
+                nis=obj.company_nis_snapshot,
+                article_number=obj.company_article_number_snapshot,
+                tax_rate=obj.tax_rate,
+            )
+            if obj.company_logo_snapshot:
+                company.logo.name = obj.company_logo_snapshot
+            return CompanySettingsSerializer(company, context=self.context).data
         request = self.context.get('request')
         company = getattr(request, '_company_settings', None) if request else None
         if company is None:
@@ -399,13 +449,36 @@ class SaleSerializer(serializers.ModelSerializer):
         ]
 
     def get_subtotal(self, obj) -> str:
+        if obj.has_certified_snapshot and obj.subtotal_ht_snapshot is not None:
+            return f'{obj.subtotal_ht_snapshot:.2f}'
         value = sum((line.line_total() for line in obj.lines.all()), Decimal('0.00'))
         return f'{value:.2f}'
 
     def get_tax_amount(self, obj) -> str:
+        if obj.has_certified_snapshot and obj.tax_amount_snapshot is not None:
+            return f'{obj.tax_amount_snapshot:.2f}'
         subtotal = sum((line.line_total() for line in obj.lines.all()), Decimal('0.00'))
         value = subtotal * Decimal(str(obj.tax_rate or 0)) / Decimal('100')
         return f'{value:.2f}'
+
+    def get_historical_document(self, obj) -> dict:
+        return {
+            'version': obj.snapshot_version,
+            'integrity_status': obj.snapshot_integrity_status,
+            'is_certified': obj.has_certified_snapshot,
+            'warning': '' if obj.has_certified_snapshot else legacy_snapshot_warning(),
+            'issued_at': obj.issued_at.isoformat() if obj.issued_at else None,
+            'currency': obj.currency_snapshot,
+            'company': self.get_company_details(obj),
+            'client': self.get_client_details(obj),
+            'totals': {
+                'subtotal_ht': self.get_subtotal(obj),
+                'tax_rate': f'{obj.tax_rate:.2f}',
+                'tax_amount': self.get_tax_amount(obj),
+                'discount': f'{obj.discount:.2f}',
+                'total_ttc': f'{obj.total:.2f}',
+            },
+        }
 
     def get_capabilities(self, obj) -> dict:
         request = self.context.get('request')

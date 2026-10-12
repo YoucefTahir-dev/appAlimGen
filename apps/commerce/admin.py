@@ -27,10 +27,17 @@ class PurchaseLineAdmin(admin.ModelAdmin):
 @admin.register(Sale)
 class SaleAdmin(admin.ModelAdmin):
     actions = None
-    list_display = ('invoice_number', 'ticket_number', 'client', 'payment_type', 'created_at', 'total')
+    list_display = (
+        'invoice_number', 'ticket_number', 'client', 'payment_type',
+        'snapshot_integrity_status', 'created_at', 'total',
+    )
     search_fields = ('invoice_number', 'ticket_number', 'client__name')
-    list_filter = ('payment_type',)
-    readonly_fields = ('invoice_number', 'ticket_number')
+    list_filter = ('payment_type', 'snapshot_integrity_status')
+    readonly_fields = (
+        'invoice_number', 'ticket_number', 'issued_at', 'snapshot_version',
+        'snapshot_integrity_status', 'currency_snapshot',
+        'subtotal_ht_snapshot', 'tax_amount_snapshot',
+    )
 
     def delete_model(self, request, obj):
         obj._stock_user = request.user
@@ -62,7 +69,11 @@ class TicketSequenceAdmin(admin.ModelAdmin):
 class SaleLineAdmin(admin.ModelAdmin):
     actions = None
     list_display = ('sale', 'product', 'packaging_name', 'packaging_quantity', 'quantity', 'unit_price', 'unit_cost')
-    readonly_fields = ('unit_cost', 'packaging_name', 'packaging_factor')
+    readonly_fields = (
+        'unit_cost', 'packaging_name', 'packaging_factor',
+        'product_name_snapshot', 'product_reference_snapshot',
+        'unit_name_snapshot', 'line_total_ht_snapshot',
+    )
 
     def save_model(self, request, obj, form, change):
         obj._stock_user = request.user

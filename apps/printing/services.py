@@ -120,7 +120,9 @@ def invoice_print_data(sale, *, paper_width=80, language='bilingual'):
         return {
             'invoice_number': sale.invoice_number,
             'ticket_number': sale.ticket_number,
-            'issued_at': sale.created_at.isoformat(),
+            'issued_at': context['issued_at'].isoformat(),
+            'snapshot_integrity_status': context['snapshot_integrity_status'],
+            'snapshot_warning': context['snapshot_warning'],
             'cashier': (
                 sale.created_by.get_full_name() or sale.created_by.get_username()
                 if sale.created_by_id else ''
@@ -130,7 +132,7 @@ def invoice_print_data(sale, *, paper_width=80, language='bilingual'):
             'characters_per_line': 32 if paper_width == 58 else 48,
             'company': {
                 'name_fr': company.company_name,
-                'name_ar': 'الأمين للمواد الغذائية وغير الغذائية',
+                'name_ar': context['company_name_ar'],
                 'address': company.address,
                 'phone': company.phone,
                 'rc_number': company.rc_number,
@@ -141,18 +143,20 @@ def invoice_print_data(sale, *, paper_width=80, language='bilingual'):
             },
             'customer': ({
                 'id': sale.client_id,
-                'name': sale.client.name,
-                'phone': sale.client.phone,
-                'address': sale.client.address,
-                'tax_number': sale.client.tax_number,
-                'nis': sale.client.nis,
-                'article_number': sale.client.article_number,
-                'trade_register_number': sale.client.trade_register_number,
-            } if sale.client else None),
+                'name': context['invoice_client'].name,
+                'phone': context['invoice_client'].phone,
+                'address': context['invoice_client'].address,
+                'tax_number': context['invoice_client'].tax_number,
+                'nis': context['invoice_client'].nis,
+                'article_number': context['invoice_client'].article_number,
+                'trade_register_number': context['invoice_client'].trade_register_number,
+            } if context['invoice_client'] else None),
             'items': [
                 {
                     'product_id': line.product_id,
-                    'name': line.product.name,
+                    'name': line.invoice_product_name,
+                    'reference': line.invoice_product_reference,
+                    'unit': line.invoice_unit_name,
                     'packaging': line.packaging_name,
                     'packaging_factor': line.packaging_factor,
                     'quantity': line.packaging_quantity,
@@ -173,7 +177,9 @@ def invoice_print_data(sale, *, paper_width=80, language='bilingual'):
                 'balance_due': str(sale.balance_due),
                 'payment_status': sale.payment_status,
             },
-            'qr_code': qr_code_data_uri(sale, context['total_ttc']),
+            'qr_code': qr_code_data_uri(
+                sale, context['total_ttc'], client_name=context['invoice_client'].name,
+            ),
             'messages': {'thank_you_fr': 'Merci pour votre visite.', 'thank_you_ar': 'شكراً لزيارتكم'},
         }
 

@@ -6,6 +6,7 @@ from pathlib import Path
 import qrcode
 from django.conf import settings
 from django.contrib.staticfiles import finders
+from django.utils.translation import get_language
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 from reportlab.lib.pagesizes import A4
@@ -24,6 +25,7 @@ from reportlab.platypus import (
 
 from apps.core.models import CompanySettings
 from apps.core.export_security import pdf_safe_text
+from apps.inventory.models import Client
 
 
 COMPANY_NAME_FR = 'El Amine lil Mawad El Ghidhaiya wa Ghayr El Ghidhaiya'
@@ -147,20 +149,77 @@ def client_legal_identifiers(client):
     return [(label, value) for label, value in identifiers if value]
 
 
+def legacy_snapshot_warning():
+    language = (get_language() or 'fr').split('-', 1)[0]
+    return {
+        'ar': (
+            'فاتورة سابقة لنظام الحفظ التاريخي: معلومات الهوية المعروضة مأخوذة '
+            'من السجلات الحالية وليست موثقة كمعلومات تاريخية.'
+        ),
+        'en': (
+            'Invoice created before historical snapshots: the displayed identity data '
+            'comes from current records and is not certified as historical.'
+        ),
+    }.get(language, (
+        'Facture antérieure aux snapshots : les informations d’identité affichées '
+        'proviennent des fiches actuelles et ne sont pas certifiées historiques.'
+    ))
+
+
 def build_invoice_context(sale):
-    company = CompanySettings.objects.first()
-    lines = list(sale.lines.select_related('product', 'packaging').all())
+    uses_historical_snapshot = sale.has_certified_snapshot
+    if uses_historical_snapshot:
+        company = CompanySettings(
+            company_name=sale.company_name_snapshot,
+            address=sale.company_address_snapshot,
+            phone=sale.company_phone_snapshot,
+            email=sale.company_email_snapshot,
+            rc_number=sale.company_rc_number_snapshot,
+            tax_number=sale.company_tax_number_snapshot,
+            nis=sale.company_nis_snapshot,
+            article_number=sale.company_article_number_snapshot,
+        )
+        if sale.company_logo_snapshot:
+            company.logo.name = sale.company_logo_snapshot
+        client = Client(
+            pk=sale.client_id,
+            name=sale.client_name_snapshot,
+            phone=sale.client_phone_snapshot,
+            address=sale.client_address_snapshot,
+            tax_number=sale.client_tax_number_snapshot,
+            nis=sale.client_nis_snapshot,
+            article_number=sale.client_article_number_snapshot,
+            trade_register_number=sale.client_trade_register_number_snapshot,
+            customer_type=sale.client_customer_type_snapshot or Client.CustomerType.RETAIL,
+        )
+        total_ht = sale.subtotal_ht_snapshot
+        tax_amount = sale.tax_amount_snapshot
+        total_ttc = sale.total
+    else:
+        company = CompanySettings.objects.first()
+        client = sale.client
+        total_ht = None
+        tax_amount = None
+    lines = list(sale.lines.select_related('product', 'product__unit', 'packaging').all())
     tax_rate = Decimal(str(sale.tax_rate or 0))
     discount = Decimal(str(sale.discount or 0))
-    total_ht = sum((line.line_total() for line in lines), Decimal('0.00'))
-    tax_amount = total_ht * (tax_rate / Decimal('100'))
-    total_ttc = total_ht + tax_amount - discount
+    if total_ht is None:
+        total_ht = sum((line.line_total() for line in lines), Decimal('0.00'))
+    if tax_amount is None:
+        tax_amount = total_ht * (tax_rate / Decimal('100'))
+    if not uses_historical_snapshot:
+        total_ttc = total_ht + tax_amount - discount
     return {
         'company': company,
         'company_name_fr': company.company_name if company and company.company_name else COMPANY_NAME_FR,
-        'company_name_ar': COMPANY_NAME_AR,
+        'company_name_ar': (
+            sale.company_name_ar_snapshot
+            if uses_historical_snapshot and sale.company_name_ar_snapshot
+            else COMPANY_NAME_AR
+        ),
         'sale': sale,
-        'client_legal_identifiers': client_legal_identifiers(sale.client),
+        'invoice_client': client,
+        'client_legal_identifiers': client_legal_identifiers(client),
         'lines': lines,
         'tax_rate': tax_rate,
         'discount': discount,
@@ -168,13 +227,18 @@ def build_invoice_context(sale):
         'tax_amount': tax_amount,
         'total_ttc': total_ttc,
         'amount_words': amount_to_french_words(total_ttc),
+        'issued_at': sale.issued_at or sale.created_at,
+        'currency': sale.currency_snapshot or 'DZD',
+        'snapshot_integrity_status': sale.snapshot_integrity_status,
+        'uses_historical_snapshot': uses_historical_snapshot,
+        'snapshot_warning': '' if uses_historical_snapshot else legacy_snapshot_warning(),
     }
 
 
-def qr_code_image_reader(sale, total_ttc):
+def qr_code_image_reader(sale, total_ttc, client_name=None):
     payload = (
         f'Facture: {sale.invoice_number}\n'
-        f'Client: {sale.client.name}\n'
+        f'Client: {client_name or sale.client.name}\n'
         f'Total TTC: {money(total_ttc)}\n'
         f'Date: {sale.created_at:%d/%m/%Y}'
     )
@@ -185,8 +249,8 @@ def qr_code_image_reader(sale, total_ttc):
     return buffer
 
 
-def qr_code_data_uri(sale, total_ttc):
-    buffer = qr_code_image_reader(sale, total_ttc)
+def qr_code_data_uri(sale, total_ttc, client_name=None):
+    buffer = qr_code_image_reader(sale, total_ttc, client_name=client_name)
     encoded = base64.b64encode(buffer.getvalue()).decode('ascii')
     return f'data:image/png;base64,{encoded}'
 
@@ -245,7 +309,7 @@ def generate_invoice_pdf(response, sale):
         [
             [Paragraph('<b>FACTURE</b>', styles['ERPBoxTitle'])],
             [Paragraph(f"<b>N° :</b> {pdf_safe_text(sale.invoice_number)}", styles['ERPSubTitle'])],
-            [Paragraph(f"<b>Date :</b> {sale.created_at:%d/%m/%Y}", styles['ERPSubTitle'])],
+            [Paragraph(f"<b>Date :</b> {context['issued_at']:%d/%m/%Y}", styles['ERPSubTitle'])],
             [Paragraph('<b>Statut :</b> Validée', styles['ERPSubTitle'])],
         ],
         colWidths=[46 * mm],
@@ -260,7 +324,7 @@ def generate_invoice_pdf(response, sale):
     header.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP')]))
     story.extend([header, Spacer(1, 10 * mm)])
 
-    client = sale.client
+    client = context['invoice_client']
     client_lines = [
         '<b>Client</b>',
         pdf_safe_text(client.name),
@@ -291,7 +355,7 @@ def generate_invoice_pdf(response, sale):
     for index, line in enumerate(context['lines'], start=1):
         table_data.append([
             str(index),
-            Paragraph(pdf_safe_text(f'{line.product.name} - {line.packaging_name}'), styles['ERPSmall']),
+            Paragraph(pdf_safe_text(f'{line.invoice_product_name} - {line.packaging_name}'), styles['ERPSmall']),
             str(line.packaging_quantity),
             money_value(line.unit_price),
             f"{context['tax_rate']}%",
@@ -343,7 +407,14 @@ def generate_invoice_pdf(response, sale):
     story.append(Spacer(1, 5 * mm))
     story.append(Paragraph(f"Arrêtée la présente facture à la somme de : <b>{context['amount_words']}</b>", styles['ERPSubTitle']))
 
-    qr_buffer = qr_code_image_reader(sale, context['total_ttc'])
+    if context['snapshot_warning']:
+        story.extend([
+            Spacer(1, 4 * mm),
+            Paragraph(pdf_safe_text(context['snapshot_warning']), styles['ERPSmall']),
+        ])
+    qr_buffer = qr_code_image_reader(
+        sale, context['total_ttc'], client_name=context['invoice_client'].name,
+    )
     footer = Table(
         [[
             Paragraph('Signature et cachet<br/><br/>____________________________', styles['ERPSubTitle']),

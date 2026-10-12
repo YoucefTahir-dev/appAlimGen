@@ -581,7 +581,9 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
                 (sale.created_by.get_full_name() or sale.created_by.get_username())
                 if sale.created_by_id else (request.user.get_full_name() or request.user.get_username())
             ),
-            'qr_code_data_uri': qr_code_data_uri(sale, context['total_ttc']),
+            'qr_code_data_uri': qr_code_data_uri(
+                sale, context['total_ttc'], client_name=context['invoice_client'].name,
+            ),
         })
         return HttpResponse(render_to_string('commerce/sale_ticket.html', context, request=request))
 
