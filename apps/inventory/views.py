@@ -19,13 +19,14 @@ from .forms import (
     ImportExcelForm,
     ProductForm,
     QuickProductForm,
-    ProductPackagingFormSet,
+    CartonConfigurationForm,
+    OtherProductPackagingFormSet,
     LoadingOrderForm,
     LoadingOrderLineFormSet,
     StockMovementForm,
     SupplierForm,
 )
-from .models import Brand, Category, Client, LoadingOrder, OperatorStock, Product, StockMovement, Supplier, Unit
+from .models import Brand, Category, Client, LoadingOrder, OperatorStock, Product, ProductPackaging, StockMovement, Supplier, Unit
 from .services import (
     cancel_loading_order, close_loading_order, create_product_from_form, generate_loading_number,
     record_stock_movement, reverse_stock_movement, validate_loading_order,
@@ -141,12 +142,29 @@ def product_list(request):
 @manager_required
 def product_create(request):
     form = ProductForm(request.POST or None, request.FILES or None)
-    packaging_data = request.POST if 'packagings-TOTAL_FORMS' in request.POST else None
-    packaging_formset = ProductPackagingFormSet(packaging_data, prefix='packagings')
-    if form.is_valid() and (not packaging_formset.is_bound or packaging_formset.is_valid()):
+    packaging_data = request.POST if 'other_packagings-TOTAL_FORMS' in request.POST else None
+    packaging_formset = OtherProductPackagingFormSet(packaging_data, prefix='other_packagings')
+    posted_mode = request.POST.get('unit_mode') if request.method == 'POST' else Product.UnitMode.PIECE_ONLY
+    carton_required = posted_mode in (Product.UnitMode.CARTON_ONLY, Product.UnitMode.CARTON_AND_PIECE)
+    carton_form = CartonConfigurationForm(
+        request.POST if carton_required else None,
+        prefix='carton',
+        required=carton_required,
+    )
+    form_valid = form.is_valid()
+    if form_valid and carton_required:
+        # ProductPackaging.clean() needs the (possibly unsaved) product to
+        # validate carton prices against the piece purchase price.
+        carton_form.instance.product = form.instance
+    if form_valid and packaging_formset.is_bound:
+        packaging_formset.instance = form.instance
+    carton_valid = not carton_required or carton_form.is_valid()
+    packaging_valid = not packaging_formset.is_bound or packaging_formset.is_valid()
+    if form_valid and carton_valid and packaging_valid:
         try:
             product = create_product_from_form(
                 form, user=request.user, packaging_formset=packaging_formset,
+                carton_form=carton_form,
             )
         except ValidationError as exc:
             for error in exc.messages:
@@ -163,7 +181,8 @@ def product_create(request):
                 )
             return redirect('product_list')
     return render(request, 'inventory/product_form.html', {
-        'form': form, 'packaging_formset': packaging_formset, 'title': _('Ajouter un produit'),
+        'form': form, 'carton_form': carton_form,
+        'packaging_formset': packaging_formset, 'title': _('Ajouter un produit'),
     })
 
 @require_POST
@@ -193,18 +212,40 @@ def product_quick_create(request):
 def product_update(request, pk):
     product = get_object_or_404(Product, pk=pk)
     form = ProductForm(request.POST or None, request.FILES or None, instance=product)
-    packaging_data = request.POST if 'packagings-TOTAL_FORMS' in request.POST else None
-    packaging_formset = ProductPackagingFormSet(packaging_data, instance=product, prefix='packagings')
-    if form.is_valid() and (not packaging_formset.is_bound or packaging_formset.is_valid()):
+    carton = ProductPackaging.objects.filter(product=product, kind=ProductPackaging.CARTON).first()
+    packaging_data = request.POST if 'other_packagings-TOTAL_FORMS' in request.POST else None
+    packaging_formset = OtherProductPackagingFormSet(
+        packaging_data, instance=product, prefix='other_packagings',
+    )
+    posted_mode = request.POST.get('unit_mode') if request.method == 'POST' else product.unit_mode
+    carton_required = posted_mode in (Product.UnitMode.CARTON_ONLY, Product.UnitMode.CARTON_AND_PIECE)
+    carton_form = CartonConfigurationForm(
+        request.POST if carton_required else None,
+        instance=carton,
+        prefix='carton',
+        required=carton_required,
+    )
+    form_valid = form.is_valid()
+    if form_valid and carton_required:
+        carton_form.instance.product = form.instance
+    carton_valid = not carton_required or carton_form.is_valid()
+    packaging_valid = not packaging_formset.is_bound or packaging_formset.is_valid()
+    if form_valid and carton_valid and packaging_valid:
         try:
             with transaction.atomic():
-                target_quantity = form.cleaned_data['quantity']
+                target_quantity = form.stock_quantity_in_base(carton_form)
                 locked_product = Product.objects.select_for_update().get(pk=product.pk)
                 form.instance.quantity = locked_product.quantity
                 saved_product = form.save()
                 if packaging_formset.is_bound:
                     packaging_formset.instance = saved_product
                     packaging_formset.save()
+                if saved_product.unit_mode in (
+                    Product.UnitMode.CARTON_ONLY, Product.UnitMode.CARTON_AND_PIECE,
+                ):
+                    carton_form.save_for(saved_product)
+                elif saved_product.unit_mode == Product.UnitMode.PIECE_ONLY:
+                    CartonConfigurationForm.disable_for(saved_product)
                 if target_quantity != locked_product.quantity:
                     record_stock_movement(
                         product=saved_product,
@@ -222,7 +263,8 @@ def product_update(request, pk):
             messages.success(request, _('Produit mis à jour.'))
             return redirect('product_list')
     return render(request, 'inventory/product_form.html', {
-        'form': form, 'packaging_formset': packaging_formset, 'title': _('Modifier le produit'),
+        'form': form, 'carton_form': carton_form,
+        'packaging_formset': packaging_formset, 'title': _('Modifier le produit'),
     })
 
 @manager_required

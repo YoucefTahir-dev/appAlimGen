@@ -1,79 +1,135 @@
 {% extends 'base/base.html' %}
-{% load i18n %}
+{% load i18n static %}
 
 {% block title %}{{ title }} - El Amine ERP{% endblock %}
-
 {% block page_title %}{{ title }}{% endblock %}
+{% block page_subtitle %}<p class="text-muted mb-0 mt-1">{% trans "Configurez les unités, les tarifs et le stock sans créer de stocks séparés." %}</p>{% endblock %}
 
 {% block content %}
-<div class="card card-dashboard p-4 bg-white">
-    <form method="post" enctype="multipart/form-data">
-        {% csrf_token %}
-        {{ form.non_field_errors }}
-        <div class="row g-3">
-            {% if form.instance.pk %}
-            <div class="col-12 mb-2">
-                <label class="form-label">{% trans "Référence" %}</label>
-                <input type="text" class="form-control" value="{{ form.instance.reference }}" readonly />
-            </div>
-            {% endif %}
-            <div class="col-md-6">{{ form.barcode_display.label_tag }}{{ form.barcode_display }}{{ form.barcode_display.errors }}</div>
-            <div class="col-md-6">{{ form.name.label_tag }}{{ form.name }}{{ form.name.errors }}</div>
-            <div class="col-md-6">{{ form.brand_text.label_tag }}{{ form.brand_text }}{{ form.brand_text.errors }}</div>
-            <div class="col-md-4">{{ form.purchase_price.label_tag }}{{ form.purchase_price }}{{ form.purchase_price.errors }}</div>
-            <div class="col-md-4">{{ form.super_wholesale_price.label_tag }}{{ form.super_wholesale_price }}{{ form.super_wholesale_price.errors }}</div>
-            <div class="col-md-4">{{ form.wholesale_price.label_tag }}{{ form.wholesale_price }}{{ form.wholesale_price.errors }}</div>
-            <div class="col-md-4">{{ form.retail_price.label_tag }}{{ form.retail_price }}{{ form.retail_price.errors }}</div>
-            <div class="col-md-4">{{ form.quantity.label_tag }}{{ form.quantity }}{{ form.quantity.errors }}</div>
-            <div class="col-md-4">{{ form.minimum_stock.label_tag }}{{ form.minimum_stock }}{{ form.minimum_stock.errors }}</div>
-            <div class="col-md-8">{{ form.photo.label_tag }}{{ form.photo }}{{ form.photo.errors }}</div>
-            {% if form.instance.pk and form.instance.qr_code %}
-            <div class="col-md-4 text-center">
-                <label class="form-label">{% trans "QR Code" %}</label>
-                <div>
-                    <img src="{{ form.instance.qr_code.url }}" alt="{% trans 'QR Code' %}" class="img-fluid qr-image-sm" />
+<form method="post" enctype="multipart/form-data" id="product-unit-form" class="product-editor"
+      data-factor-prompt="{% trans 'Renseignez le nombre de pièces par carton.' %}"
+      data-equivalence-template="{% trans '1 carton = __FACTOR__ pièce(s)' %}"
+      data-carton-conversion-template="{% trans '__ENTERED__ carton(s) × __FACTOR__ = __BASE__ pièce(s)' %}"
+      data-piece-conversion-template="{% trans '__BASE__ pièce(s)' %}"
+      data-cost-template="{% trans 'Coût indicatif : __COST__ DZD/pièce. Le prix pièce saisi reste inchangé.' %}"
+      data-cost-prompt="{% trans 'Le coût pièce indicatif sera calculé sans remplacer votre saisie.' %}"
+      data-new-product="{% trans 'Nouveau produit' %}"
+      data-no-category="{% trans 'Sans catégorie' %}">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    {{ carton_form.non_field_errors }}
+    <div class="row g-4 align-items-start">
+        <div class="col-xl-8">
+            <section class="card card-dashboard product-section mb-4">
+                <div class="product-section-heading">
+                    <span class="product-section-icon"><i class="bi bi-box-seam"></i></span>
+                    <div><h2>{% trans "Informations générales" %}</h2><p>{% trans "Identité et classement du produit." %}</p></div>
                 </div>
-            </div>
-            {% endif %}
-            <div class="col-12">{{ form.description.label_tag }}{{ form.description }}{{ form.description.errors }}</div>
-        </div>
-        <hr class="my-4">
-        <h2 class="h5">{% trans "Conditionnements" %}</h2>
-        <p class="text-muted small">{% trans "Le facteur indique le nombre d’unités de base contenu dans un conditionnement." %}</p>
-        {{ packaging_formset.management_form }}
-        {{ packaging_formset.non_form_errors }}
-        <div class="table-responsive">
-            <table class="table table-bordered align-middle">
-                <thead>
-                    <tr>
-                        <th>{% trans "Nom" %}</th>
-                        <th>{% trans "Facteur" %}</th>
-                        <th>{% trans "Prix de vente" %}</th>
-                        <th>{% trans "Code-barres" %}</th>
-                        <th>{% trans "Actif" %}</th>
-                        <th>{% trans "Supprimer" %}</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for packaging_form in packaging_formset %}
-                    <tr>
-                        <td>{{ packaging_form.id }}{{ packaging_form.name }}{{ packaging_form.name.errors }}</td>
-                        <td>{{ packaging_form.conversion_factor }}{{ packaging_form.conversion_factor.errors }}</td>
-                        <td>{{ packaging_form.default_sale_price }}{{ packaging_form.default_sale_price.errors }}</td>
-                        <td>{{ packaging_form.barcode }}{{ packaging_form.barcode.errors }}</td>
-                        <td>{{ packaging_form.is_active }}{{ packaging_form.is_active.errors }}</td>
-                        <td>{{ packaging_form.DELETE }}</td>
-                    </tr>
-                    {% if packaging_form.non_field_errors %}
-                    <tr><td colspan="6" class="text-danger">{{ packaging_form.non_field_errors }}</td></tr>
+                <div class="row g-3">
+                    <div class="col-md-8">{{ form.name.label_tag }}{{ form.name }}{{ form.name.errors }}</div>
+                    <div class="col-md-4">{{ form.category.label_tag }}{{ form.category }}{{ form.category.errors }}</div>
+                    {% if form.instance.pk %}
+                    <div class="col-md-6"><label class="form-label">{% trans "Référence" %}</label><input type="text" class="form-control" value="{{ form.instance.reference }}" readonly></div>
                     {% endif %}
-                    {% endfor %}
-                </tbody>
-            </table>
+                    <div class="col-md-6">{{ form.barcode_display.label_tag }}{{ form.barcode_display }}{{ form.barcode_display.errors }}</div>
+                    <div class="col-md-6">{{ form.brand_text.label_tag }}{{ form.brand_text }}{{ form.brand_text.errors }}</div>
+                    <div class="col-md-6">{{ form.photo.label_tag }}{{ form.photo }}{{ form.photo.errors }}</div>
+                </div>
+            </section>
+
+            <section class="card card-dashboard product-section mb-4">
+                <div class="product-section-heading"><span class="product-section-icon"><i class="bi bi-boxes"></i></span><div><h2>{% trans "Conditionnement et unités" %}</h2><p>{% trans "Le stock reste unique et est conservé en pièces pour les produits confirmés." %}</p></div></div>
+                <div class="row g-3">
+                    <div class="col-md-6">{{ form.unit_mode.label_tag }}{{ form.unit_mode }}{{ form.unit_mode.errors }}<div class="form-text">{{ form.unit_mode.help_text }}</div></div>
+                    <div class="col-md-6 carton-field">{{ carton_form.conversion_factor.label_tag }}{{ carton_form.conversion_factor }}{{ carton_form.conversion_factor.errors }}</div>
+                    <div class="col-12 carton-field"><div class="conversion-callout"><i class="bi bi-arrow-repeat"></i> <span id="carton-equivalence">{% trans "Renseignez le nombre de pièces par carton." %}</span></div></div>
+                </div>
+            </section>
+
+            <section class="card card-dashboard product-section mb-4">
+                <div class="product-section-heading"><span class="product-section-icon"><i class="bi bi-cart-check"></i></span><div><h2>{% trans "Prix d’achat" %}</h2><p>{% trans "Les prix sont des références ; un achat réel pourra conserver son prix négocié." %}</p></div></div>
+                <div class="row g-3">
+                    <div class="col-md-6">{{ form.purchase_price.label_tag }}{{ form.purchase_price }}{{ form.purchase_price.errors }}<div class="form-text">{% trans "Prix d’achat de référence par pièce." %}</div></div>
+                    <div class="col-md-6 carton-field">{{ carton_form.reference_purchase_price.label_tag }}{{ carton_form.reference_purchase_price }}{{ carton_form.reference_purchase_price.errors }}<div class="form-text" id="piece-cost-hint"></div></div>
+                </div>
+            </section>
+
+            <section class="card card-dashboard product-section mb-4">
+                <div class="product-section-heading"><span class="product-section-icon"><i class="bi bi-tags"></i></span><div><h2>{% trans "Prix de vente" %}</h2><p>{% trans "Les prix carton et pièce sont indépendants pour chaque niveau tarifaire." %}</p></div></div>
+                <div class="table-responsive pricing-matrix-wrap">
+                    <table class="table pricing-matrix align-middle mb-0">
+                        <thead><tr><th>{% trans "Niveau" %}</th><th>{% trans "Prix pièce" %}</th><th class="carton-field">{% trans "Prix carton" %}</th></tr></thead>
+                        <tbody>
+                            <tr><th>{% trans "Super gros" %}</th><td>{{ form.super_wholesale_price }}{{ form.super_wholesale_price.errors }}</td><td class="carton-field">{{ carton_form.super_wholesale_price }}{{ carton_form.super_wholesale_price.errors }}</td></tr>
+                            <tr><th>{% trans "Gros" %}</th><td>{{ form.wholesale_price }}{{ form.wholesale_price.errors }}</td><td class="carton-field">{{ carton_form.wholesale_price }}{{ carton_form.wholesale_price.errors }}</td></tr>
+                            <tr><th>{% trans "Détail" %}</th><td>{{ form.retail_price }}{{ form.retail_price.errors }}</td><td class="carton-field">{{ carton_form.retail_price }}{{ carton_form.retail_price.errors }}</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-3 carton-field">{{ carton_form.barcode.label_tag }}{{ carton_form.barcode }}{{ carton_form.barcode.errors }}</div>
+            </section>
+
+            <section class="card card-dashboard product-section mb-4">
+                <div class="product-section-heading"><span class="product-section-icon"><i class="bi bi-archive"></i></span><div><h2>{% if form.instance.pk %}{% trans "Stock physique" %}{% else %}{% trans "Stock initial" %}{% endif %}</h2><p>{% trans "La conversion est calculée avant l’écriture dans le journal de stock." %}</p></div></div>
+                <div class="row g-3">
+                    <div class="col-md-6">{{ form.quantity.label_tag }}{{ form.quantity }}{{ form.quantity.errors }}</div>
+                    <div class="col-md-6">{{ form.stock_unit.label_tag }}{{ form.stock_unit }}{{ form.stock_unit.errors }}</div>
+                    <div class="col-12"><div class="stock-conversion-preview" id="stock-conversion-preview">—</div></div>
+                    <div class="col-md-6">{{ form.minimum_stock.label_tag }}{{ form.minimum_stock }}{{ form.minimum_stock.errors }}<div class="form-text">{{ form.minimum_stock.help_text }}</div></div>
+                </div>
+            </section>
+
+            <section class="card card-dashboard product-section mb-4">
+                <div class="product-section-heading"><span class="product-section-icon"><i class="bi bi-card-text"></i></span><div><h2>{% trans "Informations complémentaires" %}</h2></div></div>
+                {{ form.description.label_tag }}{{ form.description }}{{ form.description.errors }}
+            </section>
+
+            <section class="card card-dashboard product-section mb-4">
+                <div class="product-section-heading"><span class="product-section-icon"><i class="bi bi-boxes"></i></span><div><h2>{% trans "Autres conditionnements" %}</h2><p>{% trans "Les conditionnements génériques existants restent disponibles et distincts du carton." %}</p></div></div>
+                {{ packaging_formset.management_form }}
+                {{ packaging_formset.non_form_errors }}
+                <div class="table-responsive">
+                    <table class="table table-bordered align-middle mb-0">
+                        <thead><tr><th>{% trans "Nom" %}</th><th>{% trans "Facteur" %}</th><th>{% trans "Prix de vente" %}</th><th>{% trans "Code-barres" %}</th><th>{% trans "Actif" %}</th><th>{% trans "Supprimer" %}</th></tr></thead>
+                        <tbody>
+                            {% for packaging_form in packaging_formset %}
+                            <tr>
+                                <td>{{ packaging_form.id }}{{ packaging_form.name }}{{ packaging_form.name.errors }}</td>
+                                <td>{{ packaging_form.conversion_factor }}{{ packaging_form.conversion_factor.errors }}</td>
+                                <td>{{ packaging_form.default_sale_price }}{{ packaging_form.default_sale_price.errors }}</td>
+                                <td>{{ packaging_form.barcode }}{{ packaging_form.barcode.errors }}</td>
+                                <td>{{ packaging_form.is_active }}{{ packaging_form.is_active.errors }}</td>
+                                <td>{{ packaging_form.DELETE }}</td>
+                            </tr>
+                            {% if packaging_form.non_field_errors %}<tr><td colspan="6" class="text-danger">{{ packaging_form.non_field_errors }}</td></tr>{% endif %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <div class="form-actions product-form-actions"><button class="btn btn-success px-4" type="submit"><i class="bi bi-check2-circle me-1"></i>{% trans "Enregistrer" %}</button><a class="btn btn-outline-secondary" href="{% url 'product_list' %}">{% trans "Annuler" %}</a></div>
         </div>
-        <div class="form-actions mt-3">
-            <button class="btn btn-success">{% trans "Enregistrer" %}</button>
+
+        <div class="col-xl-4">
+            <aside class="card card-dashboard product-preview-card sticky-xl-top" aria-live="polite">
+                <div class="preview-kicker">{% trans "Aperçu dynamique" %}</div>
+                <h2 id="preview-name">{% trans "Nouveau produit" %}</h2>
+                <p class="preview-category" id="preview-category">{% trans "Sans catégorie" %}</p>
+                <dl class="preview-list">
+                    <div><dt>{% trans "Mode" %}</dt><dd id="preview-mode">—</dd></div>
+                    <div class="carton-field"><dt>{% trans "Conversion" %}</dt><dd id="preview-factor">—</dd></div>
+                    <div><dt>{% trans "Achat pièce" %}</dt><dd id="preview-purchase-piece">—</dd></div>
+                    <div class="carton-field"><dt>{% trans "Achat carton" %}</dt><dd id="preview-purchase-carton">—</dd></div>
+                    <div><dt>{% trans "Vente détail pièce" %}</dt><dd id="preview-retail-piece">—</dd></div>
+                    <div class="carton-field"><dt>{% trans "Vente détail carton" %}</dt><dd id="preview-retail-carton">—</dd></div>
+                    <div><dt>{% trans "Stock converti" %}</dt><dd id="preview-stock">—</dd></div>
+                </dl>
+                {% if form.instance.pk and form.instance.unit_mode == 'legacy' %}<div class="alert alert-warning small mb-0"><i class="bi bi-shield-exclamation me-1"></i>{% trans "Produit historique : aucune conversion ne sera faite sans confirmation de son unité réelle." %}</div>{% endif %}
+            </aside>
         </div>
-    </form>
-</div>
+    </div>
+</form>
 {% endblock %}
+
+{% block extra_js %}{% get_static_prefix as static_prefix %}<script src="{{ static_prefix }}js/product-unit-form.js?v=1"></script>{% endblock %}

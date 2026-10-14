@@ -8,11 +8,15 @@ from django.utils.translation import gettext as _
 from apps.inventory.models import LoadingOrder, OperatorStock, Product, ProductPackaging
 from apps.inventory.pricing import get_sale_price
 from apps.inventory.services import active_loading_for_operator
+from apps.core.models import CompanySettings
 
 from .models import InvoiceSequence, Payment, Purchase, PurchaseLine, Sale, SaleLine, TicketSequence
 
 
 MONEY_QUANTUM = Decimal('0.01')
+INVOICE_SNAPSHOT_VERSION = 1
+DEFAULT_COMPANY_NAME_FR = 'El Amine lil Mawad El Ghidhaiya wa Ghayr El Ghidhaiya'
+DEFAULT_COMPANY_NAME_AR = 'الأمين للمواد الغذائية و غير الغذائية'
 
 
 def money(value):
@@ -23,6 +27,57 @@ def validate_tax_rate(value):
     if not Decimal(value).is_finite() or not 0 <= value <= 100:
         raise ValidationError(_('Le taux de TVA doit être compris entre 0 et 100.'))
     return value
+
+
+def _invoice_snapshot_values(
+    *, client, subtotal, tax_amount, issued_at=None,
+    integrity_status=Sale.SNAPSHOT_COMPLETE, snapshot_version=INVOICE_SNAPSHOT_VERSION,
+):
+    company = CompanySettings.objects.order_by('pk').first()
+    return {
+        'issued_at': issued_at or timezone.now(),
+        'snapshot_version': snapshot_version,
+        'snapshot_integrity_status': integrity_status,
+        'currency_snapshot': 'DZD',
+        'subtotal_ht_snapshot': money(subtotal),
+        'tax_amount_snapshot': money(tax_amount),
+        'company_name_snapshot': company.company_name if company else DEFAULT_COMPANY_NAME_FR,
+        'company_name_ar_snapshot': DEFAULT_COMPANY_NAME_AR,
+        'company_address_snapshot': company.address if company else '',
+        'company_phone_snapshot': company.phone if company else '',
+        'company_email_snapshot': company.email if company else '',
+        'company_rc_number_snapshot': company.rc_number if company else '',
+        'company_tax_number_snapshot': company.tax_number if company else '',
+        'company_nis_snapshot': company.nis if company else '',
+        'company_article_number_snapshot': company.article_number if company else '',
+        'company_logo_snapshot': company.logo.name if company and company.logo else '',
+        'client_name_snapshot': client.name,
+        'client_phone_snapshot': client.phone,
+        'client_address_snapshot': client.address,
+        'client_tax_number_snapshot': client.tax_number,
+        'client_nis_snapshot': client.nis,
+        'client_article_number_snapshot': client.article_number,
+        'client_trade_register_number_snapshot': client.trade_register_number,
+        'client_customer_type_snapshot': client.customer_type,
+    }
+
+
+def refresh_invoice_snapshot(sale):
+    """Refresh a deliberately edited invoice without touching stock or payments."""
+    subtotal = sum((line.line_total() for line in sale.lines.all()), Decimal('0.00'))
+    tax_amount = money(sale.total - money(subtotal) + sale.discount)
+    values = _invoice_snapshot_values(
+        client=sale.client,
+        subtotal=subtotal,
+        tax_amount=tax_amount,
+        issued_at=sale.issued_at or sale.created_at,
+        integrity_status=sale.snapshot_integrity_status,
+        snapshot_version=sale.snapshot_version,
+    )
+    for field, value in values.items():
+        setattr(sale, field, value)
+    sale.save(update_fields=tuple(values))
+    return sale
 
 
 def generate_invoice_number():
@@ -172,6 +227,10 @@ def create_sale(*, client, lines, discount=0, tax_rate=0, payment_type=Sale.CASH
             )}
         )
     total = money(subtotal + subtotal * tax_rate / Decimal('100') - discount)
+    tax_amount = money(total - money(subtotal) + discount)
+    snapshot_values = _invoice_snapshot_values(
+        client=client, subtotal=subtotal, tax_amount=tax_amount,
+    )
     sale = Sale.objects.create(
         invoice_number=generate_invoice_number(),
         ticket_number=generate_ticket_number(),
@@ -183,6 +242,7 @@ def create_sale(*, client, lines, discount=0, tax_rate=0, payment_type=Sale.CASH
         payment_tracking_initialized=True,
         created_by=user,
         loading_order=active_loading,
+        **snapshot_values,
     )
     for line in normalized_lines:
         sale_line = SaleLine(
@@ -346,6 +406,7 @@ def update_sale(
             )
         })
     total = money(subtotal + subtotal * tax_rate / Decimal('100') - discount)
+    tax_amount = money(total - money(subtotal) + discount)
 
     sale.client = client
     sale.discount = discount
@@ -353,6 +414,15 @@ def update_sale(
     sale.payment_type = payment_type
     sale.total = total
     sale.payment_tracking_initialized = True
+    for field, value in _invoice_snapshot_values(
+        client=client,
+        subtotal=subtotal,
+        tax_amount=tax_amount,
+        issued_at=sale.issued_at or sale.created_at,
+        integrity_status=sale.snapshot_integrity_status,
+        snapshot_version=sale.snapshot_version,
+    ).items():
+        setattr(sale, field, value)
     sale.save()
 
     if normalized_lines is not None:

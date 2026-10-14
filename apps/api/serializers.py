@@ -11,6 +11,7 @@ from apps.accounts.permissions import has_permission
 from apps.core.models import CompanySettings
 from apps.commerce.models import Payment, Purchase, PurchaseLine, Sale, SaleLine
 from apps.commerce.services import create_purchase, create_sale, update_sale
+from apps.commerce.utils import legacy_snapshot_warning
 from apps.expenses.models import Expense, ExpenseCategory
 from apps.inventory.models import (
     Brand,
@@ -59,7 +60,9 @@ class ProductPackagingSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductPackaging
         fields = (
-            'id', 'product', 'name', 'conversion_factor', 'default_sale_price',
+            'id', 'product', 'name', 'kind', 'conversion_factor', 'default_sale_price',
+            'reference_purchase_price', 'super_wholesale_price', 'wholesale_price',
+            'retail_price', 'purchase_enabled', 'sale_enabled',
             'minimum_sale_price', 'barcode', 'is_active',
         )
 
@@ -69,16 +72,47 @@ class ProductPackagingSerializer(serializers.ModelSerializer):
         if request and not has_permission(request.user, 'inventory.view_product_pricing'):
             fields.pop('default_sale_price', None)
             fields.pop('minimum_sale_price', None)
+            fields.pop('reference_purchase_price', None)
+            fields.pop('super_wholesale_price', None)
+            fields.pop('wholesale_price', None)
+            fields.pop('retail_price', None)
         return fields
 
     def validate(self, attrs):
         product = attrs.get('product') or getattr(self.instance, 'product', None)
         factor = attrs.get('conversion_factor', getattr(self.instance, 'conversion_factor', None))
-        price = attrs.get('default_sale_price', getattr(self.instance, 'default_sale_price', None))
-        if product and factor and price is not None and price < product.purchase_price * factor:
-            raise serializers.ValidationError({
-                'default_sale_price': _("Le prix du conditionnement ne peut pas être inférieur à son coût d'achat."),
-            })
+        kind = attrs.get('kind', getattr(self.instance, 'kind', ProductPackaging.OTHER))
+        reference_cost = attrs.get(
+            'reference_purchase_price',
+            getattr(self.instance, 'reference_purchase_price', None),
+        )
+        minimum_price = reference_cost
+        if minimum_price is None and product and factor:
+            minimum_price = product.purchase_price * factor
+        errors = {}
+        for field_name in (
+            'default_sale_price', 'super_wholesale_price',
+            'wholesale_price', 'retail_price',
+        ):
+            value = attrs.get(field_name, getattr(self.instance, field_name, None))
+            if value is not None and minimum_price is not None and value < minimum_price:
+                errors[field_name] = _(
+                    "Le prix du conditionnement ne peut pas être inférieur à son coût d'achat."
+                )
+        tier_prices = [
+            attrs.get(name, getattr(self.instance, name, None))
+            for name in ('super_wholesale_price', 'wholesale_price', 'retail_price')
+        ]
+        if all(value is not None for value in tier_prices) and not (
+            tier_prices[0] <= tier_prices[1] <= tier_prices[2]
+        ):
+            errors['retail_price'] = _(
+                'Les tarifs carton doivent respecter l’ordre : Super Gros ≤ Gros ≤ Détail.'
+            )
+        if kind == ProductPackaging.CARTON and factor == 1:
+            errors['conversion_factor'] = _('Un carton doit contenir plus d’une pièce.')
+        if errors:
+            raise serializers.ValidationError(errors)
         return attrs
 
 
@@ -93,7 +127,7 @@ class ProductSerializer(serializers.ModelSerializer):
         model = Product
         fields = (
             'id', 'reference', 'barcode', 'name', 'category', 'category_name',
-            'brand', 'brand_name', 'unit', 'unit_name', 'purchase_price',
+            'brand', 'brand_name', 'unit', 'unit_name', 'unit_mode', 'purchase_price',
             'sale_price', 'super_wholesale_price', 'wholesale_price', 'retail_price',
             'quantity', 'minimum_stock', 'description', 'photo',
             'qr_code', 'barcode_image', 'stock_status', 'conditionnements', 'created_at',
@@ -286,8 +320,18 @@ class ProductSummarySerializer(serializers.ModelSerializer):
 
 
 class SaleLineReadSerializer(serializers.ModelSerializer):
-    product = ProductSummarySerializer(read_only=True)
+    product = serializers.SerializerMethodField()
     line_total = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
+
+    def get_product(self, obj) -> dict:
+        if obj.sale.has_certified_snapshot:
+            return {
+                'id': obj.product_id,
+                'reference': obj.product_reference_snapshot,
+                'barcode': obj.product.barcode,
+                'name': obj.product_name_snapshot,
+            }
+        return ProductSummarySerializer(obj.product, context=self.context).data
 
     def get_fields(self):
         fields = super().get_fields()
@@ -301,6 +345,8 @@ class SaleLineReadSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'product', 'packaging', 'packaging_name', 'packaging_factor',
             'packaging_quantity', 'quantity', 'unit_price', 'unit_cost', 'line_total',
+            'product_name_snapshot', 'product_reference_snapshot', 'unit_name_snapshot',
+            'line_total_ht_snapshot',
         )
 
 
@@ -344,6 +390,7 @@ class SaleSerializer(serializers.ModelSerializer):
     payment_type_display = serializers.CharField(source='get_payment_type_display', read_only=True)
     capabilities = serializers.SerializerMethodField()
     company_details = serializers.SerializerMethodField()
+    historical_document = serializers.SerializerMethodField()
 
     class Meta:
         model = Sale
@@ -355,14 +402,35 @@ class SaleSerializer(serializers.ModelSerializer):
             'loading_order',
             'client_details', 'payments', 'subtotal', 'tax_amount',
             'payment_type_display', 'capabilities', 'company_details',
+            'issued_at', 'snapshot_version', 'snapshot_integrity_status',
+            'currency_snapshot', 'subtotal_ht_snapshot', 'tax_amount_snapshot',
+            'historical_document',
         )
         read_only_fields = (
             'invoice_number', 'ticket_number', 'total',
             'payment_tracking_initialized', 'created_at', 'loading_order',
+            'issued_at', 'snapshot_version', 'snapshot_integrity_status',
+            'currency_snapshot', 'subtotal_ht_snapshot', 'tax_amount_snapshot',
         )
 
     def get_client_details(self, obj) -> dict:
         client = obj.client
+        if obj.has_certified_snapshot:
+            customer_type = obj.client_customer_type_snapshot
+            return {
+                'id': obj.client_id,
+                'name': obj.client_name_snapshot,
+                'phone': obj.client_phone_snapshot,
+                'address': obj.client_address_snapshot,
+                'tax_number': obj.client_tax_number_snapshot,
+                'nis': obj.client_nis_snapshot,
+                'article_number': obj.client_article_number_snapshot,
+                'trade_register_number': obj.client_trade_register_number_snapshot,
+                'customer_type': customer_type,
+                'customer_type_display': str(
+                    dict(Client.CustomerType.choices).get(customer_type, '')
+                ),
+            }
         return {
             'id': client.pk,
             'name': client.name,
@@ -377,6 +445,21 @@ class SaleSerializer(serializers.ModelSerializer):
         }
 
     def get_company_details(self, obj) -> dict:
+        if obj.has_certified_snapshot:
+            company = CompanySettings(
+                company_name=obj.company_name_snapshot,
+                address=obj.company_address_snapshot,
+                phone=obj.company_phone_snapshot,
+                email=obj.company_email_snapshot,
+                rc_number=obj.company_rc_number_snapshot,
+                tax_number=obj.company_tax_number_snapshot,
+                nis=obj.company_nis_snapshot,
+                article_number=obj.company_article_number_snapshot,
+                tax_rate=obj.tax_rate,
+            )
+            if obj.company_logo_snapshot:
+                company.logo.name = obj.company_logo_snapshot
+            return CompanySettingsSerializer(company, context=self.context).data
         request = self.context.get('request')
         company = getattr(request, '_company_settings', None) if request else None
         if company is None:
@@ -399,13 +482,36 @@ class SaleSerializer(serializers.ModelSerializer):
         ]
 
     def get_subtotal(self, obj) -> str:
+        if obj.has_certified_snapshot and obj.subtotal_ht_snapshot is not None:
+            return f'{obj.subtotal_ht_snapshot:.2f}'
         value = sum((line.line_total() for line in obj.lines.all()), Decimal('0.00'))
         return f'{value:.2f}'
 
     def get_tax_amount(self, obj) -> str:
+        if obj.has_certified_snapshot and obj.tax_amount_snapshot is not None:
+            return f'{obj.tax_amount_snapshot:.2f}'
         subtotal = sum((line.line_total() for line in obj.lines.all()), Decimal('0.00'))
         value = subtotal * Decimal(str(obj.tax_rate or 0)) / Decimal('100')
         return f'{value:.2f}'
+
+    def get_historical_document(self, obj) -> dict:
+        return {
+            'version': obj.snapshot_version,
+            'integrity_status': obj.snapshot_integrity_status,
+            'is_certified': obj.has_certified_snapshot,
+            'warning': '' if obj.has_certified_snapshot else legacy_snapshot_warning(),
+            'issued_at': obj.issued_at.isoformat() if obj.issued_at else None,
+            'currency': obj.currency_snapshot,
+            'company': self.get_company_details(obj),
+            'client': self.get_client_details(obj),
+            'totals': {
+                'subtotal_ht': self.get_subtotal(obj),
+                'tax_rate': f'{obj.tax_rate:.2f}',
+                'tax_amount': self.get_tax_amount(obj),
+                'discount': f'{obj.discount:.2f}',
+                'total_ttc': f'{obj.total:.2f}',
+            },
+        }
 
     def get_capabilities(self, obj) -> dict:
         request = self.context.get('request')

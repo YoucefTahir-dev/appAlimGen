@@ -20,7 +20,7 @@ from apps.inventory.pricing import get_sale_price_context
 
 from .forms import PaymentForm, PurchaseForm, PurchaseLineFormSet, SaleForm, SaleLineFormSet
 from .models import Payment, Purchase, Sale
-from .services import create_sale, create_purchase, ensure_ticket_number
+from .services import create_sale, create_purchase, ensure_ticket_number, refresh_invoice_snapshot
 from .utils import build_invoice_context, generate_invoice_pdf, qr_code_data_uri
 from .product_search import commercial_products, search_products
 
@@ -241,6 +241,7 @@ def sale_update(request, pk):
                     sale.save()
                     _set_formset_stock_user(formset, request.user)
                     formset.save()
+                    refresh_invoice_snapshot(sale)
                     if form.cleaned_data['settlement_action'] == SaleForm.PAY_FULL:
                         _record_remaining_sale_payment(sale, request.user)
             except ValidationError as exc:
@@ -445,6 +446,8 @@ def sale_ticket_preview(request, pk, width):
                 (sale.created_by.get_full_name() or sale.created_by.get_username())
                 if sale.created_by_id else (request.user.get_full_name() or request.user.get_username())
             ),
-        'qr_code_data_uri': qr_code_data_uri(sale, context['total_ttc']),
+        'qr_code_data_uri': qr_code_data_uri(
+            sale, context['total_ttc'], client_name=context['invoice_client'].name,
+        ),
     })
     return render(request, 'commerce/sale_ticket.html', context)

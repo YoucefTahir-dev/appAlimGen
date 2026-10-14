@@ -160,6 +160,7 @@
 </div>
 
 <main class="ticket">
+    {% if snapshot_warning %}<div class="small">{{ snapshot_warning }}</div><div class="separator"></div>{% endif %}
     <header class="center">
         {% if company and company.logo %}
             <img src="{{ company.logo.url }}" class="logo" alt="Logo">
@@ -179,11 +180,11 @@
     <section>
         <div class="row"><span>{% trans "Ticket" %}</span><span>{{ sale.ticket_number }}</span></div>
         <div class="row"><span>{% trans "Facture" %}</span><span>{{ sale.invoice_number }}</span></div>
-        <div class="row"><span>{% trans "Date" %}</span><span>{{ sale.created_at|date:"d/m/Y" }}</span></div>
-        <div class="row"><span>{% trans "Heure" %}</span><span>{{ sale.created_at|date:"H:i" }}</span></div>
+        <div class="row"><span>{% trans "Date" %}</span><span>{{ issued_at|date:"d/m/Y" }}</span></div>
+        <div class="row"><span>{% trans "Heure" %}</span><span>{{ issued_at|date:"H:i" }}</span></div>
         <div class="row"><span>{% trans "Caissier" %}</span><span>{{ cashier_name }}</span></div>
-        {% if sale.client %}
-            <div class="row"><span>{% trans "Client" %}</span><span>{{ sale.client.name }}</span></div>
+        {% if invoice_client %}
+            <div class="row"><span>{% trans "Client" %}</span><span>{{ invoice_client.name }}</span></div>
             {% for label, value in client_legal_identifiers %}
                 <div class="row"><span>{{ label }}</span><span>{{ value }}</span></div>
             {% endfor %}
@@ -205,7 +206,7 @@
             {% for line in lines %}
                 <tr>
                     <td>
-                        <div class="product-name">{{ line.product.name }}</div>
+                        <div class="product-name">{{ line.invoice_product_name }}</div>
                         <div class="small muted">{% trans "Conditionnement" %} : {{ line.packaging_name }}</div>
                     </td>
                     <td class="num">{{ line.packaging_quantity }}</td>

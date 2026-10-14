@@ -24,6 +24,7 @@ class ProductAdmin(admin.ModelAdmin):
         'name',
         'category',
         'brand',
+        'unit_mode',
         'quantity',
         'minimum_stock',
         'super_wholesale_price',
@@ -31,14 +32,17 @@ class ProductAdmin(admin.ModelAdmin):
         'retail_price',
     )
     search_fields = ('reference', 'barcode', 'name')
-    list_filter = ('category', 'brand')
+    list_filter = ('category', 'brand', 'unit_mode')
     readonly_fields = ('reference', 'barcode', 'quantity', 'qr_code', 'barcode_image')
 
 
 @admin.register(ProductPackaging)
 class ProductPackagingAdmin(admin.ModelAdmin):
-    list_display = ('product', 'name', 'conversion_factor', 'default_sale_price', 'barcode', 'is_active')
-    list_filter = ('is_active',)
+    list_display = (
+        'product', 'name', 'kind', 'conversion_factor', 'reference_purchase_price',
+        'super_wholesale_price', 'wholesale_price', 'retail_price', 'is_active',
+    )
+    list_filter = ('kind', 'purchase_enabled', 'sale_enabled', 'is_active')
     search_fields = ('product__name', 'product__reference', 'name', 'barcode')
 
 @admin.register(StockMovement)

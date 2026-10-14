@@ -257,6 +257,14 @@ class Sale(models.Model):
         (CHEQUE, 'Chèque'),
         (TRANSFER, 'Virement'),
     ]
+    SNAPSHOT_LEGACY_UNKNOWN = 'legacy_unknown'
+    SNAPSHOT_COMPLETE = 'complete'
+    SNAPSHOT_MANUALLY_VERIFIED = 'manually_verified'
+    SNAPSHOT_INTEGRITY_CHOICES = [
+        (SNAPSHOT_LEGACY_UNKNOWN, _('Historique non certifié')),
+        (SNAPSHOT_COMPLETE, _('Snapshot historique complet')),
+        (SNAPSHOT_MANUALLY_VERIFIED, _('Historique vérifié manuellement')),
+    ]
 
     invoice_number = models.CharField('Numéro facture', max_length=100, unique=True)
     ticket_number = models.CharField('Numéro ticket', max_length=100, unique=True, blank=True, null=True)
@@ -275,6 +283,37 @@ class Sale(models.Model):
         related_name='sales', verbose_name=_('Chargement opérateur'),
     )
     created_at = models.DateTimeField('Date', default=timezone.now, db_index=True)
+    issued_at = models.DateTimeField(_('Date d’émission'), null=True, blank=True, editable=False)
+    snapshot_version = models.PositiveSmallIntegerField(default=0, editable=False)
+    snapshot_integrity_status = models.CharField(
+        _('Intégrité historique'), max_length=24, choices=SNAPSHOT_INTEGRITY_CHOICES,
+        default=SNAPSHOT_LEGACY_UNKNOWN, editable=False,
+    )
+    currency_snapshot = models.CharField(_('Devise historique'), max_length=3, default='DZD', editable=False)
+    subtotal_ht_snapshot = models.DecimalField(
+        _('Total HT historique'), max_digits=14, decimal_places=2, null=True, blank=True, editable=False,
+    )
+    tax_amount_snapshot = models.DecimalField(
+        _('Montant TVA historique'), max_digits=14, decimal_places=2, null=True, blank=True, editable=False,
+    )
+    company_name_snapshot = models.CharField(max_length=200, blank=True, editable=False)
+    company_name_ar_snapshot = models.CharField(max_length=200, blank=True, editable=False)
+    company_address_snapshot = models.CharField(max_length=255, blank=True, editable=False)
+    company_phone_snapshot = models.CharField(max_length=50, blank=True, editable=False)
+    company_email_snapshot = models.EmailField(blank=True, editable=False)
+    company_rc_number_snapshot = models.CharField(max_length=100, blank=True, editable=False)
+    company_tax_number_snapshot = models.CharField(max_length=100, blank=True, editable=False)
+    company_nis_snapshot = models.CharField(max_length=100, blank=True, editable=False)
+    company_article_number_snapshot = models.CharField(max_length=100, blank=True, editable=False)
+    company_logo_snapshot = models.CharField(max_length=500, blank=True, editable=False)
+    client_name_snapshot = models.CharField(max_length=200, blank=True, editable=False)
+    client_phone_snapshot = models.CharField(max_length=50, blank=True, editable=False)
+    client_address_snapshot = models.CharField(max_length=255, blank=True, editable=False)
+    client_tax_number_snapshot = models.CharField(max_length=100, blank=True, editable=False)
+    client_nis_snapshot = models.CharField(max_length=100, blank=True, editable=False)
+    client_article_number_snapshot = models.CharField(max_length=100, blank=True, editable=False)
+    client_trade_register_number_snapshot = models.CharField(max_length=100, blank=True, editable=False)
+    client_customer_type_snapshot = models.CharField(max_length=20, blank=True, editable=False)
 
     objects = CommercialDocumentQuerySet.as_manager()
 
@@ -296,6 +335,13 @@ class Sale(models.Model):
     @property
     def payment_status(self):
         return _payment_status(self)
+
+    @property
+    def has_certified_snapshot(self):
+        return self.snapshot_integrity_status in {
+            self.SNAPSHOT_COMPLETE,
+            self.SNAPSHOT_MANUALLY_VERIFIED,
+        }
 
     @transaction.atomic
     def save(self, *args, **kwargs):
@@ -360,6 +406,12 @@ class SaleLine(models.Model):
         decimal_places=2,
         editable=False,
     )
+    product_name_snapshot = models.CharField(max_length=255, blank=True, editable=False)
+    product_reference_snapshot = models.CharField(max_length=100, blank=True, editable=False)
+    unit_name_snapshot = models.CharField(max_length=50, blank=True, editable=False)
+    line_total_ht_snapshot = models.DecimalField(
+        max_digits=14, decimal_places=2, null=True, blank=True, editable=False,
+    )
 
     objects = StockTrackedLineQuerySet.as_manager()
 
@@ -372,7 +424,27 @@ class SaleLine(models.Model):
         return self.unit_cost * self.packaging_factor
 
     def line_total(self):
+        if self.line_total_ht_snapshot is not None:
+            return self.line_total_ht_snapshot
         return self.packaging_quantity * self.unit_price
+
+    @property
+    def invoice_product_name(self):
+        if self.sale.has_certified_snapshot:
+            return self.product_name_snapshot
+        return self.product.name
+
+    @property
+    def invoice_product_reference(self):
+        if self.sale.has_certified_snapshot:
+            return self.product_reference_snapshot
+        return self.product.reference
+
+    @property
+    def invoice_unit_name(self):
+        if self.sale.has_certified_snapshot:
+            return self.unit_name_snapshot
+        return self.product.unit.name if self.product.unit_id else ''
 
     @transaction.atomic
     def save(self, *args, **kwargs):
@@ -381,9 +453,10 @@ class SaleLine(models.Model):
         self.unit_price = Decimal(str(self.unit_price))
         user = getattr(self, '_stock_user', None)
         if self._state.adding:
-            locked_product = Product.objects.select_for_update().only('pk', 'purchase_price').get(
-                pk=self.product_id
-            )
+            # Lock only the product row. ``Product.unit`` is nullable, so joining it
+            # in a ``SELECT ... FOR UPDATE`` makes PostgreSQL reject the query with
+            # "FOR UPDATE cannot be applied to the nullable side of an outer join".
+            locked_product = Product.objects.select_for_update().get(pk=self.product_id)
             if self.packaging_id:
                 packaging = ProductPackaging.objects.select_for_update().get(pk=self.packaging_id)
                 if packaging.product_id != self.product_id or not packaging.is_active:
@@ -392,13 +465,19 @@ class SaleLine(models.Model):
                 self.packaging_name = packaging.name
             else:
                 self.packaging_factor = 1
-                self.packaging_name = self.product.unit.name if self.product.unit_id else _('Unité')
+                self.packaging_name = locked_product.unit.name if locked_product.unit_id else _('Unité')
                 self.packaging_quantity = self.quantity
             if self.packaging_quantity < 1:
                 raise ValidationError({'packaging_quantity': _('La quantité doit être strictement positive.')})
             if self.quantity != self.packaging_quantity * self.packaging_factor:
                 raise ValidationError({'quantity': _('La conversion du conditionnement est incohérente.')})
             self.unit_cost = locked_product.purchase_price
+            self.product_name_snapshot = locked_product.name
+            self.product_reference_snapshot = locked_product.reference
+            self.unit_name_snapshot = locked_product.unit.name if locked_product.unit_id else ''
+            self.line_total_ht_snapshot = (
+                Decimal(self.packaging_quantity) * self.unit_price
+            ).quantize(Decimal('0.01'))
             if self.unit_price < self.minimum_sale_price:
                 raise ValidationError({'unit_price': _(
                     "Impossible de vendre un produit à un prix inférieur à son prix d'achat."
@@ -424,7 +503,6 @@ class SaleLine(models.Model):
         locked_products = {
             product.pk: product
             for product in Product.objects.select_for_update()
-            .only('pk', 'purchase_price')
             .filter(pk__in={old.product_id, persisted_product_id})
             .order_by('pk')
         }
@@ -452,6 +530,19 @@ class SaleLine(models.Model):
             raise ValidationError({'unit_price': _(
                 "Impossible de vendre un produit à un prix inférieur à son prix d'achat."
             )})
+        product_for_snapshot = locked_products[persisted_product_id]
+        self.product_name_snapshot = product_for_snapshot.name
+        self.product_reference_snapshot = product_for_snapshot.reference
+        self.unit_name_snapshot = product_for_snapshot.unit.name if product_for_snapshot.unit_id else ''
+        self.line_total_ht_snapshot = (
+            Decimal(self.packaging_quantity) * self.unit_price
+        ).quantize(Decimal('0.01'))
+        if update_fields is not None:
+            update_fields.update({
+                'product_name_snapshot', 'product_reference_snapshot',
+                'unit_name_snapshot', 'line_total_ht_snapshot',
+            })
+            kwargs['update_fields'] = update_fields
         super().save(*args, **kwargs)
         self.product_id = persisted_product_id
         self.quantity = persisted_quantity

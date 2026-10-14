@@ -116,12 +116,23 @@ class ProductReferenceSequence(models.Model):
 
 
 class Product(models.Model):
+    class UnitMode(models.TextChoices):
+        LEGACY = 'legacy', _('Historique à confirmer')
+        PIECE_ONLY = 'piece_only', _('Pièce uniquement')
+        CARTON_ONLY = 'carton_only', _('Carton uniquement')
+        CARTON_AND_PIECE = 'carton_and_piece', _('Carton et pièce')
+
     reference = models.CharField(_('Référence'), max_length=100, unique=True, editable=False)
     barcode = models.CharField(_('Code-barres'), max_length=100, unique=True, blank=True)
     name = models.CharField(_('Nom produit'), max_length=255)
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, related_name='products')
     brand = models.ForeignKey(Brand, on_delete=models.SET_NULL, null=True, related_name='products')
     unit = models.ForeignKey(Unit, on_delete=models.SET_NULL, null=True, related_name='products')
+    unit_mode = models.CharField(
+        _('Mode de vente'), max_length=24, choices=UnitMode.choices,
+        default=UnitMode.LEGACY,
+        help_text=_('Les produits historiques restent inchangés tant que leur unité réelle n’est pas confirmée.'),
+    )
     purchase_price = models.DecimalField(_("Prix d'achat"), max_digits=12, decimal_places=2)
     sale_price = models.DecimalField(_('Prix de vente'), max_digits=12, decimal_places=2)
     super_wholesale_price = models.DecimalField(_('Prix Super Gros'), max_digits=12, decimal_places=2, default=0)
@@ -174,6 +185,30 @@ class Product(models.Model):
 
     def __str__(self):
         return self.name
+
+    @property
+    def carton_packaging(self):
+        cached = getattr(self, '_prefetched_objects_cache', {}).get('packagings')
+        if cached is not None:
+            return next((item for item in cached if item.kind == ProductPackaging.CARTON), None)
+        return self.packagings.filter(kind=ProductPackaging.CARTON).first()
+
+    @property
+    def pieces_per_carton(self):
+        carton = self.carton_packaging
+        return carton.conversion_factor if carton else None
+
+    def format_stock_quantity(self, quantity=None):
+        quantity = self.quantity if quantity is None else int(quantity)
+        carton = self.carton_packaging
+        if not carton or carton.conversion_factor < 1:
+            unit_name = self.unit.name if self.unit_id else str(_('unité(s)'))
+            return f'{quantity} {unit_name}'
+        cartons, pieces = divmod(quantity, carton.conversion_factor)
+        return _('%(cartons)s carton(s) et %(pieces)s pièce(s)') % {
+            'cartons': cartons,
+            'pieces': pieces,
+        }
 
     def clean(self):
         super().clean()
@@ -262,8 +297,16 @@ class Product(models.Model):
 
 
 class ProductPackaging(models.Model):
+    CARTON = 'carton'
+    OTHER = 'other'
+    KIND_CHOICES = [
+        (CARTON, _('Carton')),
+        (OTHER, _('Autre conditionnement')),
+    ]
+
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='packagings')
     name = models.CharField(_('Nom du conditionnement'), max_length=100)
+    kind = models.CharField(_('Type'), max_length=16, choices=KIND_CHOICES, default=OTHER)
     conversion_factor = models.PositiveIntegerField(
         _('Facteur de conversion'),
         help_text=_("Nombre d'unités de base contenues dans ce conditionnement."),
@@ -271,6 +314,24 @@ class ProductPackaging(models.Model):
     default_sale_price = models.DecimalField(
         _('Prix de vente par défaut'), max_digits=12, decimal_places=2,
     )
+    reference_purchase_price = models.DecimalField(
+        _('Prix d’achat de référence'), max_digits=12, decimal_places=2,
+        null=True, blank=True,
+    )
+    super_wholesale_price = models.DecimalField(
+        _('Prix carton Super Gros'), max_digits=12, decimal_places=2,
+        null=True, blank=True,
+    )
+    wholesale_price = models.DecimalField(
+        _('Prix carton Gros'), max_digits=12, decimal_places=2,
+        null=True, blank=True,
+    )
+    retail_price = models.DecimalField(
+        _('Prix carton Détail'), max_digits=12, decimal_places=2,
+        null=True, blank=True,
+    )
+    purchase_enabled = models.BooleanField(_('Disponible à l’achat'), default=True)
+    sale_enabled = models.BooleanField(_('Disponible à la vente'), default=True)
     barcode = models.CharField(_('Code-barres'), max_length=100, unique=True, blank=True, null=True)
     is_active = models.BooleanField(_('Actif'), default=True)
 
@@ -278,23 +339,60 @@ class ProductPackaging(models.Model):
         ordering = ('product__name', 'conversion_factor', 'name')
         constraints = [
             models.UniqueConstraint(fields=('product', 'name'), name='uniq_packaging_name_per_product'),
+            models.UniqueConstraint(
+                fields=('product',), condition=Q(kind='carton'),
+                name='uniq_carton_packaging_per_product',
+            ),
             models.CheckConstraint(condition=Q(conversion_factor__gte=1), name='packaging_factor_gte_1'),
             models.CheckConstraint(condition=Q(default_sale_price__gte=0), name='packaging_price_gte_0'),
+            models.CheckConstraint(
+                condition=Q(reference_purchase_price__isnull=True) | Q(reference_purchase_price__gte=0),
+                name='packaging_purchase_price_gte_0',
+            ),
+            models.CheckConstraint(
+                condition=Q(super_wholesale_price__isnull=True) | Q(super_wholesale_price__gte=0),
+                name='packaging_super_price_gte_0',
+            ),
+            models.CheckConstraint(
+                condition=Q(wholesale_price__isnull=True) | Q(wholesale_price__gte=0),
+                name='packaging_wholesale_price_gte_0',
+            ),
+            models.CheckConstraint(
+                condition=Q(retail_price__isnull=True) | Q(retail_price__gte=0),
+                name='packaging_retail_price_gte_0',
+            ),
         ]
 
     @property
     def minimum_sale_price(self):
+        if self.reference_purchase_price not in (None, ''):
+            return Decimal(str(self.reference_purchase_price))
         return Decimal(str(self.product.purchase_price)) * int(self.conversion_factor)
 
     def clean(self):
         super().clean()
-        if self.conversion_factor and self.default_sale_price is not None:
-            if self.default_sale_price < self.minimum_sale_price:
-                raise ValidationError({
-                    'default_sale_price': _(
-                        "Le prix du conditionnement ne peut pas être inférieur à son coût d'achat."
-                    )
-                })
+        errors = {}
+        if self.conversion_factor and self.default_sale_price not in (None, ''):
+            if Decimal(str(self.default_sale_price)) < self.minimum_sale_price:
+                errors['default_sale_price'] = _(
+                    "Le prix du conditionnement ne peut pas être inférieur à son coût d'achat."
+                )
+        price_fields = ('super_wholesale_price', 'wholesale_price', 'retail_price')
+        prices = [getattr(self, field_name) for field_name in price_fields]
+        for field_name, price in zip(price_fields, prices):
+            if price not in (None, '') and Decimal(str(price)) < self.minimum_sale_price:
+                errors[field_name] = _(
+                    "Le prix du conditionnement ne peut pas être inférieur à son coût d'achat."
+                )
+        normalized_prices = [Decimal(str(price)) for price in prices if price not in (None, '')]
+        if len(normalized_prices) == 3 and not normalized_prices[0] <= normalized_prices[1] <= normalized_prices[2]:
+            errors['retail_price'] = _(
+                'Les tarifs carton doivent respecter l’ordre : Super Gros ≤ Gros ≤ Détail.'
+            )
+        if self.kind == self.CARTON and self.conversion_factor == 1:
+            errors['conversion_factor'] = _('Un carton doit contenir plus d’une pièce.')
+        if errors:
+            raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
         self.name = normalize_business_text(self.name)

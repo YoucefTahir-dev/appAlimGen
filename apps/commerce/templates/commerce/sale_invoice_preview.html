@@ -41,6 +41,9 @@
 </div>
 
 <main class="invoice-page">
+    {% if snapshot_warning %}
+        <div class="alert alert-warning" role="alert">{{ snapshot_warning }}</div>
+    {% endif %}
     <header class="row g-4 align-items-start mb-4">
         <div class="col-md-2">
             {% if company and company.logo %}
@@ -63,7 +66,7 @@
             <div class="invoice-title">
                 <div class="h3 mb-2">{% trans "FACTURE" %}</div>
                 <div>N° : <strong>{{ sale.invoice_number }}</strong></div>
-                <div>{% trans "Date" %} : {{ sale.created_at|date:"d/m/Y" }}</div>
+                <div>{% trans "Date" %} : {{ issued_at|date:"d/m/Y" }}</div>
                 <div>{% trans "Statut" %} : Validée</div>
             </div>
         </div>
@@ -72,9 +75,9 @@
     <section class="border rounded-3 p-3 mb-4 bg-light">
         <h2 class="h6 brand">{% trans "Client" %}</h2>
         <div class="row">
-            <div class="col-md-6"><strong>{{ sale.client.name }}</strong></div>
-            <div class="col-md-6">Téléphone : {{ sale.client.phone }}</div>
-            <div class="col-md-6">{% trans "Adresse" %} : {{ sale.client.address }}</div>
+            <div class="col-md-6"><strong>{{ invoice_client.name }}</strong></div>
+            <div class="col-md-6">Téléphone : {{ invoice_client.phone }}</div>
+            <div class="col-md-6">{% trans "Adresse" %} : {{ invoice_client.address }}</div>
             {% for label, value in client_legal_identifiers %}
                 <div class="col-md-6"><strong>{{ label }}</strong> : {{ value }}</div>
             {% endfor %}
@@ -97,7 +100,7 @@
                 {% for line in lines %}
                     <tr>
                         <td>{{ forloop.counter }}</td>
-                        <td>{{ line.product.name }} <span class="text-muted">— {{ line.packaging_name }}</span></td>
+                        <td>{{ line.invoice_product_name }} <span class="text-muted">— {{ line.packaging_name }}</span></td>
                         <td class="text-end">{{ line.packaging_quantity }}</td>
                         <td class="text-end">{{ line.unit_price|floatformat:2 }} DZD</td>
                         <td class="text-end">{{ sale.tax_rate|floatformat:2 }}%</td>
