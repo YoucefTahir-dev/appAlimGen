@@ -60,7 +60,9 @@ class ProductPackagingSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductPackaging
         fields = (
-            'id', 'product', 'name', 'conversion_factor', 'default_sale_price',
+            'id', 'product', 'name', 'kind', 'conversion_factor', 'default_sale_price',
+            'reference_purchase_price', 'super_wholesale_price', 'wholesale_price',
+            'retail_price', 'purchase_enabled', 'sale_enabled',
             'minimum_sale_price', 'barcode', 'is_active',
         )
 
@@ -70,16 +72,47 @@ class ProductPackagingSerializer(serializers.ModelSerializer):
         if request and not has_permission(request.user, 'inventory.view_product_pricing'):
             fields.pop('default_sale_price', None)
             fields.pop('minimum_sale_price', None)
+            fields.pop('reference_purchase_price', None)
+            fields.pop('super_wholesale_price', None)
+            fields.pop('wholesale_price', None)
+            fields.pop('retail_price', None)
         return fields
 
     def validate(self, attrs):
         product = attrs.get('product') or getattr(self.instance, 'product', None)
         factor = attrs.get('conversion_factor', getattr(self.instance, 'conversion_factor', None))
-        price = attrs.get('default_sale_price', getattr(self.instance, 'default_sale_price', None))
-        if product and factor and price is not None and price < product.purchase_price * factor:
-            raise serializers.ValidationError({
-                'default_sale_price': _("Le prix du conditionnement ne peut pas être inférieur à son coût d'achat."),
-            })
+        kind = attrs.get('kind', getattr(self.instance, 'kind', ProductPackaging.OTHER))
+        reference_cost = attrs.get(
+            'reference_purchase_price',
+            getattr(self.instance, 'reference_purchase_price', None),
+        )
+        minimum_price = reference_cost
+        if minimum_price is None and product and factor:
+            minimum_price = product.purchase_price * factor
+        errors = {}
+        for field_name in (
+            'default_sale_price', 'super_wholesale_price',
+            'wholesale_price', 'retail_price',
+        ):
+            value = attrs.get(field_name, getattr(self.instance, field_name, None))
+            if value is not None and minimum_price is not None and value < minimum_price:
+                errors[field_name] = _(
+                    "Le prix du conditionnement ne peut pas être inférieur à son coût d'achat."
+                )
+        tier_prices = [
+            attrs.get(name, getattr(self.instance, name, None))
+            for name in ('super_wholesale_price', 'wholesale_price', 'retail_price')
+        ]
+        if all(value is not None for value in tier_prices) and not (
+            tier_prices[0] <= tier_prices[1] <= tier_prices[2]
+        ):
+            errors['retail_price'] = _(
+                'Les tarifs carton doivent respecter l’ordre : Super Gros ≤ Gros ≤ Détail.'
+            )
+        if kind == ProductPackaging.CARTON and factor == 1:
+            errors['conversion_factor'] = _('Un carton doit contenir plus d’une pièce.')
+        if errors:
+            raise serializers.ValidationError(errors)
         return attrs
 
 
@@ -94,7 +127,7 @@ class ProductSerializer(serializers.ModelSerializer):
         model = Product
         fields = (
             'id', 'reference', 'barcode', 'name', 'category', 'category_name',
-            'brand', 'brand_name', 'unit', 'unit_name', 'purchase_price',
+            'brand', 'brand_name', 'unit', 'unit_name', 'unit_mode', 'purchase_price',
             'sale_price', 'super_wholesale_price', 'wholesale_price', 'retail_price',
             'quantity', 'minimum_stock', 'description', 'photo',
             'qr_code', 'barcode_image', 'stock_status', 'conditionnements', 'created_at',

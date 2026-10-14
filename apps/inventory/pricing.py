@@ -10,6 +10,12 @@ PRICE_FIELD_BY_CUSTOMER_TYPE = {
     'RETAIL': 'retail_price',
 }
 
+PACKAGING_PRICE_FIELD_BY_CUSTOMER_TYPE = {
+    'SUPER_WHOLESALE': 'super_wholesale_price',
+    'WHOLESALE': 'wholesale_price',
+    'RETAIL': 'retail_price',
+}
+
 
 def get_sale_price(product, customer=None, packaging=None):
     """Return the authoritative tariff for a product/customer pair.
@@ -21,11 +27,16 @@ def get_sale_price(product, customer=None, packaging=None):
     customer_type = getattr(customer, 'customer_type', 'RETAIL') or 'RETAIL'
     field_name = PRICE_FIELD_BY_CUSTOMER_TYPE.get(customer_type, 'retail_price')
     price = getattr(product, field_name, None)
+    if packaging is not None:
+        packaging_field = PACKAGING_PRICE_FIELD_BY_CUSTOMER_TYPE.get(
+            customer_type, 'retail_price'
+        )
+        packaging_price = getattr(packaging, packaging_field, None)
+        if packaging_price is not None:
+            return Decimal(str(packaging_price))
     selected_price = product.sale_price if price is None else price
     selected_price = Decimal(str(selected_price))
-    if packaging is not None:
-        selected_price *= int(packaging.conversion_factor)
-    return selected_price
+    return selected_price * int(packaging.conversion_factor) if packaging is not None else selected_price
 
 
 def get_sale_price_context(product, customer, packaging=None):

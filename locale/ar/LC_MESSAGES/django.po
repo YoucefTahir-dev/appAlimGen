@@ -1384,3 +1384,169 @@ msgstr "المخزون غير كافٍ للمنتج %(product)s. المتاح: %
 
 msgid "Contexte de recherche invalide."
 msgstr "سياق البحث غير صالح."
+
+# Multi-unit product editor (lot 1)
+msgid "Historique à confirmer"
+msgstr "بيانات تاريخية تحتاج إلى تأكيد"
+
+msgid "Pièce uniquement"
+msgstr "بالقطعة فقط"
+
+msgid "Carton uniquement"
+msgstr "بالكرتون فقط"
+
+msgid "Carton et pièce"
+msgstr "بالكرتون والقطعة"
+
+msgid "Mode de vente"
+msgstr "وضع البيع"
+
+msgid "Les produits historiques restent inchangés tant que leur unité réelle n’est pas confirmée."
+msgstr "تبقى المنتجات التاريخية دون تغيير إلى أن يتم تأكيد وحدتها الفعلية."
+
+msgid "Unité du stock saisi"
+msgstr "وحدة المخزون المُدخل"
+
+msgid "Unité de base historique"
+msgstr "الوحدة الأساسية التاريخية"
+
+msgid "Quantité de stock"
+msgstr "كمية المخزون"
+
+msgid "Toujours exprimé dans l’unité de base."
+msgstr "تُعبّر دائمًا بالوحدة الأساسية."
+
+msgid "Le stock en cartons exige un mode autorisant le carton."
+msgstr "إدخال المخزون بالكرتون يتطلب وضعًا يسمح بالكرتون."
+
+msgid "Confirmez d’abord l’unité historique de ce produit."
+msgstr "أكد أولًا الوحدة التاريخية لهذا المنتج."
+
+msgid "La signification historique de ce stock n’est pas confirmée. Utilisez la future procédure de migration contrôlée."
+msgstr "لم يتم تأكيد المعنى التاريخي لهذا المخزون. استخدم لاحقًا إجراء الترحيل المراقب."
+
+msgid "Le conditionnement carton est invalide."
+msgstr "إعداد الكرتون غير صالح."
+
+msgid "Nombre de pièces par carton"
+msgstr "عدد القطع في الكرتون"
+
+msgid "Prix d’achat carton"
+msgstr "سعر شراء الكرتون"
+
+msgid "Un carton doit contenir plus d’une pièce."
+msgstr "يجب أن يحتوي الكرتون على أكثر من قطعة واحدة."
+
+msgid "Les tarifs carton doivent respecter l’ordre : Super Gros ≤ Gros ≤ Détail."
+msgstr "يجب أن تحترم أسعار الكرتون الترتيب: جملة كبرى ≤ جملة ≤ تجزئة."
+
+msgid "Autre conditionnement"
+msgstr "تعبئة أخرى"
+
+msgid "Prix d’achat de référence"
+msgstr "سعر الشراء المرجعي"
+
+msgid "Prix carton Super Gros"
+msgstr "سعر الكرتون للجملة الكبرى"
+
+msgid "Prix carton Gros"
+msgstr "سعر الكرتون للجملة"
+
+msgid "Prix carton Détail"
+msgstr "سعر الكرتون للتجزئة"
+
+msgid "Disponible à l’achat"
+msgstr "متاح للشراء"
+
+msgid "Disponible à la vente"
+msgstr "متاح للبيع"
+
+msgid "Configurez les unités, les tarifs et le stock sans créer de stocks séparés."
+msgstr "اضبط الوحدات والأسعار والمخزون دون إنشاء مخزونات منفصلة."
+
+msgid "Renseignez le nombre de pièces par carton."
+msgstr "أدخل عدد القطع في الكرتون."
+
+msgid "1 carton = __FACTOR__ pièce(s)"
+msgstr "1 كرتون = __FACTOR__ قطعة"
+
+msgid "__ENTERED__ carton(s) × __FACTOR__ = __BASE__ pièce(s)"
+msgstr "__ENTERED__ كرتون × __FACTOR__ = __BASE__ قطعة"
+
+msgid "__BASE__ pièce(s)"
+msgstr "__BASE__ قطعة"
+
+msgid "Coût indicatif : __COST__ DZD/pièce. Le prix pièce saisi reste inchangé."
+msgstr "التكلفة التقديرية: __COST__ دج/قطعة. يبقى سعر القطعة المُدخل دون تغيير."
+
+msgid "Le coût pièce indicatif sera calculé sans remplacer votre saisie."
+msgstr "ستُحسب التكلفة التقديرية للقطعة دون استبدال القيمة التي أدخلتها."
+
+msgid "Informations générales"
+msgstr "معلومات عامة"
+
+msgid "Identité et classement du produit."
+msgstr "تعريف المنتج وتصنيفه."
+
+msgid "Conditionnement et unités"
+msgstr "التعبئة والوحدات"
+
+msgid "Le stock reste unique et est conservé en pièces pour les produits confirmés."
+msgstr "يبقى المخزون موحدًا ويُحفظ بالقطع للمنتجات المؤكدة."
+
+msgid "Prix d’achat"
+msgstr "سعر الشراء"
+
+msgid "Les prix sont des références ; un achat réel pourra conserver son prix négocié."
+msgstr "الأسعار مرجعية؛ ويمكن لعملية الشراء الفعلية الاحتفاظ بالسعر المتفاوض عليه."
+
+msgid "Prix d’achat de référence par pièce."
+msgstr "سعر الشراء المرجعي للقطعة."
+
+msgid "Les prix carton et pièce sont indépendants pour chaque niveau tarifaire."
+msgstr "سعر الكرتون وسعر القطعة مستقلان في كل مستوى تسعير."
+
+msgid "Prix pièce"
+msgstr "سعر القطعة"
+
+msgid "Prix carton"
+msgstr "سعر الكرتون"
+
+msgid "Stock physique"
+msgstr "المخزون الفعلي"
+
+msgid "Stock initial"
+msgstr "المخزون الأولي"
+
+msgid "La conversion est calculée avant l’écriture dans le journal de stock."
+msgstr "يتم حساب التحويل قبل التسجيل في سجل المخزون."
+
+msgid "Informations complémentaires"
+msgstr "معلومات إضافية"
+
+msgid "Autres conditionnements"
+msgstr "تعبئات أخرى"
+
+msgid "Les conditionnements génériques existants restent disponibles et distincts du carton."
+msgstr "تبقى التعبئات العامة الحالية متاحة ومنفصلة عن الكرتون."
+
+msgid "Aperçu dynamique"
+msgstr "معاينة فورية"
+
+msgid "Achat pièce"
+msgstr "شراء القطعة"
+
+msgid "Achat carton"
+msgstr "شراء الكرتون"
+
+msgid "Vente détail pièce"
+msgstr "بيع التجزئة للقطعة"
+
+msgid "Vente détail carton"
+msgstr "بيع التجزئة للكرتون"
+
+msgid "Stock converti"
+msgstr "المخزون بعد التحويل"
+
+msgid "Produit historique : aucune conversion ne sera faite sans confirmation de son unité réelle."
+msgstr "منتج تاريخي: لن يتم أي تحويل دون تأكيد وحدته الفعلية."

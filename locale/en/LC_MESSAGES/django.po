@@ -456,3 +456,169 @@ msgstr "Insufficient stock for %(product)s. Available: %(available)s."
 
 msgid "Contexte de recherche invalide."
 msgstr "Invalid search context."
+
+# Multi-unit product editor (lot 1)
+msgid "Historique à confirmer"
+msgstr "Historical unit to confirm"
+
+msgid "Pièce uniquement"
+msgstr "Piece only"
+
+msgid "Carton uniquement"
+msgstr "Carton only"
+
+msgid "Carton et pièce"
+msgstr "Carton and piece"
+
+msgid "Mode de vente"
+msgstr "Sales mode"
+
+msgid "Les produits historiques restent inchangés tant que leur unité réelle n’est pas confirmée."
+msgstr "Historical products remain unchanged until their actual unit is confirmed."
+
+msgid "Unité du stock saisi"
+msgstr "Entered stock unit"
+
+msgid "Unité de base historique"
+msgstr "Historical base unit"
+
+msgid "Quantité de stock"
+msgstr "Stock quantity"
+
+msgid "Toujours exprimé dans l’unité de base."
+msgstr "Always expressed in the base unit."
+
+msgid "Le stock en cartons exige un mode autorisant le carton."
+msgstr "Stock entered in cartons requires a mode that allows cartons."
+
+msgid "Confirmez d’abord l’unité historique de ce produit."
+msgstr "Confirm this product's historical unit first."
+
+msgid "La signification historique de ce stock n’est pas confirmée. Utilisez la future procédure de migration contrôlée."
+msgstr "The historical meaning of this stock is not confirmed. Use the future controlled migration procedure."
+
+msgid "Le conditionnement carton est invalide."
+msgstr "The carton configuration is invalid."
+
+msgid "Nombre de pièces par carton"
+msgstr "Pieces per carton"
+
+msgid "Prix d’achat carton"
+msgstr "Carton purchase price"
+
+msgid "Un carton doit contenir plus d’une pièce."
+msgstr "A carton must contain more than one piece."
+
+msgid "Les tarifs carton doivent respecter l’ordre : Super Gros ≤ Gros ≤ Détail."
+msgstr "Carton prices must follow this order: Super Wholesale ≤ Wholesale ≤ Retail."
+
+msgid "Autre conditionnement"
+msgstr "Other packaging"
+
+msgid "Prix d’achat de référence"
+msgstr "Reference purchase price"
+
+msgid "Prix carton Super Gros"
+msgstr "Super Wholesale carton price"
+
+msgid "Prix carton Gros"
+msgstr "Wholesale carton price"
+
+msgid "Prix carton Détail"
+msgstr "Retail carton price"
+
+msgid "Disponible à l’achat"
+msgstr "Available for purchase"
+
+msgid "Disponible à la vente"
+msgstr "Available for sale"
+
+msgid "Configurez les unités, les tarifs et le stock sans créer de stocks séparés."
+msgstr "Configure units, prices and stock without creating separate inventories."
+
+msgid "Renseignez le nombre de pièces par carton."
+msgstr "Enter the number of pieces per carton."
+
+msgid "1 carton = __FACTOR__ pièce(s)"
+msgstr "1 carton = __FACTOR__ piece(s)"
+
+msgid "__ENTERED__ carton(s) × __FACTOR__ = __BASE__ pièce(s)"
+msgstr "__ENTERED__ carton(s) × __FACTOR__ = __BASE__ piece(s)"
+
+msgid "__BASE__ pièce(s)"
+msgstr "__BASE__ piece(s)"
+
+msgid "Coût indicatif : __COST__ DZD/pièce. Le prix pièce saisi reste inchangé."
+msgstr "Estimated cost: __COST__ DZD/piece. The entered piece price remains unchanged."
+
+msgid "Le coût pièce indicatif sera calculé sans remplacer votre saisie."
+msgstr "The estimated piece cost will be calculated without replacing your input."
+
+msgid "Informations générales"
+msgstr "General information"
+
+msgid "Identité et classement du produit."
+msgstr "Product identity and classification."
+
+msgid "Conditionnement et unités"
+msgstr "Packaging and units"
+
+msgid "Le stock reste unique et est conservé en pièces pour les produits confirmés."
+msgstr "Stock remains unified and is stored in pieces for confirmed products."
+
+msgid "Prix d’achat"
+msgstr "Purchase prices"
+
+msgid "Les prix sont des références ; un achat réel pourra conserver son prix négocié."
+msgstr "These are reference prices; an actual purchase can retain its negotiated price."
+
+msgid "Prix d’achat de référence par pièce."
+msgstr "Reference purchase price per piece."
+
+msgid "Les prix carton et pièce sont indépendants pour chaque niveau tarifaire."
+msgstr "Carton and piece prices are independent at each pricing level."
+
+msgid "Prix pièce"
+msgstr "Piece price"
+
+msgid "Prix carton"
+msgstr "Carton price"
+
+msgid "Stock physique"
+msgstr "Physical stock"
+
+msgid "Stock initial"
+msgstr "Initial stock"
+
+msgid "La conversion est calculée avant l’écriture dans le journal de stock."
+msgstr "Conversion is calculated before writing to the stock ledger."
+
+msgid "Informations complémentaires"
+msgstr "Additional information"
+
+msgid "Autres conditionnements"
+msgstr "Other packaging"
+
+msgid "Les conditionnements génériques existants restent disponibles et distincts du carton."
+msgstr "Existing generic packaging remains available and separate from cartons."
+
+msgid "Aperçu dynamique"
+msgstr "Live preview"
+
+msgid "Achat pièce"
+msgstr "Piece purchase"
+
+msgid "Achat carton"
+msgstr "Carton purchase"
+
+msgid "Vente détail pièce"
+msgstr "Retail piece sale"
+
+msgid "Vente détail carton"
+msgstr "Retail carton sale"
+
+msgid "Stock converti"
+msgstr "Converted stock"
+
+msgid "Produit historique : aucune conversion ne sera faite sans confirmation de son unité réelle."
+msgstr "Historical product: no conversion will occur until its actual unit is confirmed."

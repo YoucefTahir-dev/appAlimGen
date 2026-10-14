@@ -12,15 +12,22 @@ from .models import (
 
 
 @transaction.atomic
-def create_product_from_form(form, *, user, packaging_formset=None):
+def create_product_from_form(form, *, user, packaging_formset=None, carton_form=None):
     """Persist a validated product form and its initial stock through the ledger."""
-    initial_quantity = form.cleaned_data.get('quantity', 0)
+    initial_quantity = form.stock_quantity_in_base(carton_form) if hasattr(
+        form, 'stock_quantity_in_base'
+    ) else form.cleaned_data.get('quantity', 0)
     product = form.save(commit=False)
     product.quantity = 0
     product.save()
     if packaging_formset is not None and packaging_formset.is_bound:
         packaging_formset.instance = product
         packaging_formset.save()
+    if carton_form is not None:
+        if product.unit_mode in (Product.UnitMode.CARTON_ONLY, Product.UnitMode.CARTON_AND_PIECE):
+            carton_form.save_for(product)
+        elif product.unit_mode == Product.UnitMode.PIECE_ONLY:
+            carton_form.disable_for(product)
     if initial_quantity:
         record_stock_movement(
             product=product, movement_type=StockMovement.ENTRY,

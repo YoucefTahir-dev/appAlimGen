@@ -431,6 +431,32 @@ body.rtl .text-end {
     margin: 0;
     margin-inline-start: auto;
 }
+.product-editor { max-width: 1480px; margin-inline: auto; }
+.product-section { padding: 1.5rem; border: 1px solid rgba(16, 80, 58, .09); }
+.product-section-heading { display: flex; align-items: center; gap: .9rem; margin-bottom: 1.25rem; }
+.product-section-heading h2 { margin: 0; font-size: 1.08rem; font-weight: 700; }
+.product-section-heading p { margin: .2rem 0 0; color: var(--bs-secondary-color); font-size: .9rem; }
+.product-section-icon { width: 2.6rem; height: 2.6rem; border-radius: .8rem; display: grid; place-items: center; background: rgba(25, 135, 84, .11); color: #198754; font-size: 1.2rem; flex: 0 0 auto; }
+.conversion-callout, .stock-conversion-preview { padding: .85rem 1rem; border-radius: .75rem; background: #eef8f3; color: #146c43; font-weight: 600; }
+.pricing-matrix-wrap { border: 1px solid var(--bs-border-color); border-radius: .85rem; }
+.pricing-matrix th { background: #f7faf8; }
+.pricing-matrix input { min-width: 10rem; }
+.product-preview-card { top: 1rem; padding: 1.5rem; overflow: hidden; background: linear-gradient(155deg, #123f31, #176d50); color: #fff; }
+.preview-kicker { text-transform: uppercase; letter-spacing: .08em; font-size: .72rem; opacity: .75; }
+.product-preview-card h2 { margin: .45rem 0 .1rem; font-size: 1.45rem; overflow-wrap: anywhere; }
+.preview-category { opacity: .75; }
+.preview-list { margin: 1.25rem 0; }
+.preview-list > div { display: flex; justify-content: space-between; gap: 1rem; padding: .7rem 0; border-bottom: 1px solid rgba(255,255,255,.13); }
+.preview-list dt { font-weight: 400; opacity: .72; }
+.preview-list dd { margin: 0; font-weight: 650; text-align: end; }
+.product-form-actions { padding-bottom: 1rem; }
+
+@media (max-width: 767.98px) {
+    .product-section { padding: 1rem; }
+    .product-section-heading { align-items: flex-start; }
+    .pricing-matrix input { min-width: 8rem; }
+    .product-preview-card { position: static !important; }
+}
 .product-results { max-height: 12rem; overflow-y: auto; margin-block-start: .25rem; }
 .product-result { text-align: start; white-space: normal; overflow-wrap: anywhere; }
 .product-picker { min-width: 0; }
