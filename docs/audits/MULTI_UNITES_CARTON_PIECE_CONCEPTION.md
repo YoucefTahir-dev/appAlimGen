@@ -1,8 +1,8 @@
 # Gestion multi-unités carton / pièce — audit et conception
 
-Date de l'audit : 14 octobre 2026  
-Dépôt audité : `gestio_stock`  
-Révision auditée : `fix/p0-03-historical-invoices` — `706ded3`  
+Date de l'audit : 14 octobre 2026
+Dépôt audité : `gestio_stock`
+Révision auditée : `fix/p0-03-historical-invoices` — `706ded3`
 Périmètre : audit et conception uniquement. Aucun modèle, service, contrat API, écran Web/Flutter ou fichier de migration n'a été modifié.
 
 ## 1. Décision d'architecture et verdict

@@ -59,4 +59,3 @@ class ProductUnitFormBrowserTests(StaticLiveServerTestCase):
                 expect(page.locator('#id_purchase_price')).to_have_value('160')
             finally:
                 browser.close()
-

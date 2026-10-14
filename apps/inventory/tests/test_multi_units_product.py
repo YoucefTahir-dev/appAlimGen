@@ -249,4 +249,3 @@ class MultiUnitProductLotOneTests(TestCase):
         arabic_response = self.client.get(reverse('product_update', args=[product.pk]))
         self.assertContains(arabic_response, 'التعبئة والوحدات')
         self.assertContains(arabic_response, 'معاينة فورية')
-

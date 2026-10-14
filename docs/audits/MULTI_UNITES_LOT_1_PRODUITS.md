@@ -1,7 +1,7 @@
 # LOT 1 — Produits et tarifs carton / pièce
 
-Date de validation locale : 14 octobre 2026  
-Branche de travail : `fix/p0-03-historical-invoices`  
+Date de validation locale : 14 octobre 2026
+Branche de travail : `fix/p0-03-historical-invoices`
 Périmètre : produit, tarifs, formulaire Web et migration additive uniquement.
 
 ## 1. Résultat
@@ -149,6 +149,4 @@ Le choix retenu impose qu'un carton contienne au moins deux pièces. L'ordre tar
 - ventes, chargements, stock opérateur et impressions non modifiés ;
 - application Flutter non modifiée ;
 - aucune migration Neon ;
-- aucun déploiement Render ;
-- aucun commit ni push.
-
+- aucun déploiement Render effectué pendant la validation locale.
