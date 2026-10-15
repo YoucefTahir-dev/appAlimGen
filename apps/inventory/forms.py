@@ -3,6 +3,7 @@ from decimal import Decimal
 from django import forms
 from django.core.exceptions import ValidationError
 from django.forms import BaseInlineFormSet, inlineformset_factory
+from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from apps.core.security import validate_excel_upload
 from apps.commerce.widgets import ProductAutocomplete
@@ -213,16 +214,66 @@ class LoadingOrderLineForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        product_id = self.data.get(self.add_prefix('product')) if self.is_bound else self.initial.get('product')
+        if not product_id and self.instance and self.instance.pk:
+            product_id = self.instance.product_id
+        if not str(product_id or '').isdigit():
+            product_id = None
+        queryset = ProductPackaging.objects.filter(
+            product_id=product_id, is_active=True,
+        ).filter(Q(purchase_enabled=True) | Q(sale_enabled=True)).order_by('conversion_factor', 'name')
+        if self.instance and self.instance.pk and self.instance.packaging_id:
+            queryset = ProductPackaging.objects.filter(
+                Q(product_id=product_id, is_active=True, purchase_enabled=True)
+                | Q(product_id=product_id, is_active=True, sale_enabled=True)
+                | Q(pk=self.instance.packaging_id)
+            ).order_by('conversion_factor', 'name')
+        self.fields['packaging'].queryset = queryset
+        self.fields['packaging'].required = False
+        self.fields['packaging'].empty_label = _('Unité de base')
+        if self.instance and self.instance.pk:
+            self.initial['quantity'] = self.instance.entered_quantity
         self.fields['product'].error_messages['invalid_choice'] = _(
             'Veuillez sélectionner un produit dans les résultats proposés.'
         )
 
     class Meta:
         model = LoadingOrderLine
-        fields = ('product', 'quantity')
+        fields = ('product', 'packaging', 'quantity')
         widgets = {
             'product': ProductAutocomplete(attrs={'search_context': 'loading_order'}),
+            'packaging': forms.Select(attrs={'class': 'form-select loading-unit'}),
         }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        product = cleaned_data.get('product')
+        packaging = cleaned_data.get('packaging')
+        if not product:
+            return cleaned_data
+        from .pricing import loading_base_unit_allowed, loading_packaging_allowed
+        same_historical_unit = bool(
+            self.instance and self.instance.pk
+            and self.instance.product_id == product.pk
+            and self.instance.packaging_id == getattr(packaging, 'pk', None)
+        )
+        if packaging and not same_historical_unit and not loading_packaging_allowed(product, packaging):
+            self.add_error('packaging', _('Conditionnement de chargement invalide ou inactif.'))
+        elif not packaging and not same_historical_unit and not loading_base_unit_allowed(product):
+            self.add_error('packaging', _('Ce produit doit être chargé en carton.'))
+        return cleaned_data
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        packaging = self.cleaned_data.get('packaging')
+        entered_quantity = self.cleaned_data['quantity']
+        instance.packaging = packaging
+        instance.packaging_quantity = entered_quantity
+        instance.quantity = entered_quantity * (packaging.conversion_factor if packaging else 1)
+        if commit:
+            instance.save()
+            self.save_m2m()
+        return instance
 
 
 class BaseLoadingOrderLineFormSet(BaseInlineFormSet):
@@ -238,12 +289,9 @@ class BaseLoadingOrderLineFormSet(BaseInlineFormSet):
             and not form.cleaned_data.get('DELETE')
             and form.cleaned_data.get('product')
         ]
-        duplicate_product = len(selected_product_ids) != len(set(selected_product_ids))
         try:
             super().clean()
         except ValidationError:
-            if duplicate_product:
-                raise ValidationError(_('Ce produit est déjà présent dans le bon de chargement.'))
             if not selected_product_ids:
                 raise ValidationError(_('Le bon de chargement doit contenir au moins un produit.'))
             raise
@@ -260,10 +308,6 @@ class BaseLoadingOrderLineFormSet(BaseInlineFormSet):
         ]
         if not active_lines:
             raise ValidationError(_('Le bon de chargement doit contenir au moins un produit.'))
-
-        if duplicate_product:
-            raise ValidationError(_('Ce produit est déjà présent dans le bon de chargement.'))
-
 
 LoadingOrderLineFormSet = inlineformset_factory(
     LoadingOrder, LoadingOrderLine, form=LoadingOrderLineForm,

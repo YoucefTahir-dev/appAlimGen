@@ -51,13 +51,20 @@ def search_products(*, user, query, context, customer=None):
         When(name__istartswith=query, then=Value(2)),
         default=Value(3), output_field=IntegerField(),
     )).order_by('search_rank', 'name', 'pk')
-    if context == 'purchase':
+    if context in {'purchase', 'loading_order'}:
+        packaging_queryset = ProductPackaging.objects.filter(is_active=True)
+        if context == 'purchase':
+            packaging_queryset = packaging_queryset.filter(purchase_enabled=True)
+            to_attr = 'purchase_packagings'
+        else:
+            packaging_queryset = packaging_queryset.filter(
+                Q(purchase_enabled=True) | Q(sale_enabled=True)
+            )
+            to_attr = 'loading_packagings'
         products = products.prefetch_related(Prefetch(
             'packagings',
-            queryset=ProductPackaging.objects.filter(
-                is_active=True, purchase_enabled=True,
-            ).order_by('conversion_factor', 'name'),
-            to_attr='purchase_packagings',
+            queryset=packaging_queryset.order_by('conversion_factor', 'name'),
+            to_attr=to_attr,
         ))
     products = products[:20]
     results = []
@@ -94,5 +101,23 @@ def search_products(*, user, query, context, customer=None):
             item['purchase_units'] = purchase_units
         elif context == 'sale':
             item['price'] = f'{get_sale_price(product, customer):.2f}'
+        elif context == 'loading_order':
+            loading_units = []
+            if product.unit_mode != Product.UnitMode.CARTON_ONLY:
+                loading_units.append({
+                    'id': None,
+                    'name': product.unit.name if product.unit_id else str(_('Unité de base')),
+                    'factor': 1,
+                })
+            if product.unit_mode in {Product.UnitMode.CARTON_ONLY, Product.UnitMode.CARTON_AND_PIECE}:
+                for packaging in getattr(product, 'loading_packagings', []):
+                    if product.unit_mode == Product.UnitMode.CARTON_ONLY and packaging.kind != ProductPackaging.CARTON:
+                        continue
+                    loading_units.append({
+                        'id': packaging.pk,
+                        'name': packaging.name,
+                        'factor': packaging.conversion_factor,
+                    })
+            item['loading_units'] = loading_units
         results.append(item)
     return results

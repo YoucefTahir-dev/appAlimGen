@@ -581,20 +581,107 @@ class LoadingOrder(models.Model):
 class LoadingOrderLine(models.Model):
     loading_order = models.ForeignKey(LoadingOrder, on_delete=models.CASCADE, related_name='lines')
     product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name='loading_lines')
+    packaging = models.ForeignKey(
+        ProductPackaging, on_delete=models.PROTECT, null=True, blank=True,
+        related_name='loading_lines', verbose_name=_('Conditionnement'),
+    )
+    packaging_name = models.CharField(_('Conditionnement historique'), max_length=100, blank=True)
+    packaging_factor = models.PositiveIntegerField(_('Facteur historique'), default=1, editable=False)
+    packaging_quantity = models.PositiveIntegerField(
+        _('Quantité chargée saisie'), null=True, blank=True,
+        help_text=_('Quantité saisie dans le conditionnement sélectionné.'),
+    )
     quantity = models.PositiveIntegerField(_('Quantité chargée'))
     returned_quantity = models.PositiveIntegerField(_('Quantité retournée'), default=0, editable=False)
 
     class Meta:
         ordering = ('pk',)
         constraints = [
-            models.UniqueConstraint(fields=('loading_order', 'product'), name='uniq_product_per_loading'),
             models.CheckConstraint(condition=Q(quantity__gt=0), name='loading_line_quantity_positive'),
+            models.CheckConstraint(condition=Q(packaging_factor__gte=1), name='loading_line_packaging_factor_gte_1'),
+            models.CheckConstraint(
+                condition=Q(packaging_quantity__isnull=True) | Q(packaging_quantity__gte=1),
+                name='loading_line_packaging_quantity_positive',
+            ),
             models.CheckConstraint(condition=Q(returned_quantity__gte=0), name='loading_returned_non_negative'),
         ]
 
     @property
     def sold_quantity(self):
         return self.quantity - self.returned_quantity
+
+    @property
+    def entered_quantity(self):
+        return self.packaging_quantity if self.packaging_quantity is not None else self.quantity
+
+    @property
+    def stock_quantity(self):
+        return self.quantity
+
+    @property
+    def formatted_quantity(self):
+        return self.product.format_stock_quantity(self.quantity)
+
+    def _set_packaging_snapshot(self, old=None):
+        from .pricing import loading_base_unit_allowed, loading_packaging_allowed
+
+        product = Product.objects.select_for_update().get(pk=self.product_id)
+        entered_quantity = self.packaging_quantity
+        if entered_quantity is None:
+            entered_quantity = self.quantity
+        entered_quantity = int(entered_quantity)
+        if entered_quantity < 1:
+            raise ValidationError({'packaging_quantity': _('La quantité doit être strictement positive.')})
+
+        same_historical_unit = bool(
+            old and old.product_id == self.product_id and old.packaging_id == self.packaging_id
+        )
+        if same_historical_unit:
+            factor = old.packaging_factor
+            packaging_name = old.packaging_name
+        elif self.packaging_id:
+            packaging = ProductPackaging.objects.select_for_update().get(pk=self.packaging_id)
+            if not loading_packaging_allowed(product, packaging):
+                raise ValidationError({'packaging': _('Conditionnement de chargement invalide ou inactif.')})
+            factor = packaging.conversion_factor
+            packaging_name = packaging.name
+        else:
+            if not loading_base_unit_allowed(product):
+                raise ValidationError({'packaging': _('Ce produit doit être chargé en carton.')})
+            factor = 1
+            packaging_name = product.unit.name if product.unit_id else str(_('Unité de base'))
+
+        self.packaging_quantity = entered_quantity
+        self.packaging_factor = factor
+        self.packaging_name = packaging_name
+        self.quantity = entered_quantity * factor
+
+    @transaction.atomic
+    def save(self, *args, **kwargs):
+        update_fields = kwargs.get('update_fields')
+        tracked_fields = {
+            'product', 'product_id', 'quantity', 'packaging', 'packaging_id', 'packaging_quantity'
+        }
+        if update_fields is not None and not set(update_fields) & tracked_fields:
+            return super().save(*args, **kwargs)
+        old = LoadingOrderLine.objects.select_for_update().get(pk=self.pk) if self.pk else None
+        if (
+            old and not self.packaging_id
+            and (self.packaging_quantity is None or self.packaging_quantity == old.packaging_quantity)
+            and self.quantity != old.quantity
+        ):
+            self.packaging_quantity = self.quantity
+        self._set_packaging_snapshot(old=old)
+        if update_fields is not None:
+            fields = set(update_fields)
+            fields.update({
+                'product', 'quantity', 'packaging', 'packaging_name',
+                'packaging_factor', 'packaging_quantity',
+            })
+            fields.discard('product_id')
+            fields.discard('packaging_id')
+            kwargs['update_fields'] = fields
+        return super().save(*args, **kwargs)
 
 
 class OperatorStock(models.Model):
@@ -609,6 +696,10 @@ class OperatorStock(models.Model):
             models.UniqueConstraint(fields=('operator', 'product'), name='uniq_operator_product_stock'),
             models.CheckConstraint(condition=Q(quantity__gte=0), name='operator_stock_non_negative'),
         ]
+
+    @property
+    def formatted_quantity(self):
+        return self.product.format_stock_quantity(self.quantity)
 
 
 class ImmutableOperatorStockMovementQuerySet(models.QuerySet):

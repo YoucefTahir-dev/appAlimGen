@@ -277,22 +277,25 @@ def validate_loading_order(loading_order, *, user=None):
         operator=order.operator, status__in=(LoadingOrder.VALIDATED, LoadingOrder.IN_PROGRESS),
     ).exclude(pk=order.pk).exists():
         raise ValidationError({'operator': _('Cet opérateur possède déjà un chargement actif.')})
-    lines = list(order.lines.select_related('product').order_by('product_id'))
+    lines = list(order.lines.select_for_update().order_by('product_id', 'pk'))
     if not lines:
         raise ValidationError({'lines': _('Le chargement doit contenir au moins un produit.')})
     if any(line.quantity <= 0 for line in lines):
         raise ValidationError({'lines': _('Toutes les quantités doivent être strictement positives.')})
+    quantities_by_product = {}
+    for line in lines:
+        quantities_by_product[line.product_id] = quantities_by_product.get(line.product_id, 0) + line.quantity
     changes = [
         StockChange(
-            product=line.product_id, movement_type=StockMovement.EXIT, quantity=line.quantity,
+            product=product_id, movement_type=StockMovement.EXIT, quantity=quantity,
             reason=_('Validation du chargement %(number)s') % {'number': order.number},
             user=user, source_type=StockMovement.SOURCE_LOADING, source_reference=order.number,
-        ) for line in lines
+        ) for product_id, quantity in sorted(quantities_by_product.items())
     ]
     record_stock_movements(changes)
-    for line in lines:
+    for product_id, quantity in sorted(quantities_by_product.items()):
         adjust_operator_stock(
-            loading_order=order, product=line.product_id, delta=line.quantity,
+            loading_order=order, product=product_id, delta=quantity,
             movement_type=OperatorStockMovement.LOAD, user=user, source_reference=order.number,
         )
     order.status = LoadingOrder.IN_PROGRESS
@@ -307,7 +310,12 @@ def close_loading_order(loading_order, *, user=None):
     order = LoadingOrder.objects.select_for_update().get(pk=order_id)
     if order.status not in (LoadingOrder.VALIDATED, LoadingOrder.IN_PROGRESS):
         raise ValidationError({'status': _('Seul un chargement actif peut être clôturé.')})
-    lines = list(order.lines.select_for_update().order_by('product_id'))
+    lines = list(order.lines.select_for_update().order_by('product_id', 'pk'))
+    quantities_by_product = {}
+    lines_by_product = {}
+    for line in lines:
+        quantities_by_product[line.product_id] = quantities_by_product.get(line.product_id, 0) + line.quantity
+        lines_by_product.setdefault(line.product_id, []).append(line)
     stocks = {
         stock.product_id: stock
         for stock in OperatorStock.objects.select_for_update().filter(
@@ -315,22 +323,25 @@ def close_loading_order(loading_order, *, user=None):
         ).order_by('product_id')
     }
     depot_returns = []
-    for line in lines:
-        remaining = stocks.get(line.product_id).quantity if line.product_id in stocks else 0
-        if remaining > line.quantity:
+    for product_id, loaded_quantity in sorted(quantities_by_product.items()):
+        remaining = stocks.get(product_id).quantity if product_id in stocks else 0
+        if remaining > loaded_quantity:
             raise ValidationError({'quantity': _('Le solde opérateur est incohérent avec ce chargement.')})
         if remaining:
             depot_returns.append(StockChange(
-                product=line.product_id, movement_type=StockMovement.ENTRY, quantity=remaining,
+                product=product_id, movement_type=StockMovement.ENTRY, quantity=remaining,
                 reason=_('Retour du chargement %(number)s') % {'number': order.number},
                 user=user, source_type=StockMovement.SOURCE_LOADING, source_reference=order.number,
             ))
             adjust_operator_stock(
-                loading_order=order, product=line.product_id, delta=-remaining,
+                loading_order=order, product=product_id, delta=-remaining,
                 movement_type=OperatorStockMovement.RETURN, user=user, source_reference=order.number,
             )
-        line.returned_quantity = remaining
-        line.save(update_fields=('returned_quantity',))
+        unallocated_return = remaining
+        for line in lines_by_product[product_id]:
+            line.returned_quantity = min(line.quantity, unallocated_return)
+            unallocated_return -= line.returned_quantity
+            line.save(update_fields=('returned_quantity',))
     record_stock_movements(depot_returns)
     order.status = LoadingOrder.CLOSED
     order.closed_at = timezone.now()

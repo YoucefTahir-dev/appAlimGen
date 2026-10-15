@@ -100,7 +100,10 @@ class SupplierAdmin(admin.ModelAdmin):
 class LoadingOrderLineInline(admin.TabularInline):
     model = LoadingOrderLine
     extra = 0
-    readonly_fields = ('product', 'quantity', 'returned_quantity')
+    readonly_fields = (
+        'product', 'packaging', 'packaging_name', 'packaging_factor',
+        'packaging_quantity', 'quantity', 'returned_quantity',
+    )
     can_delete = False
 
     def has_add_permission(self, request, obj=None):

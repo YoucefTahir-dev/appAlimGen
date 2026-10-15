@@ -72,17 +72,12 @@ class LoadingOrderProductSelectionTests(TestCase):
         self.biscuit.refresh_from_db()
         self.assertEqual((self.chocolate.quantity, self.biscuit.quantity), (50, 30))
 
-    def test_empty_invalid_quantity_and_duplicate_lines_are_rejected(self):
+    def test_empty_and_invalid_quantities_are_rejected(self):
         cases = (
             ({**self.management(1), 'lines-0-product': '', 'lines-0-quantity': ''},
              'Le bon de chargement doit contenir au moins un produit.'),
             ({**self.management(1), 'lines-0-product': self.chocolate.pk, 'lines-0-quantity': '0'}, 'positive'),
             ({**self.management(1), 'lines-0-product': self.chocolate.pk, 'lines-0-quantity': '-2'}, 'positive'),
-            ({
-                **self.management(2),
-                'lines-0-product': self.chocolate.pk, 'lines-0-quantity': '1',
-                'lines-1-product': self.chocolate.pk, 'lines-1-quantity': '2',
-            }, 'Ce produit est déjà présent dans le bon de chargement.'),
         )
         for line_data, expected in cases:
             with self.subTest(line_data=line_data):
@@ -162,7 +157,10 @@ class LoadingOrderProductSelectionTests(TestCase):
         search = api.get(reverse('api-product-search'), {'q': 'choc', 'context': 'loading_order'})
         self.assertEqual(search.status_code, 200, search.data)
         self.assertEqual(search.json()['data']['results'][0]['id'], self.chocolate.pk)
-        self.assertEqual(set(search.json()['data']['results'][0]), {'id', 'name', 'reference', 'stock'})
+        self.assertEqual(
+            set(search.json()['data']['results'][0]),
+            {'id', 'name', 'reference', 'stock', 'loading_units'},
+        )
 
         payload = {
             'operator': self.operator.pk,
@@ -178,7 +176,7 @@ class LoadingOrderProductSelectionTests(TestCase):
 
         payload['lines'][1]['product'] = self.chocolate.pk
         duplicate = api.post(reverse('api-loading-order-list'), payload, format='json')
-        self.assertEqual(duplicate.status_code, 400)
+        self.assertEqual(duplicate.status_code, 201, duplicate.data)
 
     def test_new_interface_labels_are_translated(self):
         with override('en'):

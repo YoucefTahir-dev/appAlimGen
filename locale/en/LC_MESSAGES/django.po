@@ -651,3 +651,18 @@ msgstr "Invalid or inactive sale packaging."
 
 msgid "Ce produit doit être vendu en carton."
 msgstr "This product must be sold by carton."
+
+msgid "Quantité chargée saisie"
+msgstr "Entered loading quantity"
+
+msgid "Conditionnement historique"
+msgstr "Historical packaging"
+
+msgid "Facteur historique"
+msgstr "Historical factor"
+
+msgid "Conditionnement de chargement invalide ou inactif."
+msgstr "Invalid or inactive loading packaging."
+
+msgid "Ce produit doit être chargé en carton."
+msgstr "This product must be loaded by carton."
