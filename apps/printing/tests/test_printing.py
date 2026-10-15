@@ -132,6 +132,7 @@ class PrintingApiTests(APITestCase):
         )
         cls.product = Product.objects.create(
             name='Boisson', purchase_price=Decimal('50'), sale_price=Decimal('80'), quantity=0,
+            unit_mode=Product.UnitMode.CARTON_AND_PIECE,
         )
         record_stock_movement(
             product=cls.product, movement_type=StockMovement.ENTRY, quantity=100,

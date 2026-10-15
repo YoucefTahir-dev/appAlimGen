@@ -1573,3 +1573,9 @@ msgstr "لا يمكن شراء هذا المنتج إلا بوحدته الأس�
 
 msgid "Ce produit doit être acheté en carton."
 msgstr "يجب شراء هذا المنتج بالكرتون."
+
+msgid "Conditionnement de vente invalide ou inactif."
+msgstr "وحدة تغليف البيع غير صالحة أو غير نشطة."
+
+msgid "Ce produit doit être vendu en carton."
+msgstr "يجب بيع هذا المنتج بالكرتون."

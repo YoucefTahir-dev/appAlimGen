@@ -9617,6 +9617,9 @@ components:
           type: integer
           nullable: true
           title: Conditionnement
+        packaging_id:
+          type: integer
+          readOnly: true
         packaging_name:
           type: string
           title: Conditionnement historique
@@ -9631,12 +9634,18 @@ components:
           minimum: 0
           format: int64
           title: Quantité vendue
+        entered_quantity:
+          type: integer
+          readOnly: true
         quantity:
           type: integer
           maximum: 9223372036854775807
           minimum: 0
           format: int64
           title: Quantité
+        base_quantity:
+          type: integer
+          readOnly: true
         unit_price:
           type: string
           format: decimal
@@ -9663,10 +9672,13 @@ components:
           readOnly: true
           nullable: true
       required:
+      - base_quantity
+      - entered_quantity
       - id
       - line_total
       - line_total_ht_snapshot
       - packaging_factor
+      - packaging_id
       - product
       - product_name_snapshot
       - product_reference_snapshot

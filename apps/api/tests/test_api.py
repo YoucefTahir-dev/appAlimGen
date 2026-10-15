@@ -48,6 +48,7 @@ class MobileApiTests(APITestCase):
             name='Produit API', category=cls.category, brand=cls.brand, unit=cls.unit,
             purchase_price=Decimal('50.00'), sale_price=Decimal('80.00'),
             quantity=0, minimum_stock=2,
+            unit_mode=Product.UnitMode.CARTON_AND_PIECE,
         )
         cls.product.super_wholesale_price = Decimal('60.00')
         cls.product.wholesale_price = Decimal('70.00')

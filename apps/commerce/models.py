@@ -8,6 +8,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from apps.inventory.models import Client, LoadingOrder, OperatorStockMovement, Product, ProductPackaging, StockMovement, Supplier
+from apps.inventory.pricing import sale_base_unit_allowed, sale_packaging_allowed
 from apps.inventory.services import adjust_operator_stock, record_stock_movements, stock_change_for_delta
 
 
@@ -567,13 +568,15 @@ class SaleLine(models.Model):
             locked_product = Product.objects.select_for_update().get(pk=self.product_id)
             if self.packaging_id:
                 packaging = ProductPackaging.objects.select_for_update().get(pk=self.packaging_id)
-                if packaging.product_id != self.product_id or not packaging.is_active:
-                    raise ValidationError({'packaging': _('Conditionnement invalide ou inactif.')})
+                if not sale_packaging_allowed(locked_product, packaging):
+                    raise ValidationError({'packaging': _('Conditionnement de vente invalide ou inactif.')})
                 self.packaging_factor = packaging.conversion_factor
                 self.packaging_name = packaging.name
             else:
+                if not sale_base_unit_allowed(locked_product):
+                    raise ValidationError({'packaging': _('Ce produit doit être vendu en carton.')})
                 self.packaging_factor = 1
-                self.packaging_name = locked_product.unit.name if locked_product.unit_id else _('Unité')
+                self.packaging_name = locked_product.unit.name if locked_product.unit_id else _('Unité de base')
                 self.packaging_quantity = self.quantity
             if self.packaging_quantity < 1:
                 raise ValidationError({'packaging_quantity': _('La quantité doit être strictement positive.')})
@@ -582,7 +585,7 @@ class SaleLine(models.Model):
             self.unit_cost = locked_product.purchase_price
             self.product_name_snapshot = locked_product.name
             self.product_reference_snapshot = locked_product.reference
-            self.unit_name_snapshot = locked_product.unit.name if locked_product.unit_id else ''
+            self.unit_name_snapshot = self.packaging_name
             self.line_total_ht_snapshot = (
                 Decimal(self.packaging_quantity) * self.unit_price
             ).quantize(Decimal('0.01'))
@@ -614,16 +617,26 @@ class SaleLine(models.Model):
             .filter(pk__in={old.product_id, persisted_product_id})
             .order_by('pk')
         }
-        if self.packaging_id:
+        same_historical_unit = bool(
+            old.product_id == persisted_product_id
+            and old.packaging_id == self.packaging_id
+        )
+        if same_historical_unit:
+            self.packaging_factor = old.packaging_factor
+            self.packaging_name = old.packaging_name
+        elif self.packaging_id:
             packaging = ProductPackaging.objects.select_for_update().get(pk=self.packaging_id)
-            if packaging.product_id != persisted_product_id or not packaging.is_active:
-                raise ValidationError({'packaging': _('Conditionnement invalide ou inactif.')})
+            product_for_unit = locked_products[persisted_product_id]
+            if not sale_packaging_allowed(product_for_unit, packaging):
+                raise ValidationError({'packaging': _('Conditionnement de vente invalide ou inactif.')})
             self.packaging_factor = packaging.conversion_factor
             self.packaging_name = packaging.name
         else:
             product_for_label = locked_products[persisted_product_id]
+            if not sale_base_unit_allowed(product_for_label):
+                raise ValidationError({'packaging': _('Ce produit doit être vendu en carton.')})
             self.packaging_factor = 1
-            self.packaging_name = product_for_label.unit.name if product_for_label.unit_id else _('Unité')
+            self.packaging_name = product_for_label.unit.name if product_for_label.unit_id else _('Unité de base')
             self.packaging_quantity = persisted_quantity
         if self.packaging_quantity < 1 or persisted_quantity != self.packaging_quantity * self.packaging_factor:
             raise ValidationError({'quantity': _('La conversion du conditionnement est incohérente.')})
@@ -638,10 +651,15 @@ class SaleLine(models.Model):
             raise ValidationError({'unit_price': _(
                 "Impossible de vendre un produit à un prix inférieur à son prix d'achat."
             )})
-        product_for_snapshot = locked_products[persisted_product_id]
-        self.product_name_snapshot = product_for_snapshot.name
-        self.product_reference_snapshot = product_for_snapshot.reference
-        self.unit_name_snapshot = product_for_snapshot.unit.name if product_for_snapshot.unit_id else ''
+        if old.product_id != persisted_product_id:
+            product_for_snapshot = locked_products[persisted_product_id]
+            self.product_name_snapshot = product_for_snapshot.name
+            self.product_reference_snapshot = product_for_snapshot.reference
+            self.unit_name_snapshot = self.packaging_name
+        else:
+            self.product_name_snapshot = old.product_name_snapshot
+            self.product_reference_snapshot = old.product_reference_snapshot
+            self.unit_name_snapshot = old.unit_name_snapshot
         self.line_total_ht_snapshot = (
             Decimal(self.packaging_quantity) * self.unit_price
         ).quantize(Decimal('0.01'))

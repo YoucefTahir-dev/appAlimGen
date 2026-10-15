@@ -27,6 +27,7 @@ class CustomerPricingTests(TestCase):
             wholesale_price='120.00',
             retail_price='135.00',
             sale_price='135.00',
+            unit_mode=Product.UnitMode.CARTON_AND_PIECE,
             quantity=10,
         )
 

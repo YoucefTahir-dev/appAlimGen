@@ -25,6 +25,39 @@
         };
         let requestSequence = 0;
 
+        const money = value => `${new Intl.NumberFormat(document.documentElement.lang || 'fr', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        }).format(Number.isFinite(value) ? value : 0)} DZD`;
+
+        function numberValue(input) {
+            const value = Number.parseFloat(String(input?.value || '').replace(',', '.'));
+            return Number.isFinite(value) ? value : 0;
+        }
+
+        function refreshTotals() {
+            let subtotal = 0;
+            body.querySelectorAll('.sale-line-row').forEach(function (row) {
+                const quantity = numberValue(row.querySelector('[name$="-quantity"]'));
+                const price = numberValue(row.querySelector('[name$="-unit_price"]'));
+                const unit = row.querySelector('[name$="-packaging"]')?.selectedOptions[0];
+                const factor = Number.parseInt(unit?.dataset.factor || '1', 10) || 1;
+                const deleted = row.querySelector('[name$="-DELETE"]')?.checked;
+                const stockQuantity = row.querySelector('.sale-stock-quantity');
+                const lineTotal = row.querySelector('.sale-line-total');
+                if (stockQuantity) stockQuantity.textContent = deleted ? '—' : String(quantity * factor);
+                if (lineTotal) lineTotal.textContent = money(deleted ? 0 : quantity * price);
+                if (!deleted) subtotal += quantity * price;
+            });
+            const taxRate = numberValue(document.getElementById('id_tax_rate'));
+            const discount = numberValue(document.getElementById('id_discount'));
+            const tax = subtotal * taxRate / 100;
+            document.getElementById('sale-total-ht').textContent = money(subtotal);
+            document.getElementById('sale-tax-total').textContent = money(tax);
+            document.getElementById('sale-discount-total').textContent = money(discount);
+            document.getElementById('sale-total-ttc').textContent = money(subtotal + tax - discount);
+        }
+
         function setFeedback(row, message, isError) {
             const feedback = row.querySelector('.sale-price-feedback');
             if (!feedback) {
@@ -34,24 +67,32 @@
             feedback.classList.toggle('text-danger', Boolean(isError));
         }
 
-        function updatePackagingOptions(select, packagings, selectedValue) {
+        function updatePackagingOptions(select, packagings, selectedValue, baseAllowed = true) {
             if (!select) {
                 return;
             }
             const fragment = document.createDocumentFragment();
-            const baseOption = document.createElement('option');
-            baseOption.value = '';
-            baseOption.textContent = labels.baseUnit;
-            fragment.appendChild(baseOption);
+            if (baseAllowed) {
+                const baseOption = document.createElement('option');
+                baseOption.value = '';
+                baseOption.textContent = labels.baseUnit;
+                baseOption.dataset.factor = '1';
+                fragment.appendChild(baseOption);
+            }
             packagings.forEach(function (packaging) {
                 const option = document.createElement('option');
                 option.value = String(packaging.id);
                 option.textContent = `${packaging.name} (×${packaging.conversion_factor})`;
+                option.dataset.factor = String(packaging.conversion_factor);
                 fragment.appendChild(option);
             });
             select.replaceChildren(fragment);
             select.value = selectedValue || '';
+            if (!baseAllowed && select.selectedIndex < 0 && select.options.length) {
+                select.selectedIndex = 0;
+            }
             select.disabled = false;
+            return select.value;
         }
 
         async function updateRowPrice(row) {
@@ -107,8 +148,18 @@
                 }
                 const payload = await response.json();
                 if (row.dataset.priceRequest === requestKey) {
-                    priceInput.value = payload.price;
-                    updatePackagingOptions(packagingSelect, payload.packagings || [], packagingValue);
+                    const selectedPackaging = updatePackagingOptions(
+                        packagingSelect,
+                        payload.packagings || [],
+                        packagingValue,
+                        payload.base_unit_allowed !== false,
+                    );
+                    const selectedUnit = (payload.packagings || []).find(
+                        item => String(item.id) === String(selectedPackaging),
+                    );
+                    priceInput.value = selectedUnit && !packagingValue
+                        ? selectedUnit.price
+                        : payload.price;
                     if (clientType) {
                         clientType.textContent = payload.customer_type_label || '';
                     }
@@ -116,6 +167,7 @@
                         productMeta.textContent = `${payload.reference} · ${saleForm.dataset.stockLabel}: ${payload.stock}`;
                     }
                     setFeedback(row, '', false);
+                    refreshTotals();
                 }
             } catch (_error) {
                 if (row.dataset.priceRequest === requestKey) {
@@ -139,6 +191,7 @@
                     row.dataset.priceRequest = '';
                     row.querySelector('.product-search').setCustomValidity('');
                     window.ProductAutocomplete.close(row.querySelector('.product-picker'));
+                    refreshTotals();
                 } else {
                     row.remove();
                 }
@@ -159,6 +212,7 @@
             } else if (event.target.matches('select[name$="-packaging"]')) {
                 updateRowPrice(row);
             }
+            refreshTotals();
         });
 
         if (clientSelect && autoPricing) {
@@ -167,11 +221,12 @@
             });
         }
 
-        body.addEventListener('input', function (event) {
+        saleForm.addEventListener('input', function (event) {
             if (event.target.matches('input[name$="-unit_price"]')) {
                 event.target.closest('.sale-line-row').dataset.priceRequest = '';
                 event.target.removeAttribute('aria-busy');
             }
+            refreshTotals();
         });
 
         addButton.addEventListener('click', function () {
@@ -187,7 +242,10 @@
                 updatePackagingOptions(packagingSelect, [], '');
                 packagingSelect.disabled = true;
             }
+            refreshTotals();
         });
+
+        refreshTotals();
     }
 
     if (document.readyState === 'loading') {
