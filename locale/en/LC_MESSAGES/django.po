@@ -622,3 +622,26 @@ msgstr "Converted stock"
 
 msgid "Produit historique : aucune conversion ne sera faite sans confirmation de son unité réelle."
 msgstr "Historical product: no conversion will occur until its actual unit is confirmed."
+msgid "Unité d'achat"
+msgstr "Purchase unit"
+
+msgid "Quantité en stock"
+msgstr "Stock quantity"
+
+msgid "Total ligne"
+msgstr "Line total"
+
+msgid "Quantité achetée"
+msgstr "Purchased quantity"
+
+msgid "Quantité saisie dans le conditionnement sélectionné."
+msgstr "Quantity entered in the selected packaging."
+
+msgid "Conditionnement d’achat invalide ou inactif."
+msgstr "Invalid or inactive purchase packaging."
+
+msgid "Ce produit ne peut être acheté qu’en unité de base."
+msgstr "This product can only be purchased in its base unit."
+
+msgid "Ce produit doit être acheté en carton."
+msgstr "This product must be purchased by carton."

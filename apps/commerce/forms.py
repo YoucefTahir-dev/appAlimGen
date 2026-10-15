@@ -11,6 +11,21 @@ from .widgets import ProductAutocomplete
 from .services import validate_tax_rate
 
 
+class PackagingSelect(forms.Select):
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        option = super().create_option(name, value, label, selected, index, subindex, attrs)
+        packaging = getattr(value, 'instance', None)
+        if packaging is not None:
+            option['attrs']['data-factor'] = packaging.conversion_factor
+            option['attrs']['data-purchase-price'] = (
+                packaging.reference_purchase_price
+                if packaging.reference_purchase_price is not None else ''
+            )
+        elif value in ('', None):
+            option['attrs']['data-factor'] = 1
+        return option
+
+
 class PurchaseForm(forms.ModelForm):
     class Meta:
         model = Purchase
@@ -225,13 +240,32 @@ class BaseSaleLineFormSet(BaseInlineFormSet):
 class PurchaseLineForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        product_id = self.data.get(self.add_prefix('product')) if self.is_bound else self.initial.get('product')
+        if not product_id and self.instance and self.instance.pk:
+            product_id = self.instance.product_id
+        if not str(product_id or '').isdigit():
+            product_id = None
+        queryset = ProductPackaging.objects.filter(
+            product_id=product_id, is_active=True, purchase_enabled=True,
+        ).select_related('product').order_by('conversion_factor', 'name')
+        if self.instance and self.instance.pk and self.instance.packaging_id:
+            queryset = ProductPackaging.objects.filter(
+                Q(product_id=product_id, is_active=True, purchase_enabled=True)
+                | Q(pk=self.instance.packaging_id)
+            ).select_related('product').order_by('product__name', 'conversion_factor', 'name')
+        self.fields['packaging'].queryset = queryset
+        self.fields['packaging'].required = False
+        self.fields['packaging'].empty_label = _('Unité de base')
+        if self.instance and self.instance.pk:
+            self.initial['quantity'] = self.instance.entered_quantity
         self.fields['product'].error_messages['invalid_choice'] = _('Veuillez sélectionner un produit dans les résultats proposés.')
 
     class Meta:
         model = PurchaseLine
-        fields = ('product', 'quantity', 'purchase_price')
+        fields = ('product', 'packaging', 'quantity', 'purchase_price')
         widgets = {
             'product': ProductAutocomplete(attrs={'search_context': 'purchase'}),
+            'packaging': PackagingSelect(attrs={'class': 'form-select purchase-unit'}),
             'quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
             'purchase_price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': 0}),
         }
@@ -247,6 +281,49 @@ class PurchaseLineForm(forms.ModelForm):
         if purchase_price < 0:
             raise ValidationError(_("Le prix d'achat ne peut pas être négatif."))
         return purchase_price
+
+    def clean(self):
+        cleaned_data = super().clean()
+        product = cleaned_data.get('product')
+        packaging = cleaned_data.get('packaging')
+        same_historical_unit = bool(
+            self.instance
+            and self.instance.pk
+            and product
+            and self.instance.product_id == product.pk
+            and self.instance.packaging_id == getattr(packaging, 'pk', None)
+        )
+        if packaging and (
+            not product
+            or packaging.product_id != product.pk
+            or not packaging.is_active
+            or not packaging.purchase_enabled
+        ) and not same_historical_unit:
+            self.add_error('packaging', _('Conditionnement d’achat invalide ou inactif.'))
+        if product and not same_historical_unit:
+            if packaging and product.unit_mode in {product.UnitMode.LEGACY, product.UnitMode.PIECE_ONLY}:
+                self.add_error('packaging', _('Ce produit ne peut être acheté qu’en unité de base.'))
+            if product.unit_mode == product.UnitMode.CARTON_ONLY and not packaging:
+                self.add_error('packaging', _('Ce produit doit être acheté en carton.'))
+            if (
+                packaging
+                and product.unit_mode == product.UnitMode.CARTON_ONLY
+                and packaging.kind != packaging.CARTON
+            ):
+                self.add_error('packaging', _('Ce produit doit être acheté en carton.'))
+        return cleaned_data
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        packaging = self.cleaned_data.get('packaging')
+        entered_quantity = self.cleaned_data['quantity']
+        instance.packaging_quantity = entered_quantity
+        instance.packaging = packaging
+        instance.quantity = entered_quantity * (packaging.conversion_factor if packaging else 1)
+        if commit:
+            instance.save()
+            self.save_m2m()
+        return instance
 
 
 PurchaseLineFormSet = inlineformset_factory(

@@ -25,8 +25,11 @@
                 <thead>
                     <tr>
                         <th>{% trans "Produit" %}</th>
+                        <th>{% trans "Unité d'achat" %}</th>
                         <th>{% trans "Quantité" %}</th>
                         <th>{% trans "Prix d'achat" %}</th>
+                        <th>{% trans "Quantité en stock" %}</th>
+                        <th>{% trans "Total ligne" %}</th>
                         <th>{% trans "Supprimer" %}</th>
                     </tr>
                 </thead>
@@ -40,6 +43,18 @@
         <template id="purchase-line-template">
             {% include 'commerce/_purchase_line.html' with form_line=formset.empty_form %}
         </template>
+        <div class="row justify-content-end mt-3">
+            <div class="col-12 col-md-5 col-xl-4">
+                <dl class="row mb-0 purchase-summary" aria-live="polite">
+                    <dt class="col-6">{% trans "Total HT" %}</dt>
+                    <dd class="col-6 text-end" id="purchase-total-ht">0,00 DZD</dd>
+                    <dt class="col-6">{% trans "TVA" %}</dt>
+                    <dd class="col-6 text-end" id="purchase-tax-total">0,00 DZD</dd>
+                    <dt class="col-6 fs-5">{% trans "Total TTC" %}</dt>
+                    <dd class="col-6 text-end fs-5 fw-bold" id="purchase-total-ttc">0,00 DZD</dd>
+                </dl>
+            </div>
+        </div>
         <div class="form-actions">
             <button type="button" id="add-purchase-line" class="btn btn-outline-primary">{% trans "Ajouter un produit" %}</button>
             <button class="btn btn-success">{% trans "Enregistrer" %}</button>

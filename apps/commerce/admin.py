@@ -14,7 +14,10 @@ class PurchaseAdmin(admin.ModelAdmin):
 @admin.register(PurchaseLine)
 class PurchaseLineAdmin(admin.ModelAdmin):
     actions = None
-    list_display = ('purchase', 'product', 'quantity', 'purchase_price')
+    list_display = (
+        'purchase', 'product', 'packaging_name', 'packaging_quantity',
+        'quantity', 'purchase_price',
+    )
 
     def save_model(self, request, obj, form, change):
         obj._stock_user = request.user
