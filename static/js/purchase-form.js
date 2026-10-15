@@ -11,6 +11,51 @@
     let targetRow = null;
     let pending = false;
 
+    const money = value => `${new Intl.NumberFormat(document.documentElement.lang || 'fr', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    }).format(Number.isFinite(value) ? value : 0)} DZD`;
+
+    function numberValue(input) {
+        const value = Number.parseFloat(String(input?.value || '').replace(',', '.'));
+        return Number.isFinite(value) ? value : 0;
+    }
+
+    function refreshRow(row) {
+        const quantity = numberValue(row.querySelector('[name$="-quantity"]'));
+        const price = numberValue(row.querySelector('[name$="-purchase_price"]'));
+        const unit = row.querySelector('[name$="-packaging"]')?.selectedOptions[0];
+        const factor = Number.parseInt(unit?.dataset.factor || '1', 10) || 1;
+        const deleted = row.querySelector('[name$="-DELETE"]')?.checked;
+        row.querySelector('.purchase-stock-quantity').textContent = deleted ? '—' : String(quantity * factor);
+        row.querySelector('.purchase-line-total').textContent = money(deleted ? 0 : quantity * price);
+    }
+
+    function refreshTotals() {
+        let subtotal = 0;
+        lines.querySelectorAll('.purchase-line-row').forEach(row => {
+            refreshRow(row);
+            if (!row.querySelector('[name$="-DELETE"]')?.checked) {
+                subtotal += numberValue(row.querySelector('[name$="-quantity"]'))
+                    * numberValue(row.querySelector('[name$="-purchase_price"]'));
+            }
+        });
+        const taxRate = numberValue(document.getElementById('id_tax_rate'));
+        const tax = subtotal * taxRate / 100;
+        document.getElementById('purchase-total-ht').textContent = money(subtotal);
+        document.getElementById('purchase-tax-total').textContent = money(tax);
+        document.getElementById('purchase-total-ttc').textContent = money(subtotal + tax);
+    }
+
+    purchase.addEventListener('input', refreshTotals);
+    purchase.addEventListener('change', function (event) {
+        if (event.target.matches('[name$="-packaging"]')) {
+            const price = event.target.selectedOptions[0]?.dataset.purchasePrice;
+            const priceInput = event.target.closest('tr').querySelector('[name$="-purchase_price"]');
+            if (price !== undefined && price !== '') priceInput.value = price;
+        }
+        refreshTotals();
+    });
 
     document.getElementById('add-purchase-line').addEventListener('click', function () {
         const index = Number.parseInt(total.value, 10);
@@ -18,7 +63,10 @@
         if (!Number.isInteger(index) || index >= maximum) return;
         lines.insertAdjacentHTML('beforeend', template.innerHTML.replace(/__prefix__/g, String(index)));
         total.value = String(index + 1);
+        refreshTotals();
     });
+
+    refreshTotals();
 
     if (!quickForm) return;
     function clearErrors() {

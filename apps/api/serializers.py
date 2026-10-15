@@ -588,14 +588,26 @@ class SaleSerializer(serializers.ModelSerializer):
 class PurchaseLineReadSerializer(serializers.ModelSerializer):
     product = ProductSummarySerializer(read_only=True)
     line_total = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
+    packaging_id = serializers.IntegerField(read_only=True)
+    entered_quantity = serializers.IntegerField(read_only=True)
+    base_quantity = serializers.IntegerField(source='quantity', read_only=True)
 
     class Meta:
         model = PurchaseLine
-        fields = ('id', 'product', 'quantity', 'purchase_price', 'line_total')
+        fields = (
+            'id', 'product', 'quantity', 'base_quantity', 'packaging_id',
+            'packaging_name', 'packaging_factor', 'packaging_quantity',
+            'entered_quantity', 'purchase_price', 'line_total',
+        )
 
 
 class PurchaseLineWriteSerializer(serializers.Serializer):
     product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all())
+    packaging_id = serializers.PrimaryKeyRelatedField(
+        source='packaging',
+        queryset=ProductPackaging.objects.filter(is_active=True, purchase_enabled=True),
+        required=False, allow_null=True,
+    )
     quantity = serializers.IntegerField(min_value=1)
     purchase_price = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=0)
 

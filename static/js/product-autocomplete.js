@@ -26,7 +26,27 @@
         hidden.value = String(product.id);
         picker.querySelector('.product-search-status').textContent = '';
         if (picker.dataset.context === 'purchase') {
-            picker.closest('tr').querySelector('[name$="-purchase_price"]').value = product.purchase_price;
+            const row = picker.closest('tr');
+            const priceInput = row.querySelector('[name$="-purchase_price"]');
+            const unitSelect = row.querySelector('[name$="-packaging"]');
+            if (unitSelect && Array.isArray(product.purchase_units)) {
+                unitSelect.replaceChildren();
+                product.purchase_units.forEach(unit => {
+                    const option = document.createElement('option');
+                    option.value = unit.id == null ? '' : String(unit.id);
+                    option.textContent = unit.factor > 1 ? `${unit.name} (×${unit.factor})` : unit.name;
+                    option.dataset.factor = String(unit.factor || 1);
+                    option.dataset.purchasePrice = unit.purchase_price || '';
+                    unitSelect.appendChild(option);
+                });
+                unitSelect.disabled = product.purchase_units.length === 0;
+                unitSelect.dispatchEvent(new Event('change', {bubbles: true}));
+            }
+            if (priceInput) {
+                const selectedUnit = unitSelect?.selectedOptions[0];
+                priceInput.value = selectedUnit?.dataset.purchasePrice || product.purchase_price;
+                priceInput.dispatchEvent(new Event('input', {bubbles: true}));
+            }
         }
         hidden.dispatchEvent(new Event('change', {bubbles: true}));
     }

@@ -59,7 +59,10 @@ class StockAwareDeleteQuerySet(models.QuerySet):
 
 class StockTrackedLineQuerySet(StockAwareDeleteQuerySet):
     def update(self, **kwargs):
-        if {'quantity', 'product', 'product_id', 'unit_cost'} & kwargs.keys():
+        if {
+            'quantity', 'product', 'product_id', 'unit_cost', 'packaging',
+            'packaging_id', 'packaging_factor', 'packaging_quantity',
+        } & kwargs.keys():
             raise ValidationError(
                 'La quantité et le produit d’une ligne commerciale doivent être modifiés avec save().'
             )
@@ -69,7 +72,10 @@ class StockTrackedLineQuerySet(StockAwareDeleteQuerySet):
         raise ValidationError('La création groupée contournerait le journal de stock.')
 
     def bulk_update(self, objs, fields, **kwargs):
-        if {'quantity', 'product', 'product_id', 'unit_cost'} & set(fields):
+        if {
+            'quantity', 'product', 'product_id', 'unit_cost', 'packaging',
+            'packaging_id', 'packaging_factor', 'packaging_quantity',
+        } & set(fields):
             raise ValidationError(
                 'La mise à jour groupée contournerait le journal de stock.'
             )
@@ -158,18 +164,122 @@ class PurchaseLine(models.Model):
     purchase = models.ForeignKey(Purchase, on_delete=models.CASCADE, related_name='lines')
     product = models.ForeignKey(Product, on_delete=models.PROTECT)
     quantity = models.PositiveIntegerField('Quantité')
+    packaging = models.ForeignKey(
+        ProductPackaging, on_delete=models.PROTECT, null=True, blank=True,
+        related_name='purchase_lines', verbose_name=_('Conditionnement'),
+    )
+    packaging_name = models.CharField(_('Conditionnement historique'), max_length=100, blank=True)
+    packaging_factor = models.PositiveIntegerField(_('Facteur historique'), default=1, editable=False)
+    packaging_quantity = models.PositiveIntegerField(
+        _('Quantité achetée'), null=True, blank=True,
+        help_text=_('Quantité saisie dans le conditionnement sélectionné.'),
+    )
     purchase_price = models.DecimalField("Prix d'achat", max_digits=12, decimal_places=2)
 
     objects = StockTrackedLineQuerySet.as_manager()
 
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(packaging_factor__gte=1),
+                name='purchase_line_packaging_factor_gte_1',
+            ),
+            models.CheckConstraint(
+                condition=Q(packaging_quantity__isnull=True) | Q(packaging_quantity__gte=1),
+                name='purchase_line_packaging_quantity_positive',
+            ),
+        ]
+
+    @property
+    def entered_quantity(self):
+        return self.packaging_quantity if self.packaging_quantity is not None else self.quantity
+
+    @property
+    def stock_quantity(self):
+        return self.quantity
+
     def line_total(self):
-        return self.quantity * self.purchase_price
+        return self.entered_quantity * self.purchase_price
+
+    def _set_packaging_snapshot(self, old=None):
+        # Lock only Product. ``Product.unit`` is nullable and joining it in a
+        # FOR UPDATE query is rejected by PostgreSQL.
+        product = Product.objects.select_for_update().get(pk=self.product_id)
+        entered_quantity = self.packaging_quantity
+        if entered_quantity is None:
+            entered_quantity = self.quantity
+        entered_quantity = int(entered_quantity)
+        if entered_quantity < 1:
+            raise ValidationError({'packaging_quantity': _('La quantité doit être strictement positive.')})
+
+        packaging = None
+        same_historical_unit = bool(
+            old
+            and old.product_id == self.product_id
+            and old.packaging_id == self.packaging_id
+        )
+        if same_historical_unit:
+            factor = old.packaging_factor
+            packaging_name = old.packaging_name
+        elif self.packaging_id:
+            packaging = ProductPackaging.objects.select_for_update().get(pk=self.packaging_id)
+            if (
+                packaging.product_id != product.pk
+                or not packaging.is_active
+                or not packaging.purchase_enabled
+            ):
+                raise ValidationError({'packaging': _('Conditionnement d’achat invalide ou inactif.')})
+            if product.unit_mode in {Product.UnitMode.LEGACY, Product.UnitMode.PIECE_ONLY}:
+                raise ValidationError({'packaging': _('Ce produit ne peut être acheté qu’en unité de base.')})
+            if product.unit_mode == Product.UnitMode.CARTON_ONLY and packaging.kind != ProductPackaging.CARTON:
+                raise ValidationError({'packaging': _('Ce produit doit être acheté en carton.')})
+            factor = packaging.conversion_factor
+            packaging_name = packaging.name
+        elif product.unit_mode == Product.UnitMode.CARTON_ONLY:
+            raise ValidationError({'packaging': _('Ce produit doit être acheté en carton.')})
+        else:
+            factor = 1
+            packaging_name = product.unit.name if product.unit_id else str(_('Unité de base'))
+
+        self.packaging_quantity = entered_quantity
+        self.packaging_factor = factor
+        self.packaging_name = packaging_name
+        self.quantity = entered_quantity * factor
 
     @transaction.atomic
     def save(self, *args, **kwargs):
-        self.quantity = int(self.quantity)
         self.purchase_price = Decimal(str(self.purchase_price))
         user = getattr(self, '_stock_user', None)
+        old = None
+        if self.pk:
+            old = PurchaseLine.objects.select_for_update().get(pk=self.pk)
+        if (
+            old
+            and not self.packaging_id
+            and (
+                self.packaging_quantity is None
+                or self.packaging_quantity == old.packaging_quantity
+            )
+            and self.quantity != old.quantity
+        ):
+            # Preserve the historical direct-model API where ``quantity`` is the
+            # entered base-unit quantity.
+            self.packaging_quantity = self.quantity
+        self._set_packaging_snapshot(old=old)
+        update_fields = kwargs.get('update_fields')
+        if update_fields is not None:
+            update_fields = set(update_fields)
+            if update_fields & {
+                'product', 'product_id', 'quantity', 'packaging',
+                'packaging_id', 'packaging_quantity',
+            }:
+                update_fields.update({
+                    'product', 'quantity', 'packaging', 'packaging_name',
+                    'packaging_factor', 'packaging_quantity',
+                })
+                update_fields.discard('product_id')
+                update_fields.discard('packaging_id')
+            kwargs['update_fields'] = update_fields
         if self._state.adding:
             super().save(*args, **kwargs)
             _apply_line_stock_changes(
@@ -184,8 +294,6 @@ class PurchaseLine(models.Model):
             )
             return
 
-        old = PurchaseLine.objects.select_for_update().get(pk=self.pk)
-        update_fields = kwargs.get('update_fields')
         persisted_product_id = self.product_id
         persisted_quantity = self.quantity
         if update_fields is not None:
@@ -245,7 +353,7 @@ class PurchaseLine(models.Model):
         return super().delete(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.product.name} - {self.quantity}"
+        return f"{self.product.name} - {self.entered_quantity} {self.packaging_name}"
 
 
 class Sale(models.Model):

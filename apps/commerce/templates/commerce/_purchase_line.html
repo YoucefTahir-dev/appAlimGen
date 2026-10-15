@@ -8,7 +8,10 @@
         <button type="button" class="btn btn-sm btn-outline-primary mt-2 quick-product-open">+ {% trans "Nouveau produit" %}</button>
         {% endif %}
     </td>
+    <td>{{ form_line.packaging }}{{ form_line.packaging.errors }}</td>
     <td>{{ form_line.quantity }}{{ form_line.quantity.errors }}</td>
     <td>{{ form_line.purchase_price }}{{ form_line.purchase_price.errors }}</td>
+    <td><span class="purchase-stock-quantity">—</span></td>
+    <td><span class="purchase-line-total">0,00 DZD</span></td>
     <td>{{ form_line.DELETE }}</td>
 </tr>

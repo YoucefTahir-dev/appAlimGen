@@ -7641,6 +7641,14 @@ components:
       required:
       - id
       - name
+    KindEnum:
+      enum:
+      - carton
+      - other
+      type: string
+      description: |-
+        * `carton` - Carton
+        * `other` - Autre conditionnement
     LanguageEnum:
       enum:
       - fr
@@ -8594,6 +8602,17 @@ components:
         unit_name:
           type: string
           readOnly: true
+        unit_mode:
+          allOf:
+          - $ref: '#/components/schemas/UnitModeEnum'
+          title: Mode de vente
+          description: |-
+            Les produits historiques restent inchangés tant que leur unité réelle n’est pas confirmée.
+
+            * `legacy` - Historique à confirmer
+            * `piece_only` - Pièce uniquement
+            * `carton_only` - Carton uniquement
+            * `carton_and_piece` - Carton et pièce
         quantity:
           type: integer
           maximum: 9223372036854775807
@@ -8647,6 +8666,10 @@ components:
           type: string
           title: Nom du conditionnement
           maxLength: 100
+        kind:
+          allOf:
+          - $ref: '#/components/schemas/KindEnum'
+          title: Type
         conversion_factor:
           type: integer
           maximum: 9223372036854775807
@@ -8654,6 +8677,12 @@ components:
           format: int64
           title: Facteur de conversion
           description: Nombre d'unités de base contenues dans ce conditionnement.
+        purchase_enabled:
+          type: boolean
+          title: Disponible à l’achat
+        sale_enabled:
+          type: boolean
+          title: Disponible à la vente
         barcode:
           type: string
           nullable: true
@@ -8766,6 +8795,41 @@ components:
           additionalProperties: {}
           readOnly: true
         company_details:
+          type: object
+          additionalProperties: {}
+          readOnly: true
+        issued_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+          title: Date d’émission
+        snapshot_version:
+          type: integer
+          readOnly: true
+        snapshot_integrity_status:
+          type: string
+          readOnly: true
+          title: Intégrité historique
+        currency_snapshot:
+          type: string
+          readOnly: true
+          title: Devise historique
+        subtotal_ht_snapshot:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          readOnly: true
+          nullable: true
+          title: Total HT historique
+        tax_amount_snapshot:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          readOnly: true
+          nullable: true
+          title: Montant TVA historique
+        historical_document:
           type: object
           additionalProperties: {}
           readOnly: true
@@ -9072,6 +9136,17 @@ components:
         unit_name:
           type: string
           readOnly: true
+        unit_mode:
+          allOf:
+          - $ref: '#/components/schemas/UnitModeEnum'
+          title: Mode de vente
+          description: |-
+            Les produits historiques restent inchangés tant que leur unité réelle n’est pas confirmée.
+
+            * `legacy` - Historique à confirmer
+            * `piece_only` - Pièce uniquement
+            * `carton_only` - Carton uniquement
+            * `carton_and_piece` - Carton et pièce
         quantity:
           type: integer
           maximum: 9223372036854775807
@@ -9138,6 +9213,10 @@ components:
           type: string
           title: Nom du conditionnement
           maxLength: 100
+        kind:
+          allOf:
+          - $ref: '#/components/schemas/KindEnum'
+          title: Type
         conversion_factor:
           type: integer
           maximum: 9223372036854775807
@@ -9145,6 +9224,12 @@ components:
           format: int64
           title: Facteur de conversion
           description: Nombre d'unités de base contenues dans ce conditionnement.
+        purchase_enabled:
+          type: boolean
+          title: Disponible à l’achat
+        sale_enabled:
+          type: boolean
+          title: Disponible à la vente
         barcode:
           type: string
           nullable: true
@@ -9283,6 +9368,31 @@ components:
           minimum: 0
           format: int64
           title: Quantité
+        base_quantity:
+          type: integer
+          readOnly: true
+        packaging_id:
+          type: integer
+          readOnly: true
+        packaging_name:
+          type: string
+          title: Conditionnement historique
+          maxLength: 100
+        packaging_factor:
+          type: integer
+          readOnly: true
+          title: Facteur historique
+        packaging_quantity:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          nullable: true
+          title: Quantité achetée
+          description: Quantité saisie dans le conditionnement sélectionné.
+        entered_quantity:
+          type: integer
+          readOnly: true
         purchase_price:
           type: string
           format: decimal
@@ -9294,8 +9404,12 @@ components:
           pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
           readOnly: true
       required:
+      - base_quantity
+      - entered_quantity
       - id
       - line_total
+      - packaging_factor
+      - packaging_id
       - product
       - purchase_price
       - quantity
@@ -9304,6 +9418,9 @@ components:
       properties:
         product:
           type: integer
+        packaging_id:
+          type: integer
+          nullable: true
         quantity:
           type: integer
           minimum: 1
@@ -9422,6 +9539,41 @@ components:
           type: object
           additionalProperties: {}
           readOnly: true
+        issued_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+          title: Date d’émission
+        snapshot_version:
+          type: integer
+          readOnly: true
+        snapshot_integrity_status:
+          type: string
+          readOnly: true
+          title: Intégrité historique
+        currency_snapshot:
+          type: string
+          readOnly: true
+          title: Devise historique
+        subtotal_ht_snapshot:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          readOnly: true
+          nullable: true
+          title: Total HT historique
+        tax_amount_snapshot:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          readOnly: true
+          nullable: true
+          title: Montant TVA historique
+        historical_document:
+          type: object
+          additionalProperties: {}
+          readOnly: true
       required:
       - amount_paid
       - balance_due
@@ -9431,8 +9583,11 @@ components:
       - company_details
       - created_at
       - created_by_name
+      - currency_snapshot
+      - historical_document
       - id
       - invoice_number
+      - issued_at
       - items
       - lines
       - loading_order
@@ -9440,8 +9595,12 @@ components:
       - payment_tracking_initialized
       - payment_type_display
       - payments
+      - snapshot_integrity_status
+      - snapshot_version
       - subtotal
+      - subtotal_ht_snapshot
       - tax_amount
+      - tax_amount_snapshot
       - ticket_number
       - total
     SaleLineRead:
@@ -9451,8 +9610,8 @@ components:
           type: integer
           readOnly: true
         product:
-          allOf:
-          - $ref: '#/components/schemas/ProductSummary'
+          type: object
+          additionalProperties: {}
           readOnly: true
         packaging:
           type: integer
@@ -9488,12 +9647,31 @@ components:
           format: decimal
           pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
           readOnly: true
+        product_name_snapshot:
+          type: string
+          readOnly: true
+        product_reference_snapshot:
+          type: string
+          readOnly: true
+        unit_name_snapshot:
+          type: string
+          readOnly: true
+        line_total_ht_snapshot:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          readOnly: true
+          nullable: true
       required:
       - id
       - line_total
+      - line_total_ht_snapshot
       - packaging_factor
       - product
+      - product_name_snapshot
+      - product_reference_snapshot
       - quantity
+      - unit_name_snapshot
       - unit_price
     SaleLineWrite:
       type: object
@@ -9586,6 +9764,18 @@ components:
       required:
       - id
       - name
+    UnitModeEnum:
+      enum:
+      - legacy
+      - piece_only
+      - carton_only
+      - carton_and_piece
+      type: string
+      description: |-
+        * `legacy` - Historique à confirmer
+        * `piece_only` - Pièce uniquement
+        * `carton_only` - Carton uniquement
+        * `carton_and_piece` - Carton et pièce
     APIError:
       type: object
       required:

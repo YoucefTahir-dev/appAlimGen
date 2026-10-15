@@ -1550,3 +1550,26 @@ msgstr "المخزون بعد التحويل"
 
 msgid "Produit historique : aucune conversion ne sera faite sans confirmation de son unité réelle."
 msgstr "منتج تاريخي: لن يتم أي تحويل دون تأكيد وحدته الفعلية."
+msgid "Unité d'achat"
+msgstr "وحدة الشراء"
+
+msgid "Quantité en stock"
+msgstr "الكمية في المخزون"
+
+msgid "Total ligne"
+msgstr "إجمالي السطر"
+
+msgid "Quantité achetée"
+msgstr "الكمية المشتراة"
+
+msgid "Quantité saisie dans le conditionnement sélectionné."
+msgstr "الكمية المدخلة بوحدة التغليف المحددة."
+
+msgid "Conditionnement d’achat invalide ou inactif."
+msgstr "وحدة تغليف الشراء غير صالحة أو غير نشطة."
+
+msgid "Ce produit ne peut être acheté qu’en unité de base."
+msgstr "لا يمكن شراء هذا المنتج إلا بوحدته الأساسية."
+
+msgid "Ce produit doit être acheté en carton."
+msgstr "يجب شراء هذا المنتج بالكرتون."
