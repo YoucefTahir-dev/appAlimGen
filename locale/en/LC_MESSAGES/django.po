@@ -645,3 +645,9 @@ msgstr "This product can only be purchased in its base unit."
 
 msgid "Ce produit doit être acheté en carton."
 msgstr "This product must be purchased by carton."
+
+msgid "Conditionnement de vente invalide ou inactif."
+msgstr "Invalid or inactive sale packaging."
+
+msgid "Ce produit doit être vendu en carton."
+msgstr "This product must be sold by carton."

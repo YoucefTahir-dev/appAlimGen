@@ -16,7 +16,7 @@ from apps.accounts.permissions import has_permission, manager_required, permissi
 from apps.core.pagination import paginate_queryset
 from apps.inventory.models import Client, LoadingOrder, Product, ProductPackaging
 from apps.inventory.forms import QuickProductForm
-from apps.inventory.pricing import get_sale_price_context
+from apps.inventory.pricing import get_sale_price_context, sale_packaging_allowed
 
 from .forms import PaymentForm, PurchaseForm, PurchaseLineFormSet, SaleForm, SaleLineFormSet
 from .models import Payment, Purchase, Sale
@@ -193,7 +193,13 @@ def sale_price_lookup(request):
             pk=packaging_id,
             product=product,
             is_active=True,
+            sale_enabled=True,
         )
+        if not sale_packaging_allowed(product, packaging):
+            return JsonResponse(
+                {'error': _('Conditionnement de vente invalide ou inactif.')},
+                status=400,
+            )
     return JsonResponse(get_sale_price_context(product, customer, packaging))
 
 

@@ -5,6 +5,7 @@ from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
 from apps.inventory.models import ProductPackaging
+from apps.inventory.pricing import sale_base_unit_allowed, sale_packaging_allowed
 
 from .models import Payment, Purchase, PurchaseLine, Sale, SaleLine
 from .widgets import ProductAutocomplete
@@ -133,21 +134,30 @@ class SaleLineForm(forms.ModelForm):
         fields = ('product', 'packaging', 'quantity', 'unit_price')
         widgets = {
             'product': ProductAutocomplete(attrs={'search_context': 'sale'}),
-            'packaging': forms.Select(attrs={'class': 'form-select'}),
+            'packaging': PackagingSelect(attrs={'class': 'form-select sale-unit'}),
             'quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
             'unit_price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': 0}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self._original_product_id = self.instance.product_id if self.instance and self.instance.pk else None
+        self._original_packaging_id = self.instance.packaging_id if self.instance and self.instance.pk else None
+        self._original_packaging_factor = self.instance.packaging_factor if self.instance and self.instance.pk else 1
+        self._original_packaging_name = self.instance.packaging_name if self.instance and self.instance.pk else ''
         product_id = self.data.get(self.add_prefix('product')) if self.is_bound else self.initial.get('product')
+        if not product_id and self.instance and self.instance.pk:
+            product_id = self.instance.product_id
         if not str(product_id or '').isdigit():
             product_id = None
-        queryset = ProductPackaging.objects.filter(product_id=product_id, is_active=True).select_related('product').order_by('name')
+        queryset = ProductPackaging.objects.filter(
+            product_id=product_id, is_active=True, sale_enabled=True,
+        ).select_related('product').order_by('conversion_factor', 'name')
         if self.instance and self.instance.pk and self.instance.packaging_id:
             queryset = ProductPackaging.objects.filter(
-                Q(product_id=product_id, is_active=True) | Q(pk=self.instance.packaging_id)
-            ).select_related('product').order_by('product__name', 'name')
+                Q(product_id=product_id, is_active=True, sale_enabled=True)
+                | Q(pk=self.instance.packaging_id)
+            ).select_related('product').order_by('product__name', 'conversion_factor', 'name')
         self.fields['packaging'].queryset = queryset
         self.fields['packaging'].required = False
         self.fields['packaging'].empty_label = _('Unité de base')
@@ -167,9 +177,23 @@ class SaleLineForm(forms.ModelForm):
             self.add_error('quantity', _('La quantité doit être strictement positive.'))
         if unit_price is not None and unit_price < 0:
             self.add_error('unit_price', _('Le prix unitaire ne peut pas être négatif.'))
-        if packaging and (not product or packaging.product_id != product.pk or not packaging.is_active):
-            self.add_error('packaging', _('Conditionnement invalide ou inactif.'))
-        factor = packaging.conversion_factor if packaging else 1
+        same_historical_unit = bool(
+            self.instance
+            and self.instance.pk
+            and product
+            and self._original_product_id == product.pk
+            and self._original_packaging_id == getattr(packaging, 'pk', None)
+        )
+        if packaging and (
+            not product or not sale_packaging_allowed(product, packaging)
+        ) and not same_historical_unit:
+            self.add_error('packaging', _('Conditionnement de vente invalide ou inactif.'))
+        if product and not packaging and not sale_base_unit_allowed(product) and not same_historical_unit:
+            self.add_error('packaging', _('Ce produit doit être vendu en carton.'))
+        factor = (
+            self._original_packaging_factor
+            if same_historical_unit else (packaging.conversion_factor if packaging else 1)
+        )
         if product and unit_price is not None and unit_price < product.purchase_price * factor:
             raise ValidationError(_("Le prix de vente est inférieur au coût d'achat. Vente refusée."))
 
@@ -179,12 +203,20 @@ class SaleLineForm(forms.ModelForm):
         instance = super().save(commit=False)
         packaging = self.cleaned_data.get('packaging')
         package_quantity = self.cleaned_data['quantity']
-        factor = packaging.conversion_factor if packaging else 1
+        same_historical_unit = bool(
+            instance.pk
+            and instance.product_id == self._original_product_id
+            and instance.packaging_id == self._original_packaging_id
+        )
+        factor = (
+            self._original_packaging_factor
+            if same_historical_unit else (packaging.conversion_factor if packaging else 1)
+        )
         instance.packaging_quantity = package_quantity
         instance.packaging_factor = factor
-        instance.packaging_name = packaging.name if packaging else (
+        instance.packaging_name = self._original_packaging_name if same_historical_unit else (packaging.name if packaging else (
             instance.product.unit.name if instance.product.unit_id else str(_('Unité'))
-        )
+        ))
         instance.quantity = package_quantity * factor
         if commit:
             instance.save()

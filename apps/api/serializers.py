@@ -322,6 +322,9 @@ class ProductSummarySerializer(serializers.ModelSerializer):
 class SaleLineReadSerializer(serializers.ModelSerializer):
     product = serializers.SerializerMethodField()
     line_total = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
+    packaging_id = serializers.IntegerField(read_only=True)
+    entered_quantity = serializers.IntegerField(source='packaging_quantity', read_only=True)
+    base_quantity = serializers.IntegerField(source='quantity', read_only=True)
 
     def get_product(self, obj) -> dict:
         if obj.sale.has_certified_snapshot:
@@ -343,8 +346,9 @@ class SaleLineReadSerializer(serializers.ModelSerializer):
     class Meta:
         model = SaleLine
         fields = (
-            'id', 'product', 'packaging', 'packaging_name', 'packaging_factor',
-            'packaging_quantity', 'quantity', 'unit_price', 'unit_cost', 'line_total',
+            'id', 'product', 'packaging', 'packaging_id', 'packaging_name',
+            'packaging_factor', 'packaging_quantity', 'entered_quantity',
+            'quantity', 'base_quantity', 'unit_price', 'unit_cost', 'line_total',
             'product_name_snapshot', 'product_reference_snapshot', 'unit_name_snapshot',
             'line_total_ht_snapshot',
         )
@@ -356,7 +360,9 @@ class SaleLineWriteSerializer(serializers.Serializer):
         source='product', queryset=Product.objects.all(), required=False, write_only=True,
     )
     packaging_id = serializers.PrimaryKeyRelatedField(
-        source='packaging', queryset=ProductPackaging.objects.all(), required=False, allow_null=True,
+        source='packaging', queryset=ProductPackaging.objects.filter(
+            is_active=True, sale_enabled=True,
+        ), required=False, allow_null=True,
     )
     quantity = serializers.IntegerField(min_value=1)
     unit_price = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=0, required=False)

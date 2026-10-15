@@ -48,6 +48,8 @@
                         <th>{% trans "Conditionnement" %}</th>
                         <th>{% trans "Quantité" %}</th>
                         <th>{% trans "Prix unitaire" %}</th>
+                        <th>{% trans "Quantité en stock" %}</th>
+                        <th>{% trans "Total ligne" %}</th>
                         <th>{% trans "Supprimer" %}</th>
                     </tr>
                 </thead>
@@ -55,7 +57,7 @@
                     {% for form_line in formset %}
                         {% if form_line.non_field_errors %}
                             <tr>
-                                <td colspan="5">
+                                <td colspan="7">
                                     <div class="alert alert-danger mb-0">{{ form_line.non_field_errors }}</div>
                                 </td>
                             </tr>
@@ -72,6 +74,8 @@
                                 {{ form_line.unit_price }}{{ form_line.unit_price.errors }}
                                 <div class="sale-price-feedback form-text" aria-live="polite"></div>
                             </td>
+                            <td class="sale-stock-quantity">0</td>
+                            <td class="sale-line-total">0,00 DZD</td>
                             <td>
                                 <span class="d-none">{{ form_line.DELETE }}</span>
                                 <button type="button" class="btn btn-sm btn-outline-danger remove-sale-line">
@@ -98,6 +102,8 @@
                         {{ form_line.unit_price }}
                         <div class="sale-price-feedback form-text" aria-live="polite"></div>
                     </td>
+                    <td class="sale-stock-quantity">0</td>
+                    <td class="sale-line-total">0,00 DZD</td>
                     <td>
                         <span class="d-none">{{ form_line.DELETE }}</span>
                         <button type="button" class="btn btn-sm btn-outline-danger remove-sale-line">
@@ -108,6 +114,20 @@
                 </tr>
             {% endwith %}
         </template>
+        <div class="row justify-content-end mt-3">
+            <div class="col-12 col-md-5 col-xl-4">
+                <dl class="row mb-0 sale-summary" aria-live="polite">
+                    <dt class="col-6">{% trans "Total HT" %}</dt>
+                    <dd class="col-6 text-end" id="sale-total-ht">0,00 DZD</dd>
+                    <dt class="col-6">{% trans "TVA" %}</dt>
+                    <dd class="col-6 text-end" id="sale-tax-total">0,00 DZD</dd>
+                    <dt class="col-6">{% trans "Remise" %}</dt>
+                    <dd class="col-6 text-end" id="sale-discount-total">0,00 DZD</dd>
+                    <dt class="col-6 fs-5">{% trans "Total TTC" %}</dt>
+                    <dd class="col-6 text-end fs-5 fw-bold" id="sale-total-ttc">0,00 DZD</dd>
+                </dl>
+            </div>
+        </div>
         <div class="form-actions justify-content-between">
             <button type="button" class="btn btn-outline-primary" id="add-sale-line">
                 <i class="bi bi-plus-circle me-1" aria-hidden="true"></i>

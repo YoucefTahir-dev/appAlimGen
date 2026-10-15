@@ -26,7 +26,7 @@ from apps.inventory.models import (
     Product, ProductPackaging, StockMovement, Supplier, Unit,
 )
 from apps.inventory.services import cancel_loading_order, close_loading_order, validate_loading_order
-from apps.inventory.pricing import get_sale_price_context
+from apps.inventory.pricing import get_sale_price_context, sale_packaging_allowed
 from apps.inventory.location import audit_location, location_snapshot
 from apps.printing.models import PrinterProfile, PrintProfile
 from apps.printing.services import encode_payload, invoice_print_data, printer_test_payload, select_printer_for_user
@@ -237,9 +237,12 @@ class ProductViewSet(AuditMutationMixin, viewsets.ModelViewSet):
                     pk=packaging_id,
                     product=product,
                     is_active=True,
+                    sale_enabled=True,
                 )
             except (ProductPackaging.DoesNotExist, TypeError, ValueError) as exc:
                 raise ValidationError({'packaging_id': _('Conditionnement invalide ou inactif.')}) from exc
+            if not sale_packaging_allowed(product, packaging):
+                raise ValidationError({'packaging_id': _('Conditionnement de vente invalide ou inactif.')})
         return Response(get_sale_price_context(product, customer, packaging))
 
 

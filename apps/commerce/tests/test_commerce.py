@@ -35,6 +35,7 @@ class CommerceTests(TestCase):
             unit=self.unit,
             purchase_price='10.00',
             sale_price='15.00',
+            unit_mode=Product.UnitMode.CARTON_AND_PIECE,
             quantity=10,
             minimum_stock=1,
         )

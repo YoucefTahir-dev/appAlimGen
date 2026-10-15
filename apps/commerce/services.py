@@ -6,7 +6,7 @@ from django.utils import timezone
 from django.utils.translation import gettext as _
 
 from apps.inventory.models import LoadingOrder, OperatorStock, Product, ProductPackaging
-from apps.inventory.pricing import get_sale_price
+from apps.inventory.pricing import get_sale_price, sale_base_unit_allowed, sale_packaging_allowed
 from apps.inventory.services import active_loading_for_operator
 from apps.core.models import CompanySettings
 
@@ -157,8 +157,10 @@ def create_sale(*, client, lines, discount=0, tax_rate=0, payment_type=Sale.CASH
         packaging_value = raw_line.get('packaging')
         packaging_id = packaging_value.pk if isinstance(packaging_value, ProductPackaging) else packaging_value
         packaging = packagings.get(int(packaging_id)) if packaging_id else None
-        if packaging and (packaging.product_id != product.pk or not packaging.is_active):
-            raise ValidationError({'packaging': _('Conditionnement invalide ou inactif.')})
+        if packaging and not sale_packaging_allowed(product, packaging):
+            raise ValidationError({'packaging': _('Conditionnement de vente invalide ou inactif.')})
+        if not packaging and not sale_base_unit_allowed(product):
+            raise ValidationError({'packaging': _('Ce produit doit être vendu en carton.')})
         packaging_quantity = int(raw_line['quantity'])
         if packaging_quantity <= 0:
             raise ValidationError({'quantity': _('La quantité doit être strictement positive.')})
@@ -333,8 +335,10 @@ def update_sale(
             packaging_value = raw_line.get('packaging')
             packaging_id = packaging_value.pk if isinstance(packaging_value, ProductPackaging) else packaging_value
             packaging = packagings.get(int(packaging_id)) if packaging_id else None
-            if packaging and (packaging.product_id != product.pk or not packaging.is_active):
-                raise ValidationError({'packaging': _('Conditionnement invalide ou inactif.')})
+            if packaging and not sale_packaging_allowed(product, packaging):
+                raise ValidationError({'packaging': _('Conditionnement de vente invalide ou inactif.')})
+            if not packaging and not sale_base_unit_allowed(product):
+                raise ValidationError({'packaging': _('Ce produit doit être vendu en carton.')})
             packaging_quantity = int(raw_line['quantity'])
             if packaging_quantity <= 0:
                 raise ValidationError({'quantity': _('La quantité doit être strictement positive.')})

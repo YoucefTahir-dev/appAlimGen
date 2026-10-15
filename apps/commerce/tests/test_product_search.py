@@ -19,7 +19,8 @@ class ProductSearchTests(TestCase):
         cls.brand = Brand.objects.create(name='Cacao')
         cls.product = Product.objects.create(name='Chocolat Noir', barcode='6131234567890',
             brand=cls.brand, purchase_price=10, sale_price=20, wholesale_price=18,
-            super_wholesale_price=15, retail_price=20, quantity=100)
+            super_wholesale_price=15, retail_price=20, quantity=100,
+            unit_mode=Product.UnitMode.CARTON_AND_PIECE)
         cls.other = Product.objects.create(name='Biscuit', purchase_price=5, sale_price=10, quantity=40)
         cls.pack = ProductPackaging.objects.create(product=cls.product, name='Carton', conversion_factor=12, default_sale_price=240)
         cls.url = reverse('commercial_product_search')
