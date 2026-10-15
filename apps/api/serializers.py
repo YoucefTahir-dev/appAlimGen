@@ -28,7 +28,9 @@ from apps.inventory.models import (
     Unit,
 )
 from apps.inventory.services import generate_loading_number, record_stock_movement
-from apps.inventory.pricing import validate_product_prices
+from apps.inventory.pricing import (
+    loading_base_unit_allowed, loading_packaging_allowed, validate_product_prices,
+)
 from apps.printing.models import PrinterProfile, PrintProfile, UserPrinterPreference
 
 from .exceptions import BusinessAPIException
@@ -679,11 +681,33 @@ class LoadingOrderLineSerializer(serializers.ModelSerializer):
     quantity = serializers.IntegerField(min_value=1)
     product_name = serializers.CharField(source='product.name', read_only=True)
     sold_quantity = serializers.IntegerField(read_only=True)
+    packaging_id = serializers.PrimaryKeyRelatedField(
+        source='packaging', queryset=ProductPackaging.objects.all(),
+        required=False, allow_null=True,
+    )
+    entered_quantity = serializers.IntegerField(read_only=True)
+    base_quantity = serializers.IntegerField(source='quantity', read_only=True)
 
     class Meta:
         model = LoadingOrderLine
-        fields = ('id', 'product', 'product_name', 'quantity', 'returned_quantity', 'sold_quantity')
-        read_only_fields = ('returned_quantity', 'sold_quantity')
+        fields = (
+            'id', 'product', 'product_name', 'packaging_id', 'packaging_name',
+            'packaging_factor', 'packaging_quantity', 'entered_quantity',
+            'quantity', 'base_quantity', 'returned_quantity', 'sold_quantity',
+        )
+        read_only_fields = (
+            'packaging_name', 'packaging_factor', 'packaging_quantity',
+            'entered_quantity', 'base_quantity', 'returned_quantity', 'sold_quantity',
+        )
+
+    def validate(self, attrs):
+        product = attrs.get('product')
+        packaging = attrs.get('packaging')
+        if packaging and not loading_packaging_allowed(product, packaging):
+            raise serializers.ValidationError({'packaging_id': _('Conditionnement de chargement invalide ou inactif.')})
+        if not packaging and not loading_base_unit_allowed(product):
+            raise serializers.ValidationError({'packaging_id': _('Ce produit doit être chargé en carton.')})
+        return attrs
 
 
 class LoadingOrderSerializer(serializers.ModelSerializer):
@@ -700,12 +724,21 @@ class LoadingOrderSerializer(serializers.ModelSerializer):
         read_only_fields = ('number', 'status', 'created_by_name', 'created_at', 'validated_at', 'closed_at')
 
     def validate_lines(self, lines):
-        product_ids = [line['product'].pk for line in lines]
         if not lines:
             raise serializers.ValidationError(_('Ajoutez au moins un produit.'))
-        if len(product_ids) != len(set(product_ids)):
-            raise serializers.ValidationError(_('Un produit ne peut apparaître qu’une fois.'))
         return lines
+
+    @staticmethod
+    def _create_lines(order, lines):
+        for data in lines:
+            line_data = dict(data)
+            entered_quantity = line_data.pop('quantity')
+            LoadingOrderLine.objects.create(
+                loading_order=order,
+                packaging_quantity=entered_quantity,
+                quantity=entered_quantity,
+                **line_data,
+            )
 
     @transaction.atomic
     def create(self, validated_data):
@@ -713,7 +746,7 @@ class LoadingOrderSerializer(serializers.ModelSerializer):
         order = LoadingOrder.objects.create(
             number=generate_loading_number(), created_by=self.context['request'].user, **validated_data,
         )
-        LoadingOrderLine.objects.bulk_create([LoadingOrderLine(loading_order=order, **line) for line in lines])
+        self._create_lines(order, lines)
         return order
 
     @transaction.atomic
@@ -727,7 +760,7 @@ class LoadingOrderSerializer(serializers.ModelSerializer):
         instance.save()
         if lines is not None:
             instance.lines.all().delete()
-            LoadingOrderLine.objects.bulk_create([LoadingOrderLine(loading_order=instance, **line) for line in lines])
+            self._create_lines(instance, lines)
         return instance
 
 

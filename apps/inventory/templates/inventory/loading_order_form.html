@@ -15,7 +15,7 @@
     {% if formset.non_form_errors %}<div class="alert alert-danger" role="alert">{{ formset.non_form_errors }}</div>{% endif %}
     <div class="table-responsive">
       <table class="table table-bordered align-middle">
-        <thead><tr><th>{% trans "Produit" %}</th><th>{% trans "Quantité" %}</th><th>{% trans "Action" %}</th></tr></thead>
+        <thead><tr><th>{% trans "Produit" %}</th><th>{% trans "Conditionnement" %}</th><th>{% trans "Quantité" %}</th><th>{% trans "Action" %}</th></tr></thead>
         <tbody id="loading-lines-body">
           {% for line in formset %}
             <tr class="loading-line-row">
@@ -24,6 +24,7 @@
                 {{ line.product }}
                 {{ line.product.errors }}
               </td>
+              <td data-label="{% trans 'Conditionnement' %}">{{ line.packaging }}{{ line.packaging.errors }}</td>
               <td data-label="{% trans 'Quantité' %}">{{ line.quantity }}{{ line.quantity.errors }}</td>
               <td data-label="{% trans 'Action' %}">
                 <span class="d-none">{{ line.DELETE }}</span>
@@ -45,6 +46,7 @@
             {% for hidden in line.hidden_fields %}{{ hidden }}{% endfor %}
             {{ line.product }}
           </td>
+          <td data-label="{% trans 'Conditionnement' %}">{{ line.packaging }}</td>
           <td data-label="{% trans 'Quantité' %}">{{ line.quantity }}</td>
           <td data-label="{% trans 'Action' %}">
             <span class="d-none">{{ line.DELETE }}</span>

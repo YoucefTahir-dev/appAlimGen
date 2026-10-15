@@ -48,6 +48,22 @@
                 priceInput.dispatchEvent(new Event('input', {bubbles: true}));
             }
         }
+        if (picker.dataset.context === 'loading_order') {
+            const row = picker.closest('tr');
+            const unitSelect = row.querySelector('[name$="-packaging"]');
+            if (unitSelect && Array.isArray(product.loading_units)) {
+                unitSelect.replaceChildren();
+                product.loading_units.forEach(unit => {
+                    const option = document.createElement('option');
+                    option.value = unit.id == null ? '' : String(unit.id);
+                    option.textContent = unit.factor > 1 ? `${unit.name} (×${unit.factor})` : unit.name;
+                    option.dataset.factor = String(unit.factor || 1);
+                    unitSelect.appendChild(option);
+                });
+                unitSelect.disabled = product.loading_units.length === 0;
+                unitSelect.dispatchEvent(new Event('change', {bubbles: true}));
+            }
+        }
         hidden.dispatchEvent(new Event('change', {bubbles: true}));
     }
     async function search(picker) {

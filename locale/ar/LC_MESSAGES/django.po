@@ -1579,3 +1579,18 @@ msgstr "وحدة تغليف البيع غير صالحة أو غير نشطة."
 
 msgid "Ce produit doit être vendu en carton."
 msgstr "يجب بيع هذا المنتج بالكرتون."
+
+msgid "Quantité chargée saisie"
+msgstr "كمية التحميل المدخلة"
+
+msgid "Conditionnement historique"
+msgstr "وحدة التغليف التاريخية"
+
+msgid "Facteur historique"
+msgstr "معامل التحويل التاريخي"
+
+msgid "Conditionnement de chargement invalide ou inactif."
+msgstr "وحدة تغليف التحميل غير صالحة أو غير نشطة."
+
+msgid "Ce produit doit être chargé en carton."
+msgstr "يجب تحميل هذا المنتج بالكرتون."

@@ -446,7 +446,9 @@ class PaymentViewSet(AuditMutationMixin, mixins.CreateModelMixin, mixins.ListMod
 
 
 class LoadingOrderViewSet(AuditMutationMixin, viewsets.ModelViewSet):
-    queryset = LoadingOrder.objects.select_related('operator', 'created_by').prefetch_related('lines__product')
+    queryset = LoadingOrder.objects.select_related('operator', 'created_by').prefetch_related(
+        'lines__product', 'lines__packaging',
+    )
     serializer_class = LoadingOrderSerializer
     filterset_fields = ('operator', 'status')
     search_fields = ('number', 'operator__username')

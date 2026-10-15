@@ -43,10 +43,14 @@ from django.utils.translation import gettext as _
 
 @login_required
 def loading_order_list(request):
-    orders = LoadingOrder.objects.select_related('operator', 'created_by').prefetch_related('lines__product')
+    orders = LoadingOrder.objects.select_related('operator', 'created_by').prefetch_related(
+        'lines__product__unit', 'lines__product__packagings', 'lines__packaging',
+    )
     if not has_permission(request.user, 'inventory.view_all_loadingorders'):
         orders = orders.filter(operator=request.user)
-    stocks = OperatorStock.objects.select_related('product').filter(operator=request.user, quantity__gt=0)
+    stocks = OperatorStock.objects.select_related('product__unit').prefetch_related(
+        'product__packagings'
+    ).filter(operator=request.user, quantity__gt=0)
     return render(request, 'inventory/loading_order_list.html', {'orders': orders, 'operator_stocks': stocks})
 
 

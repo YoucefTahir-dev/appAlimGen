@@ -38,6 +38,27 @@ def sale_packaging_allowed(product, packaging):
     return product.unit_mode == product.UnitMode.CARTON_AND_PIECE
 
 
+def loading_base_unit_allowed(product):
+    """Return whether a loading order may use the canonical base unit."""
+    return product.unit_mode != product.UnitMode.CARTON_ONLY
+
+
+def loading_packaging_allowed(product, packaging):
+    """Return whether a packaging can be selected for a stock transfer."""
+    if (
+        packaging is None
+        or packaging.product_id != product.pk
+        or not packaging.is_active
+        or not (packaging.purchase_enabled or packaging.sale_enabled)
+    ):
+        return False
+    if product.unit_mode in {product.UnitMode.LEGACY, product.UnitMode.PIECE_ONLY}:
+        return False
+    if product.unit_mode == product.UnitMode.CARTON_ONLY:
+        return packaging.kind == packaging.CARTON
+    return product.unit_mode == product.UnitMode.CARTON_AND_PIECE
+
+
 def get_sale_price(product, customer=None, packaging=None):
     """Return the authoritative tariff for a product/customer pair.
 

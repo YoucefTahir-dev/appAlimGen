@@ -7727,9 +7727,32 @@ components:
         product_name:
           type: string
           readOnly: true
+        packaging_id:
+          type: integer
+          nullable: true
+        packaging_name:
+          type: string
+          readOnly: true
+          title: Conditionnement historique
+        packaging_factor:
+          type: integer
+          readOnly: true
+          title: Facteur historique
+        packaging_quantity:
+          type: integer
+          readOnly: true
+          nullable: true
+          title: Quantité chargée saisie
+          description: Quantité saisie dans le conditionnement sélectionné.
+        entered_quantity:
+          type: integer
+          readOnly: true
         quantity:
           type: integer
           minimum: 1
+        base_quantity:
+          type: integer
+          readOnly: true
         returned_quantity:
           type: integer
           readOnly: true
@@ -7738,7 +7761,12 @@ components:
           type: integer
           readOnly: true
       required:
+      - base_quantity
+      - entered_quantity
       - id
+      - packaging_factor
+      - packaging_name
+      - packaging_quantity
       - product
       - product_name
       - quantity
