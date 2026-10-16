@@ -1,5 +1,5 @@
 {% extends 'base/base.html' %}
-{% load i18n static %}
+{% load i18n l10n static %}
 
 {% block title %}{{ title }} - El Amine ERP{% endblock %}
 
@@ -14,7 +14,8 @@
           data-loading-label="{% trans 'Chargement…' %}"
           data-price-error-label="{% trans 'Impossible de récupérer le prix du produit.' %}"
           data-select-client-label="{% trans 'Sélectionnez d’abord un client.' %}"
-          data-base-unit-label="{% trans 'Unité de base' %}">
+          data-base-unit-label="{% trans 'Unité de base' %}"
+          data-existing-paid="{% if form.instance.pk %}{{ form.instance.amount_paid|unlocalize }}{% else %}0.00{% endif %}">
         {% csrf_token %}
         {{ form.non_field_errors }}
         <div class="row g-3">
@@ -32,6 +33,8 @@
             <div class="col-md-6">{{ form.tax_rate.label_tag }}{{ form.tax_rate }}{{ form.tax_rate.errors }}</div>
             <div class="col-md-6">{{ form.payment_type.label_tag }}{{ form.payment_type }}{{ form.payment_type.errors }}</div>
             <div class="col-md-6">{{ form.settlement_action.label_tag }}{{ form.settlement_action }}{{ form.settlement_action.errors }}</div>
+            <div class="col-md-6" id="sale-amount-received-field">{{ form.amount_received.label_tag }}{{ form.amount_received }}{{ form.amount_received.errors }}<div class="form-text">{% trans "Strictement supérieur à 0 et inférieur au reste à payer." %}</div></div>
+            <div class="col-12"><div class="form-check">{{ form.show_legal_information }}{{ form.show_legal_information.label_tag }}</div><div class="form-text">{{ form.show_legal_information.help_text }}</div>{{ form.show_legal_information.errors }}</div>
         </div>
         <hr>
         {{ formset.management_form }}
@@ -125,6 +128,10 @@
                     <dd class="col-6 text-end" id="sale-discount-total">0,00 DZD</dd>
                     <dt class="col-6 fs-5">{% trans "Total TTC" %}</dt>
                     <dd class="col-6 text-end fs-5 fw-bold" id="sale-total-ttc">0,00 DZD</dd>
+                    <dt class="col-6">{% trans "Montant encaissé" %}</dt>
+                    <dd class="col-6 text-end text-success" id="sale-paid-total">0,00 DZD</dd>
+                    <dt class="col-6">{% trans "Reste à payer" %}</dt>
+                    <dd class="col-6 text-end fw-semibold" id="sale-due-total">0,00 DZD</dd>
                 </dl>
             </div>
         </div>

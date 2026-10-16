@@ -128,6 +128,43 @@ class CommerceTests(TestCase):
         self.product.refresh_from_db()
         self.assertEqual(self.product.quantity, 4)
 
+    def test_backend_total_matches_instant_preview_rules_for_mixed_units(self):
+        self.product.quantity = 20
+        self.product.save(update_fields=['quantity'])
+        packaging = ProductPackaging.objects.create(
+            product=self.product,
+            name='Pack de 2 concordance',
+            conversion_factor=2,
+            default_sale_price='30.00',
+            barcode='WEB-PACK-CONCORDANCE',
+        )
+
+        response = self.client.post(reverse('sale_create'), {
+            'client': self.client_obj.pk,
+            'discount': '5.00',
+            'tax_rate': '19.00',
+            'payment_type': Sale.CASH,
+            'settlement_action': SaleForm.NO_PAYMENT,
+            'lines-TOTAL_FORMS': '2',
+            'lines-INITIAL_FORMS': '0',
+            'lines-MIN_NUM_FORMS': '0',
+            'lines-MAX_NUM_FORMS': '1000',
+            'lines-0-product': str(self.product.pk),
+            'lines-0-packaging': str(packaging.pk),
+            'lines-0-quantity': '2',
+            'lines-0-unit_price': '30.00',
+            'lines-1-product': str(self.product.pk),
+            'lines-1-packaging': '',
+            'lines-1-quantity': '1',
+            'lines-1-unit_price': '20.00',
+        })
+
+        self.assertEqual(response.status_code, 302)
+        sale = Sale.objects.latest('pk')
+        self.assertEqual(sale.total, Decimal('90.20'))
+        self.assertEqual(sum(line.line_total() for line in sale.lines.all()), Decimal('80.00'))
+        self.assertEqual(sale.payments.count(), 0)
+
     def test_sale_form_exposes_dynamic_product_line_controls(self):
         response = self.client.get(reverse('sale_create'))
 
@@ -139,6 +176,11 @@ class CommerceTests(TestCase):
         self.assertContains(response, 'id="sale-client-type"')
         self.assertContains(response, 'sale-product-meta')
         self.assertContains(response, 'sale-price-feedback')
+        self.assertContains(response, 'id="sale-total-ht"')
+        self.assertContains(response, 'id="sale-total-ttc"')
+        self.assertContains(response, 'id="sale-paid-total"')
+        self.assertContains(response, 'id="sale-due-total"')
+        self.assertContains(response, 'data-existing-paid="0.00"')
         self.assertContains(response, 'min="1"')
 
     def test_sale_create_accepts_multiple_products_on_one_invoice(self):

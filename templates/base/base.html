@@ -41,6 +41,7 @@
                 {% if can_view_dashboard %}<li class="nav-item"><a class="nav-link text-white" data-sidebar-link href="{% url 'dashboard' %}"><i class="bi bi-speedometer2 me-2"></i> {% trans "Tableau de bord" %}</a></li>{% endif %}
                 <li class="nav-item"><a class="nav-link text-white" data-sidebar-link href="{% url 'profile' %}"><i class="bi bi-person-circle me-2"></i> {% trans "Mon profil" %}</a></li>
                 {% if can_view_products %}<li class="nav-item"><a class="nav-link text-white" data-sidebar-link href="{% url 'product_list' %}"><i class="bi bi-box-seam me-2"></i> {% trans "Produits" %}</a></li>{% endif %}
+                {% if can_view_products %}<li class="nav-item"><a class="nav-link text-white" data-sidebar-link href="{% url 'category_list' %}"><i class="bi bi-tags me-2"></i> {% trans "Catégories" %}</a></li>{% endif %}
                 {% if can_view_clients %}
                     <li class="nav-item"><a class="nav-link text-white" data-sidebar-link href="{% url 'client_list' %}"><i class="bi bi-people me-2"></i> {% trans "Clients" %}</a></li>
                 {% elif can_add_clients %}

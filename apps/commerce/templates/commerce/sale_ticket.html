@@ -171,8 +171,8 @@
         <div class="company-ar">الأمين للمواد الغذائية و غير الغذائية</div>
         <div class="muted">{{ company.address|default:"" }}</div>
         <div>Tél : {{ company.phone|default:"" }}</div>
-        <div>NIF : {{ company.tax_number|default:"-" }} | NIS : {{ company.nis|default:"-" }}</div>
-        <div>{% trans "RC" %} : {{ company.rc_number|default:"-" }} | AI : {{ company.article_number|default:"-" }}</div>
+        {% if sale.show_legal_information %}<div>NIF : {{ company.tax_number|default:"-" }} | NIS : {{ company.nis|default:"-" }}</div>
+        <div>{% trans "RC" %} : {{ company.rc_number|default:"-" }} | AI : {{ company.article_number|default:"-" }}</div>{% endif %}
     </header>
 
     <div class="separator"></div>
@@ -185,9 +185,9 @@
         <div class="row"><span>{% trans "Caissier" %}</span><span>{{ cashier_name }}</span></div>
         {% if invoice_client %}
             <div class="row"><span>{% trans "Client" %}</span><span>{{ invoice_client.name }}</span></div>
-            {% for label, value in client_legal_identifiers %}
+            {% if sale.show_legal_information %}{% for label, value in client_legal_identifiers %}
                 <div class="row"><span>{{ label }}</span><span>{{ value }}</span></div>
-            {% endfor %}
+            {% endfor %}{% endif %}
         {% endif %}
     </section>
 

@@ -5,6 +5,7 @@ import re
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework.response import Response
+from rest_framework.utils.encoders import JSONEncoder
 
 from .exceptions import BusinessAPIException
 from .models import IdempotencyRecord
@@ -39,10 +40,14 @@ def idempotent(request, operation, callback, *, required=True):
                 transaction.set_rollback(True)
                 return response
             record.response_status = response.status_code
-            record.response_body = response.data
+            # Serializer output may legitimately contain dates/datetimes.
+            # Normalize it exactly as DRF's JSON renderer would before storing
+            # the replay body in a JSONField.
+            replay_body = json.loads(json.dumps(response.data, cls=JSONEncoder))
+            record.response_body = replay_body
             record.completed = True
             record.completed_at = timezone.now()
-            data = response.data
+            data = replay_body
             if isinstance(data, dict):
                 record.resource_id = str(data.get('id', ''))[:80]
             record.save(update_fields=('response_status', 'response_body', 'completed', 'completed_at', 'resource_id'))

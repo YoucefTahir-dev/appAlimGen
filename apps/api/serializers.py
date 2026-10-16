@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.core.exceptions import ValidationError as DjangoValidationError
 from apps.inventory.location import validate_location
 from django.utils.translation import gettext as _
@@ -44,6 +44,31 @@ class NamedReferenceSerializer(serializers.ModelSerializer):
 class CategorySerializer(NamedReferenceSerializer):
     class Meta(NamedReferenceSerializer.Meta):
         model = Category
+
+    def validate_name(self, value):
+        cleaned = ' '.join(str(value or '').split())
+        if not cleaned:
+            raise serializers.ValidationError(_('Le nom de la catégorie est obligatoire.'))
+        duplicate = Category.objects.filter(name__iexact=cleaned)
+        if self.instance:
+            duplicate = duplicate.exclude(pk=self.instance.pk)
+        if duplicate.exists():
+            raise serializers.ValidationError(_('Une catégorie portant ce nom existe déjà.'))
+        return cleaned
+
+    def create(self, validated_data):
+        try:
+            with transaction.atomic():
+                return super().create(validated_data)
+        except IntegrityError as exc:
+            raise serializers.ValidationError({'name': _('Cette catégorie existe déjà.')}) from exc
+
+    def update(self, instance, validated_data):
+        try:
+            with transaction.atomic():
+                return super().update(instance, validated_data)
+        except IntegrityError as exc:
+            raise serializers.ValidationError({'name': _('Cette catégorie existe déjà.')}) from exc
 
 
 class BrandSerializer(NamedReferenceSerializer):
@@ -387,6 +412,10 @@ class SaleSerializer(serializers.ModelSerializer):
     lines = SaleLineReadSerializer(many=True, read_only=True)
     items = SaleLineWriteSerializer(many=True, write_only=True)
     pay_full = serializers.BooleanField(write_only=True, required=False, default=False)
+    amount_received = serializers.DecimalField(
+        write_only=True, required=False, allow_null=True,
+        max_digits=14, decimal_places=2, min_value=Decimal('0.01'),
+    )
     amount_paid = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
     balance_due = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
     payment_status = serializers.CharField(read_only=True)
@@ -405,7 +434,8 @@ class SaleSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'invoice_number', 'ticket_number', 'client', 'total', 'discount',
             'tax_rate', 'payment_type', 'payment_tracking_initialized', 'created_at',
-            'amount_paid', 'balance_due', 'payment_status', 'lines', 'items', 'pay_full',
+            'show_legal_information',
+            'amount_paid', 'balance_due', 'payment_status', 'lines', 'items', 'pay_full', 'amount_received',
             'created_by_name',
             'loading_order',
             'client_details', 'payments', 'subtotal', 'tax_amount',
@@ -539,8 +569,14 @@ class SaleSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         items = validated_data.pop('items')
         pay_full = validated_data.pop('pay_full', False)
+        amount_received = validated_data.pop('amount_received', None)
+        if pay_full and amount_received is not None:
+            raise serializers.ValidationError({'amount_received': _('Choisissez paiement total ou partiel, pas les deux.')})
         try:
-            return create_sale(lines=items, user=self.context['request'].user, pay_full=pay_full, **validated_data)
+            return create_sale(
+                lines=items, user=self.context['request'].user, pay_full=pay_full,
+                initial_payment_amount=amount_received, **validated_data,
+            )
         except Exception as exc:
             from django.core.exceptions import ValidationError as DjangoValidationError
 
@@ -564,12 +600,16 @@ class SaleSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         items = validated_data.pop('items', None)
         pay_full = validated_data.pop('pay_full', False)
+        amount_received = validated_data.pop('amount_received', None)
+        if pay_full and amount_received is not None:
+            raise serializers.ValidationError({'amount_received': _('Choisissez paiement total ou partiel, pas les deux.')})
         try:
             return update_sale(
                 sale=instance,
                 lines=items,
                 user=self.context['request'].user,
                 pay_full=pay_full,
+                initial_payment_amount=amount_received,
                 **validated_data,
             )
         except Exception as exc:

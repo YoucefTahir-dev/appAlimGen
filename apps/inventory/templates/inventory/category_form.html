@@ -1,0 +1,11 @@
+{% extends 'base/base.html' %}
+{% load i18n %}
+{% block title %}{{ title }} - El Amine ERP{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+{% block content %}
+<form method="post" class="card card-dashboard p-4" style="max-width: 680px">
+  {% csrf_token %}{{ form.non_field_errors }}
+  <div class="mb-3">{{ form.name.label_tag }}{{ form.name }}{{ form.name.errors }}</div>
+  <div class="d-flex gap-2"><button class="btn btn-success" type="submit">{% trans "Enregistrer" %}</button><a class="btn btn-outline-secondary" href="{% url 'category_list' %}">{% trans "Annuler" %}</a></div>
+</form>
+{% endblock %}

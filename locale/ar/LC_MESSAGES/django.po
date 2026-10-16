@@ -1594,3 +1594,105 @@ msgstr "وحدة تغليف التحميل غير صالحة أو غير نشط�
 
 msgid "Ce produit doit être chargé en carton."
 msgstr "يجب تحميل هذا المنتج بالكرتون."
+
+# Sales settlement, legal display and product categories
+msgid "Règlement à l’enregistrement"
+msgstr "الدفع عند الحفظ"
+
+msgid "Ne pas ajouter de règlement maintenant"
+msgstr "عدم إضافة دفعة الآن"
+
+msgid "Régler partiellement maintenant"
+msgstr "دفع جزئي الآن"
+
+msgid "Régler intégralement maintenant"
+msgstr "دفع كامل الآن"
+
+msgid "Montant reçu"
+msgstr "المبلغ المستلم"
+
+msgid "Le montant reçu est obligatoire pour un paiement partiel."
+msgstr "المبلغ المستلم مطلوب للدفع الجزئي."
+
+msgid "Afficher les informations légales sur les tickets et bons commerciaux"
+msgstr "إظهار المعلومات القانونية في الإيصالات والمستندات التجارية"
+
+msgid "Les factures officielles conservent toujours les mentions légales obligatoires."
+msgstr "تحتفظ الفواتير الرسمية دائمًا بالبيانات القانونية الإلزامية."
+
+msgid "Strictement supérieur à 0 et inférieur au reste à payer."
+msgstr "يجب أن يكون أكبر من صفر وأقل من المبلغ المتبقي."
+
+msgid "Montant encaissé"
+msgstr "المبلغ المدفوع"
+
+msgid "Reste à payer"
+msgstr "المبلغ المتبقي"
+
+msgid "Choisissez paiement total ou partiel, pas les deux."
+msgstr "اختر الدفع الكامل أو الجزئي، وليس كليهما."
+
+msgid "Le montant reçu doit être compris entre 0 et le total."
+msgstr "يجب أن يكون المبلغ المستلم بين صفر والإجمالي."
+
+msgid "Un paiement partiel doit être strictement positif et inférieur au total."
+msgstr "يجب أن تكون الدفعة الجزئية أكبر من صفر وأقل من الإجمالي."
+
+msgid "Le montant reçu dépasse le reste à payer."
+msgstr "المبلغ المستلم يتجاوز المبلغ المتبقي."
+
+msgid "Un paiement partiel doit être strictement positif et inférieur au reste à payer."
+msgstr "يجب أن تكون الدفعة الجزئية أكبر من صفر وأقل من المبلغ المتبقي."
+
+msgid "Catégories"
+msgstr "الفئات"
+
+msgid "Catégories de produits"
+msgstr "فئات المنتجات"
+
+msgid "Créez et renommez librement les catégories sans modifier les produits."
+msgstr "أنشئ الفئات وأعد تسميتها دون تعديل المنتجات."
+
+msgid "Le nom de la catégorie est obligatoire."
+msgstr "اسم الفئة مطلوب."
+
+msgid "Une catégorie portant ce nom existe déjà."
+msgstr "توجد فئة بهذا الاسم بالفعل."
+
+msgid "Cette catégorie existe déjà."
+msgstr "هذه الفئة موجودة بالفعل."
+
+msgid "Réaffecter les produits vers"
+msgstr "إعادة تعيين المنتجات إلى"
+
+msgid "Choisissez une catégorie de remplacement."
+msgstr "اختر فئة بديلة."
+
+msgid "Cette catégorie contient des produits. Une réaffectation est obligatoire."
+msgstr "تحتوي هذه الفئة على منتجات ويجب إعادة تعيينها."
+
+msgid "La catégorie de remplacement est obligatoire."
+msgstr "الفئة البديلة مطلوبة."
+
+msgid "Catégorie de remplacement invalide."
+msgstr "الفئة البديلة غير صالحة."
+
+msgid "Catégorie renommée."
+msgstr "تمت إعادة تسمية الفئة."
+
+msgid "Catégorie supprimée."
+msgstr "تم حذف الفئة."
+
+msgid "Ajouter une catégorie"
+msgstr "إضافة فئة"
+
+msgid "Modifier la catégorie"
+msgstr "تعديل الفئة"
+
+msgid "Supprimer la catégorie"
+msgstr "حذف الفئة"
+
+msgid "Cette catégorie contient %(count)s produit. Choisissez sa nouvelle catégorie."
+msgid_plural "Cette catégorie contient %(count)s produits. Choisissez leur nouvelle catégorie."
+msgstr[0] "تحتوي هذه الفئة على %(count)s منتج. اختر فئته الجديدة."
+msgstr[1] "تحتوي هذه الفئة على %(count)s منتجات. اختر فئتها الجديدة."

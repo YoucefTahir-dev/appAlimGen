@@ -96,7 +96,35 @@ class SaleUnitFormBrowserTests(StaticLiveServerTestCase):
                 expect(page.locator('#id_lines-1-unit_price')).to_have_value('220.00')
                 page.fill('#id_lines-1-quantity', '5')
                 expect(page.locator('.sale-line-row').nth(1).locator('.sale-stock-quantity')).to_have_text('5')
-                expect(page.locator('#sale-total-ht')).to_contain_text('10')
-                expect(page.locator('#sale-total-ttc')).to_contain_text('10')
+                expect(page.locator('#sale-total-ht')).to_have_attribute('data-cents', '1070000')
+
+                page.fill('#id_discount', '100.00')
+                page.fill('#id_tax_rate', '19.00')
+                expect(page.locator('#sale-tax-total')).to_have_attribute('data-cents', '203300')
+                expect(page.locator('#sale-discount-total')).to_have_attribute('data-cents', '10000')
+                expect(page.locator('#sale-total-ttc')).to_have_attribute('data-cents', '1263300')
+                expect(page.locator('#sale-paid-total')).to_have_attribute('data-cents', '1263300')
+                expect(page.locator('#sale-due-total')).to_have_attribute('data-cents', '0')
+
+                page.select_option('#id_settlement_action', 'pay_partial')
+                expect(page.locator('#sale-amount-received-field')).to_be_visible()
+                page.fill('#id_amount_received', '5000.00')
+                expect(page.locator('#sale-paid-total')).to_have_attribute('data-cents', '500000')
+                expect(page.locator('#sale-due-total')).to_have_attribute('data-cents', '763300')
+
+                page.select_option('#id_settlement_action', 'no_payment')
+                expect(page.locator('#sale-amount-received-field')).to_be_hidden()
+                expect(page.locator('#sale-paid-total')).to_have_attribute('data-cents', '0')
+                expect(page.locator('#sale-due-total')).to_have_attribute('data-cents', '1263300')
+
+                submit_guard = page.evaluate(
+                    """() => {
+                        const form = document.querySelector('#sale-form');
+                        const first = form.dispatchEvent(new Event('submit', {cancelable: true}));
+                        const second = form.dispatchEvent(new Event('submit', {cancelable: true}));
+                        return {first, second};
+                    }"""
+                )
+                self.assertEqual(submit_guard, {'first': True, 'second': False})
             finally:
                 browser.close()

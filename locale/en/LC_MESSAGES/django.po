@@ -666,3 +666,111 @@ msgstr "Invalid or inactive loading packaging."
 
 msgid "Ce produit doit être chargé en carton."
 msgstr "This product must be loaded by carton."
+
+# Sales settlement, legal display and product categories
+msgid "Règlement à l’enregistrement"
+msgstr "Settlement on save"
+
+msgid "Ne pas ajouter de règlement maintenant"
+msgstr "Do not add a payment now"
+
+msgid "Régler partiellement maintenant"
+msgstr "Pay partially now"
+
+msgid "Régler intégralement maintenant"
+msgstr "Pay in full now"
+
+msgid "Montant reçu"
+msgstr "Amount received"
+
+msgid "Le montant reçu est obligatoire pour un paiement partiel."
+msgstr "The amount received is required for a partial payment."
+
+msgid "Afficher les informations légales sur les tickets et bons commerciaux"
+msgstr "Show legal information on receipts and commercial documents"
+
+msgid "Les factures officielles conservent toujours les mentions légales obligatoires."
+msgstr "Official invoices always retain mandatory legal information."
+
+msgid "Strictement supérieur à 0 et inférieur au reste à payer."
+msgstr "Must be greater than 0 and lower than the outstanding balance."
+
+msgid "Montant encaissé"
+msgstr "Amount paid"
+
+msgid "Reste à payer"
+msgstr "Outstanding balance"
+
+msgid "Choisissez paiement total ou partiel, pas les deux."
+msgstr "Choose either full or partial payment, not both."
+
+msgid "Le montant reçu doit être compris entre 0 et le total."
+msgstr "The amount received must be between 0 and the total."
+
+msgid "Un paiement partiel doit être strictement positif et inférieur au total."
+msgstr "A partial payment must be greater than zero and lower than the total."
+
+msgid "Le montant reçu dépasse le reste à payer."
+msgstr "The amount received exceeds the outstanding balance."
+
+msgid "Un paiement partiel doit être strictement positif et inférieur au reste à payer."
+msgstr "A partial payment must be greater than zero and lower than the outstanding balance."
+
+msgid "Catégories"
+msgstr "Categories"
+
+msgid "Catégories de produits"
+msgstr "Product categories"
+
+msgid "Nouvelle catégorie"
+msgstr "New category"
+
+msgid "Créez et renommez librement les catégories sans modifier les produits."
+msgstr "Create and rename categories without changing products."
+
+msgid "Le nom de la catégorie est obligatoire."
+msgstr "The category name is required."
+
+msgid "Une catégorie portant ce nom existe déjà."
+msgstr "A category with this name already exists."
+
+msgid "Cette catégorie existe déjà."
+msgstr "This category already exists."
+
+msgid "Réaffecter les produits vers"
+msgstr "Reassign products to"
+
+msgid "Choisissez une catégorie de remplacement."
+msgstr "Choose a replacement category."
+
+msgid "Cette catégorie contient des produits. Une réaffectation est obligatoire."
+msgstr "This category contains products. Reassignment is required."
+
+msgid "La catégorie de remplacement est obligatoire."
+msgstr "A replacement category is required."
+
+msgid "Catégorie de remplacement invalide."
+msgstr "Invalid replacement category."
+
+msgid "Catégorie ajoutée."
+msgstr "Category added."
+
+msgid "Catégorie renommée."
+msgstr "Category renamed."
+
+msgid "Catégorie supprimée."
+msgstr "Category deleted."
+
+msgid "Ajouter une catégorie"
+msgstr "Add a category"
+
+msgid "Modifier la catégorie"
+msgstr "Edit category"
+
+msgid "Supprimer la catégorie"
+msgstr "Delete category"
+
+msgid "Cette catégorie contient %(count)s produit. Choisissez sa nouvelle catégorie."
+msgid_plural "Cette catégorie contient %(count)s produits. Choisissez leur nouvelle catégorie."
+msgstr[0] "This category contains %(count)s product. Choose its new category."
+msgstr[1] "This category contains %(count)s products. Choose their new category."
