@@ -1,0 +1,12 @@
+{% extends 'base/base.html' %}
+{% load i18n %}
+{% block title %}{% trans "Supprimer la catégorie" %} - El Amine ERP{% endblock %}
+{% block page_title %}{% trans "Supprimer la catégorie" %}{% endblock %}
+{% block content %}
+<form method="post" class="card card-dashboard p-4" style="max-width: 760px">
+  {% csrf_token %}
+  <p>{% blocktrans with name=category.name %}Supprimer la catégorie « {{ name }} » ?{% endblocktrans %}</p>
+  {% if product_count %}<div class="alert alert-warning">{% blocktrans count count=product_count %}Cette catégorie contient {{ count }} produit. Choisissez sa nouvelle catégorie.{% plural %}Cette catégorie contient {{ count }} produits. Choisissez leur nouvelle catégorie.{% endblocktrans %}</div><div class="mb-3">{{ form.replacement.label_tag }}{{ form.replacement }}{{ form.replacement.errors }}</div>{% endif %}
+  <div class="d-flex gap-2"><button class="btn btn-danger" type="submit">{% trans "Supprimer" %}</button><a class="btn btn-outline-secondary" href="{% url 'category_list' %}">{% trans "Annuler" %}</a></div>
+</form>
+{% endblock %}

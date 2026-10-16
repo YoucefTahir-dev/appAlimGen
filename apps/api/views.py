@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.db.models import F, Q
 from django.db.models.deletion import ProtectedError
 from django.http import HttpResponse
@@ -267,9 +268,41 @@ class ReferenceReadOnlyViewSet(viewsets.ReadOnlyModelViewSet):
     required_permissions = {'*': 'inventory.view_product'}
 
 
-class CategoryViewSet(ReferenceReadOnlyViewSet):
+class CategoryViewSet(AuditMutationMixin, viewsets.ModelViewSet):
     queryset = Category.objects.order_by('name')
     serializer_class = CategorySerializer
+    pagination_class = None
+    search_fields = ('name',)
+    ordering = ('name',)
+    audit_name = 'category'
+    required_permissions = {
+        'list': 'inventory.view_product', 'retrieve': 'inventory.view_product',
+        'create': 'inventory.add_product', 'update': 'inventory.change_product',
+        'partial_update': 'inventory.change_product', 'destroy': 'inventory.delete_product',
+        'reassign_delete': 'inventory.delete_product',
+    }
+
+    def perform_destroy(self, instance):
+        if instance.products.exists():
+            raise ValidationError({
+                'replacement': _('Cette catégorie contient des produits. Une réaffectation est obligatoire.'),
+            })
+        super().perform_destroy(instance)
+
+    @action(detail=True, methods=('post',), url_path='reassign-delete')
+    def reassign_delete(self, request, pk=None):
+        replacement_id = request.data.get('replacement')
+        if not replacement_id:
+            raise ValidationError({'replacement': _('La catégorie de remplacement est obligatoire.')})
+        with transaction.atomic():
+            category = Category.objects.select_for_update().get(pk=self.get_object().pk)
+            replacement = Category.objects.select_for_update().filter(pk=replacement_id).first()
+            if replacement is None or replacement.pk == category.pk:
+                raise ValidationError({'replacement': _('Catégorie de remplacement invalide.')})
+            Product.objects.select_for_update().filter(category=category).order_by('pk').update(category=replacement)
+            category.delete()
+        self._audit('reassign_delete', 204)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class BrandViewSet(ReferenceReadOnlyViewSet):

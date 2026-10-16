@@ -383,6 +383,11 @@ class Sale(models.Model):
     tax_rate = models.DecimalField('TVA (%)', max_digits=5, decimal_places=2, default=0)
     payment_type = models.CharField('Mode de paiement', max_length=20, choices=PAYMENT_CHOICES, default=CASH, blank=True)
     payment_tracking_initialized = models.BooleanField('Suivi des règlements initialisé', default=True)
+    show_legal_information = models.BooleanField(
+        _('Afficher les informations légales sur les tickets et bons commerciaux'),
+        default=True,
+        help_text=_('Les factures officielles conservent toujours les mentions légales obligatoires.'),
+    )
     created_by = models.ForeignKey(
         'accounts.User', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='created_sales', verbose_name='Caissier',

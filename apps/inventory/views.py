@@ -5,7 +5,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.db import DatabaseError, IntegrityError, transaction
-from django.db.models import Exists, OuterRef, Q
+from django.db.models import Count, Exists, OuterRef, Q
 from django.db.models.deletion import ProtectedError
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.http import require_POST
@@ -15,6 +15,7 @@ from apps.core.security import log_security_event
 from apps.core.export_security import excel_safe_text
 from apps.core.pagination import paginate_queryset
 from .forms import (
+    CategoryDeleteForm, CategoryForm,
     ClientForm,
     ImportExcelForm,
     ProductForm,
@@ -142,6 +143,85 @@ def product_list(request):
         'inventory/product_list.html',
         {'products': page_obj, 'page_obj': page_obj, 'pagination_query': pagination_query},
     )
+
+
+@permission_required('inventory.view_product')
+def category_list(request):
+    categories = Category.objects.annotate(product_count=Count('products')).order_by('name', 'pk')
+    return render(request, 'inventory/category_list.html', {'categories': categories})
+
+
+@permission_required('inventory.add_product')
+def category_create(request):
+    form = CategoryForm(request.POST or None)
+    if form.is_valid():
+        try:
+            with transaction.atomic():
+                form.save()
+        except IntegrityError:
+            form.add_error('name', _('Une catégorie portant ce nom existe déjà.'))
+        else:
+            messages.success(request, _('Catégorie ajoutée.'))
+            return redirect('category_list')
+    return render(request, 'inventory/category_form.html', {
+        'form': form, 'title': _('Ajouter une catégorie'),
+    })
+
+
+@permission_required('inventory.change_product')
+def category_update(request, pk):
+    category = get_object_or_404(Category, pk=pk)
+    form = CategoryForm(request.POST or None, instance=category)
+    if form.is_valid():
+        try:
+            with transaction.atomic():
+                form.save()
+        except IntegrityError:
+            form.add_error('name', _('Une catégorie portant ce nom existe déjà.'))
+        else:
+            messages.success(request, _('Catégorie renommée.'))
+            return redirect('category_list')
+    return render(request, 'inventory/category_form.html', {
+        'form': form, 'title': _('Modifier la catégorie'), 'category': category,
+    })
+
+
+@permission_required('inventory.delete_product')
+def category_delete(request, pk):
+    category = get_object_or_404(Category, pk=pk)
+    form = CategoryDeleteForm(request.POST or None, category=category)
+    if request.method == 'POST' and form.is_valid():
+        with transaction.atomic():
+            locked = Category.objects.select_for_update().get(pk=category.pk)
+            products = Product.objects.select_for_update().filter(category=locked).order_by('pk')
+            replacement = form.cleaned_data['replacement']
+            if products.exists() and replacement is None:
+                form.add_error('replacement', _('Choisissez une catégorie de remplacement.'))
+            else:
+                products.update(category=replacement)
+                locked.delete()
+                messages.success(request, _('Catégorie supprimée.'))
+                return redirect('category_list')
+    return render(request, 'inventory/category_confirm_delete.html', {
+        'category': category, 'form': form, 'product_count': category.products.count(),
+    })
+
+
+@require_POST
+@permission_required('inventory.add_product')
+def category_quick_create(request):
+    form = CategoryForm(request.POST)
+    if form.is_valid():
+        try:
+            with transaction.atomic():
+                category = form.save()
+        except IntegrityError:
+            existing = Category.objects.filter(name__iexact=form.cleaned_data['name']).first()
+            if existing:
+                return JsonResponse({'id': existing.pk, 'name': existing.name})
+            return JsonResponse({'errors': {'name': [_('Cette catégorie existe déjà.')]}}, status=409)
+        return JsonResponse({'id': category.pk, 'name': category.name}, status=201)
+    return JsonResponse({'errors': form.errors.get_json_data()}, status=400)
 
 @manager_required
 def product_create(request):

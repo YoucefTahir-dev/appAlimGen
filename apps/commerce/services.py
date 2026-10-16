@@ -124,7 +124,10 @@ def _normalized_lines(lines, price_field):
 
 
 @transaction.atomic
-def create_sale(*, client, lines, discount=0, tax_rate=0, payment_type=Sale.CASH, user=None, pay_full=False):
+def create_sale(
+    *, client, lines, discount=0, tax_rate=0, payment_type=Sale.CASH,
+    user=None, pay_full=False, initial_payment_amount=None, show_legal_information=True,
+):
     if not lines:
         raise ValidationError({'lines': _('Une vente ou un achat doit contenir au moins un produit.')})
     product_ids = sorted({line['product'].pk if isinstance(line['product'], Product) else int(line['product']) for line in lines})
@@ -242,6 +245,7 @@ def create_sale(*, client, lines, discount=0, tax_rate=0, payment_type=Sale.CASH
         tax_rate=tax_rate,
         payment_type=payment_type,
         payment_tracking_initialized=True,
+        show_legal_information=show_legal_information,
         created_by=user,
         loading_order=active_loading,
         **snapshot_values,
@@ -259,15 +263,23 @@ def create_sale(*, client, lines, discount=0, tax_rate=0, payment_type=Sale.CASH
         )
         sale_line._stock_user = user
         sale_line.save()
-    if pay_full and total > 0:
-        Payment.objects.create(sale=sale, amount=total, payment_type=payment_type, created_by=user)
+    payment_amount = total if pay_full else (
+        money(initial_payment_amount) if initial_payment_amount is not None else Decimal('0.00')
+    )
+    if payment_amount < 0 or payment_amount > total:
+        raise ValidationError({'amount_received': _('Le montant reçu doit être compris entre 0 et le total.')})
+    if initial_payment_amount is not None and not pay_full and not Decimal('0.00') < payment_amount < total:
+        raise ValidationError({'amount_received': _('Un paiement partiel doit être strictement positif et inférieur au total.')})
+    if payment_amount > 0:
+        Payment.objects.create(sale=sale, amount=payment_amount, payment_type=payment_type, created_by=user)
     return sale
 
 
 @transaction.atomic
 def update_sale(
     *, sale, client=None, lines=None, discount=None, tax_rate=None,
-    payment_type=None, user=None, pay_full=False,
+    payment_type=None, user=None, pay_full=False, initial_payment_amount=None,
+    show_legal_information=None,
 ):
     """Update a sale while leaving every stock mutation to the domain models.
 
@@ -416,6 +428,8 @@ def update_sale(
     sale.discount = discount
     sale.tax_rate = tax_rate
     sale.payment_type = payment_type
+    if show_legal_information is not None:
+        sale.show_legal_information = show_legal_information
     sale.total = total
     sale.payment_tracking_initialized = True
     for field, value in _invoice_snapshot_values(
@@ -438,10 +452,19 @@ def update_sale(
             replacement._stock_user = user
             replacement.save()
 
-    if pay_full and sale.balance_due > 0:
+    list(Payment.objects.select_for_update().filter(sale=sale).order_by('pk'))
+    remaining = sale.balance_due
+    payment_amount = remaining if pay_full else (
+        money(initial_payment_amount) if initial_payment_amount is not None else Decimal('0.00')
+    )
+    if payment_amount < 0 or payment_amount > remaining:
+        raise ValidationError({'amount_received': _('Le montant reçu dépasse le reste à payer.')})
+    if initial_payment_amount is not None and not pay_full and not Decimal('0.00') < payment_amount < remaining:
+        raise ValidationError({'amount_received': _('Un paiement partiel doit être strictement positif et inférieur au reste à payer.')})
+    if payment_amount > 0:
         Payment.objects.create(
             sale=sale,
-            amount=sale.balance_due,
+            amount=payment_amount,
             payment_type=payment_type,
             created_by=user,
         )

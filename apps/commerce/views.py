@@ -163,6 +163,8 @@ def sale_create(request):
                 payment_type=form.cleaned_data['payment_type'],
                 user=request.user,
                 pay_full=form.cleaned_data['settlement_action'] == SaleForm.PAY_FULL,
+                initial_payment_amount=form.cleaned_data.get('amount_received'),
+                show_legal_information=form.cleaned_data['show_legal_information'],
             )
         except ValidationError as exc:
             _add_stock_error(form, exc)
@@ -243,13 +245,28 @@ def sale_update(request, pk):
         else:
             try:
                 with transaction.atomic():
+                    Sale.objects.select_for_update().get(pk=sale.pk)
+                    list(Payment.objects.select_for_update().filter(sale=sale).order_by('pk'))
                     sale.payment_tracking_initialized = True
+                    sale.show_legal_information = form.cleaned_data['show_legal_information']
                     sale.save()
                     _set_formset_stock_user(formset, request.user)
                     formset.save()
                     refresh_invoice_snapshot(sale)
-                    if form.cleaned_data['settlement_action'] == SaleForm.PAY_FULL:
+                    remaining = _money(sale.balance_due)
+                    action = form.cleaned_data['settlement_action']
+                    if action == SaleForm.PAY_FULL:
                         _record_remaining_sale_payment(sale, request.user)
+                    elif action == SaleForm.PAY_PARTIAL:
+                        amount = _money(form.cleaned_data['amount_received'])
+                        if not Decimal('0.00') < amount < remaining:
+                            raise ValidationError(
+                                _('Un paiement partiel doit être strictement positif et inférieur au reste à payer.')
+                            )
+                        Payment.objects.create(
+                            sale=sale, amount=amount, payment_type=sale.payment_type,
+                            created_by=request.user,
+                        )
             except ValidationError as exc:
                 _add_stock_error(form, exc)
             else:

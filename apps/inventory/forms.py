@@ -7,7 +7,47 @@ from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from apps.core.security import validate_excel_upload
 from apps.commerce.widgets import ProductAutocomplete
-from .models import Brand, Client, LoadingOrder, LoadingOrderLine, Product, ProductPackaging, StockMovement, Supplier, Unit
+from .models import Brand, Category, Client, LoadingOrder, LoadingOrderLine, Product, ProductPackaging, StockMovement, Supplier, Unit
+
+
+class CategoryForm(forms.ModelForm):
+    class Meta:
+        model = Category
+        fields = ('name',)
+        widgets = {'name': forms.TextInput(attrs={'class': 'form-control', 'autocomplete': 'off'})}
+
+    def clean_name(self):
+        name = ' '.join((self.cleaned_data.get('name') or '').split())
+        if not name:
+            raise ValidationError(_('Le nom de la catégorie est obligatoire.'))
+        duplicate = Category.objects.filter(name__iexact=name)
+        if self.instance.pk:
+            duplicate = duplicate.exclude(pk=self.instance.pk)
+        if duplicate.exists():
+            raise ValidationError(_('Une catégorie portant ce nom existe déjà.'))
+        return name
+
+
+class CategoryDeleteForm(forms.Form):
+    replacement = forms.ModelChoiceField(
+        label=_('Réaffecter les produits vers'),
+        queryset=Category.objects.none(),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+    )
+
+    def __init__(self, *args, category=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.category = category
+        self.fields['replacement'].queryset = Category.objects.exclude(
+            pk=getattr(category, 'pk', None),
+        ).order_by('name')
+
+    def clean_replacement(self):
+        replacement = self.cleaned_data.get('replacement')
+        if self.category and self.category.products.exists() and replacement is None:
+            raise ValidationError(_('Choisissez une catégorie de remplacement.'))
+        return replacement
 
 class ProductForm(forms.ModelForm):
     STOCK_BASE = 'base'

@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
+from decimal import Decimal
 from unittest import skipUnless
 from uuid import uuid4
 
@@ -443,7 +444,11 @@ class PostgreSQLIdempotencyConcurrencyTests(TransactionTestCase):
         try:
             response = client.post(
                 reverse('api-sale-list'),
-                {'client': self.customer.pk, 'items': [{'product': self.product.pk, 'quantity': 2}]},
+                {
+                    'client': self.customer.pk,
+                    'amount_received': '10.00',
+                    'items': [{'product': self.product.pk, 'quantity': 2}],
+                },
                 format='json', HTTP_IDEMPOTENCY_KEY=self.key,
             )
             return response.status_code, response.json()
@@ -456,5 +461,8 @@ class PostgreSQLIdempotencyConcurrencyTests(TransactionTestCase):
         self.assertEqual([status for status, _ in results], [201, 201])
         self.assertEqual(results[0][1]['data']['id'], results[1][1]['data']['id'])
         self.assertEqual(Sale.objects.count(), 1)
+        sale = Sale.objects.get()
+        self.assertEqual(sale.payments.count(), 1)
+        self.assertEqual(sale.amount_paid, Decimal('10.00'))
         self.product.refresh_from_db()
         self.assertEqual(self.product.quantity, 8)

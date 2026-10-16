@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django import forms
 from django.core.exceptions import ValidationError
 from django.forms import BaseInlineFormSet, inlineformset_factory
@@ -48,26 +50,34 @@ class PurchaseForm(forms.ModelForm):
 
 class SaleForm(forms.ModelForm):
     PAY_FULL = 'pay_full'
+    PAY_PARTIAL = 'pay_partial'
     NO_PAYMENT = 'no_payment'
     settlement_action = forms.ChoiceField(
         label=_('Règlement à l’enregistrement'),
         choices=(
-            (PAY_FULL, _('Régler intégralement maintenant')),
             (NO_PAYMENT, _('Ne pas ajouter de règlement maintenant')),
+            (PAY_PARTIAL, _('Régler partiellement maintenant')),
+            (PAY_FULL, _('Régler intégralement maintenant')),
         ),
         initial=PAY_FULL,
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'}),
     )
+    amount_received = forms.DecimalField(
+        label=_('Montant reçu'), required=False, min_value=Decimal('0.01'),
+        max_digits=14, decimal_places=2,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0.01'}),
+    )
 
     class Meta:
         model = Sale
-        fields = ['client', 'discount', 'tax_rate', 'payment_type']
+        fields = ['client', 'discount', 'tax_rate', 'payment_type', 'show_legal_information']
         widgets = {
             'client': forms.Select(attrs={'class': 'form-select'}),
             'discount': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'tax_rate': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'payment_type': forms.Select(attrs={'class': 'form-select'}),
+            'show_legal_information': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -93,6 +103,16 @@ class SaleForm(forms.ModelForm):
     def clean_payment_type(self):
         """Keep legacy/API posts deterministic when the optional field is absent."""
         return self.cleaned_data.get('payment_type') or Sale.CASH
+
+    def clean(self):
+        cleaned = super().clean()
+        action = cleaned.get('settlement_action')
+        amount = cleaned.get('amount_received')
+        if action == self.PAY_PARTIAL and amount is None:
+            self.add_error('amount_received', _('Le montant reçu est obligatoire pour un paiement partiel.'))
+        elif action != self.PAY_PARTIAL:
+            cleaned['amount_received'] = None
+        return cleaned
 
 
 class PaymentForm(forms.ModelForm):

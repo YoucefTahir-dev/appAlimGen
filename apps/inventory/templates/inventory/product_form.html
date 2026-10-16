@@ -27,7 +27,7 @@
                 </div>
                 <div class="row g-3">
                     <div class="col-md-8">{{ form.name.label_tag }}{{ form.name }}{{ form.name.errors }}</div>
-                    <div class="col-md-4">{{ form.category.label_tag }}{{ form.category }}{{ form.category.errors }}</div>
+                    <div class="col-md-4">{{ form.category.label_tag }}<div class="input-group">{{ form.category }}<button class="btn btn-outline-success" type="button" id="quick-category-open" aria-label="{% trans 'Nouvelle catégorie' %}"><i class="bi bi-plus-lg"></i></button></div>{{ form.category.errors }}<div class="invalid-feedback d-block" id="quick-category-error"></div></div>
                     {% if form.instance.pk %}
                     <div class="col-md-6"><label class="form-label">{% trans "Référence" %}</label><input type="text" class="form-control" value="{{ form.instance.reference }}" readonly></div>
                     {% endif %}
@@ -130,6 +130,9 @@
         </div>
     </div>
 </form>
+<div class="modal fade" id="quick-category-modal" tabindex="-1" aria-hidden="true" data-create-url="{% url 'category_quick_create' %}">
+  <div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h2 class="modal-title fs-5">{% trans "Nouvelle catégorie" %}</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans 'Fermer' %}"></button></div><div class="modal-body"><label class="form-label" for="quick-category-name">{% trans "Nom" %}</label><input class="form-control" id="quick-category-name" maxlength="120" autocomplete="off"><div class="text-danger small mt-1" id="quick-category-modal-error"></div></div><div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{% trans "Annuler" %}</button><button type="button" class="btn btn-success" id="quick-category-save">{% trans "Ajouter" %}</button></div></div></div>
+</div>
 {% endblock %}
 
-{% block extra_js %}{% get_static_prefix as static_prefix %}<script src="{{ static_prefix }}js/product-unit-form.js?v=1"></script>{% endblock %}
+{% block extra_js %}{% get_static_prefix as static_prefix %}<script src="{{ static_prefix }}js/product-unit-form.js?v=2"></script><script src="{{ static_prefix }}js/category-quick-create.js?v=1"></script>{% endblock %}

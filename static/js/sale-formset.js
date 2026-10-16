@@ -8,6 +8,9 @@
         const totalForms = document.getElementById('id_lines-TOTAL_FORMS');
         const saleForm = document.getElementById('sale-form');
         const clientSelect = document.getElementById('id_client');
+        const settlementSelect = document.getElementById('id_settlement_action');
+        const amountReceivedInput = document.getElementById('id_amount_received');
+        const amountReceivedField = document.getElementById('sale-amount-received-field');
 
         if (!body || !template || !addButton || !totalForms) {
             return;
@@ -25,37 +28,79 @@
         };
         let requestSequence = 0;
 
-        const money = value => `${new Intl.NumberFormat(document.documentElement.lang || 'fr', {
+        const money = cents => `${new Intl.NumberFormat(document.documentElement.lang || 'fr', {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
-        }).format(Number.isFinite(value) ? value : 0)} DZD`;
+        }).format((Number.isSafeInteger(cents) ? cents : 0) / 100)} DZD`;
 
-        function numberValue(input) {
-            const value = Number.parseFloat(String(input?.value || '').replace(',', '.'));
-            return Number.isFinite(value) ? value : 0;
+        function decimalParts(value) {
+            const normalized = String(value || '').trim().replace(',', '.');
+            const match = normalized.match(/^(-?)(\d*)(?:\.(\d*))?$/);
+            if (!match || (!match[2] && !match[3])) return null;
+            return {negative: match[1] === '-', whole: match[2] || '0', fraction: match[3] || ''};
+        }
+
+        function moneyCents(value) {
+            const parts = decimalParts(value);
+            if (!parts) return 0;
+            const digits = `${parts.fraction}000`;
+            let cents = Number.parseInt(parts.whole, 10) * 100 + Number.parseInt(digits.slice(0, 2), 10);
+            if (Number.parseInt(digits[2], 10) >= 5) cents += 1;
+            return parts.negative ? -cents : cents;
+        }
+
+        function percentBasisPoints(value) {
+            const parts = decimalParts(value);
+            if (!parts) return 0;
+            const digits = `${parts.fraction}000`;
+            let basisPoints = Number.parseInt(parts.whole, 10) * 100 + Number.parseInt(digits.slice(0, 2), 10);
+            if (Number.parseInt(digits[2], 10) >= 5) basisPoints += 1;
+            return parts.negative ? -basisPoints : basisPoints;
+        }
+
+        function inputValue(input) {
+            return input?.value || '';
+        }
+
+        function setMoney(element, cents) {
+            if (!element) return;
+            element.textContent = money(cents);
+            element.dataset.cents = String(cents);
         }
 
         function refreshTotals() {
-            let subtotal = 0;
+            let subtotalCents = 0;
             body.querySelectorAll('.sale-line-row').forEach(function (row) {
-                const quantity = numberValue(row.querySelector('[name$="-quantity"]'));
-                const price = numberValue(row.querySelector('[name$="-unit_price"]'));
+                const quantity = Number.parseInt(inputValue(row.querySelector('[name$="-quantity"]')), 10) || 0;
+                const priceCents = moneyCents(inputValue(row.querySelector('[name$="-unit_price"]')));
                 const unit = row.querySelector('[name$="-packaging"]')?.selectedOptions[0];
                 const factor = Number.parseInt(unit?.dataset.factor || '1', 10) || 1;
                 const deleted = row.querySelector('[name$="-DELETE"]')?.checked;
                 const stockQuantity = row.querySelector('.sale-stock-quantity');
                 const lineTotal = row.querySelector('.sale-line-total');
+                const lineTotalCents = deleted ? 0 : quantity * priceCents;
                 if (stockQuantity) stockQuantity.textContent = deleted ? '—' : String(quantity * factor);
-                if (lineTotal) lineTotal.textContent = money(deleted ? 0 : quantity * price);
-                if (!deleted) subtotal += quantity * price;
+                setMoney(lineTotal, lineTotalCents);
+                subtotalCents += lineTotalCents;
             });
-            const taxRate = numberValue(document.getElementById('id_tax_rate'));
-            const discount = numberValue(document.getElementById('id_discount'));
-            const tax = subtotal * taxRate / 100;
-            document.getElementById('sale-total-ht').textContent = money(subtotal);
-            document.getElementById('sale-tax-total').textContent = money(tax);
-            document.getElementById('sale-discount-total').textContent = money(discount);
-            document.getElementById('sale-total-ttc').textContent = money(subtotal + tax - discount);
+            const taxRate = percentBasisPoints(inputValue(document.getElementById('id_tax_rate')));
+            const discountCents = moneyCents(inputValue(document.getElementById('id_discount')));
+            const taxCents = Math.round(subtotalCents * taxRate / 10000);
+            const totalCents = subtotalCents + taxCents - discountCents;
+            const existingPaidCents = moneyCents(saleForm?.dataset.existingPaid || '0');
+            const newPaymentCents = settlementSelect?.value === 'pay_full'
+                ? Math.max(totalCents - existingPaidCents, 0)
+                : (settlementSelect?.value === 'pay_partial' ? moneyCents(inputValue(amountReceivedInput)) : 0);
+            const paidCents = existingPaidCents + newPaymentCents;
+            const dueCents = Math.max(totalCents - paidCents, 0);
+            setMoney(document.getElementById('sale-total-ht'), subtotalCents);
+            setMoney(document.getElementById('sale-tax-total'), taxCents);
+            setMoney(document.getElementById('sale-discount-total'), discountCents);
+            setMoney(document.getElementById('sale-total-ttc'), totalCents);
+            setMoney(document.getElementById('sale-paid-total'), paidCents);
+            setMoney(document.getElementById('sale-due-total'), dueCents);
+            if (amountReceivedField) amountReceivedField.hidden = settlementSelect?.value !== 'pay_partial';
+            if (amountReceivedInput) amountReceivedInput.required = settlementSelect?.value === 'pay_partial';
         }
 
         function setFeedback(row, message, isError) {
@@ -221,12 +266,31 @@
             });
         }
 
+        if (settlementSelect) {
+            settlementSelect.addEventListener('change', refreshTotals);
+        }
+
         saleForm.addEventListener('input', function (event) {
             if (event.target.matches('input[name$="-unit_price"]')) {
                 event.target.closest('.sale-line-row').dataset.priceRequest = '';
                 event.target.removeAttribute('aria-busy');
             }
             refreshTotals();
+        });
+
+        // A rapid double click must not create the sale (and its initial
+        // payment) twice.  Native constraint validation runs before this
+        // event, so the guard is armed only for a genuinely submitted form.
+        let submissionStarted = false;
+        saleForm.addEventListener('submit', function (event) {
+            if (submissionStarted) {
+                event.preventDefault();
+                return;
+            }
+            submissionStarted = true;
+            saleForm.querySelectorAll('button[type="submit"], input[type="submit"]').forEach(function (button) {
+                button.disabled = true;
+            });
         });
 
         addButton.addEventListener('click', function () {

@@ -30,9 +30,19 @@ from .views import (
     loading_order_list,
     loading_order_update,
     loading_order_validate,
+    category_list,
+    category_create,
+    category_quick_create,
+    category_update,
+    category_delete,
 )
 
 urlpatterns = [
+    path('categories/', category_list, name='category_list'),
+    path('categories/new/', category_create, name='category_create'),
+    path('categories/quick-create/', category_quick_create, name='category_quick_create'),
+    path('categories/<int:pk>/edit/', category_update, name='category_update'),
+    path('categories/<int:pk>/delete/', category_delete, name='category_delete'),
     path('loading-orders/', loading_order_list, name='loading_order_list'),
     path('loading-orders/new/', loading_order_create, name='loading_order_create'),
     path('loading-orders/<int:pk>/edit/', loading_order_update, name='loading_order_update'),

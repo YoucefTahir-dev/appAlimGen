@@ -1,0 +1,28 @@
+{% extends 'base/base.html' %}
+{% load i18n access_tags %}
+{% block title %}{% trans "Catégories" %} - El Amine ERP{% endblock %}
+{% block page_title %}{% trans "Catégories de produits" %}{% endblock %}
+{% block content %}
+<div class="card card-dashboard p-4">
+  {% has_access 'inventory.add_product' as can_add_category %}
+  {% has_access 'inventory.change_product' as can_change_category %}
+  {% has_access 'inventory.delete_product' as can_delete_category %}
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <p class="text-muted mb-0">{% trans "Créez et renommez librement les catégories sans modifier les produits." %}</p>
+    {% if can_add_category %}<a class="btn btn-success" href="{% url 'category_create' %}"><i class="bi bi-plus-lg"></i> {% trans "Ajouter" %}</a>{% endif %}
+  </div>
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead><tr><th>{% trans "Nom" %}</th><th>{% trans "Produits" %}</th><th>{% trans "Actions" %}</th></tr></thead>
+      <tbody>
+      {% for category in categories %}
+        <tr><td>{{ category.name }}</td><td>{{ category.product_count }}</td><td>
+          {% if can_change_category %}<a class="btn btn-sm btn-outline-primary" href="{% url 'category_update' category.pk %}">{% trans "Modifier" %}</a>{% endif %}
+          {% if can_delete_category %}<a class="btn btn-sm btn-outline-danger" href="{% url 'category_delete' category.pk %}">{% trans "Supprimer" %}</a>{% endif %}
+        </td></tr>
+      {% empty %}<tr><td colspan="3" class="text-center text-muted">{% trans "Aucune catégorie." %}</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

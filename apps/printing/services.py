@@ -130,6 +130,7 @@ def invoice_print_data(sale, *, paper_width=80, language='bilingual'):
             'language': language,
             'paper_width': paper_width,
             'characters_per_line': 32 if paper_width == 58 else 48,
+            'show_legal_information': sale.show_legal_information,
             'company': {
                 'name_fr': company.company_name,
                 'name_ar': context['company_name_ar'],
