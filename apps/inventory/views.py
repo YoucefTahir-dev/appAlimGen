@@ -8,7 +8,7 @@ from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models import Count, Exists, OuterRef, Q
 from django.db.models.deletion import ProtectedError
 from django.http import HttpResponse, JsonResponse
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 from django.shortcuts import render, get_object_or_404, redirect
 from apps.accounts.permissions import manager_required, seller_required, permission_required, has_permission
 from apps.core.security import log_security_event
@@ -223,6 +223,17 @@ def category_quick_create(request):
         return JsonResponse({'id': category.pk, 'name': category.name}, status=201)
     return JsonResponse({'errors': form.errors.get_json_data()}, status=400)
 
+
+def _add_product_validation_errors(form, exc, fallback='quantity'):
+    if hasattr(exc, 'error_dict'):
+        for field_name, errors in exc.error_dict.items():
+            target = field_name if field_name in form.fields else fallback
+            for error in errors:
+                form.add_error(target, error)
+        return
+    for error in exc.error_list:
+        form.add_error(fallback, error)
+
 @manager_required
 def product_create(request):
     form = ProductForm(request.POST or None, request.FILES or None)
@@ -251,8 +262,12 @@ def product_create(request):
                 carton_form=carton_form,
             )
         except ValidationError as exc:
-            for error in exc.messages:
-                form.add_error('quantity', error)
+            _add_product_validation_errors(form, exc)
+        except IntegrityError:
+            form.add_error(
+                'barcode',
+                _('Ce code-barres vient d’être utilisé. Générez-en un autre.'),
+            )
         else:
             messages.success(request, _('Produit ajouté avec succès.'))
             if getattr(product, '_generated_media_errors', None):
@@ -269,6 +284,13 @@ def product_create(request):
         'packaging_formset': packaging_formset, 'title': _('Ajouter un produit'),
     })
 
+
+@require_GET
+@permission_required('inventory.add_product')
+def product_generate_barcode(request):
+    """Return a non-reserved internal EAN-13 suggestion for the Web editor."""
+    return JsonResponse({'barcode': Product.generate_available_barcode()})
+
 @require_POST
 @permission_required('inventory.add_product', 'commerce.add_purchase')
 def product_quick_create(request):
@@ -277,7 +299,8 @@ def product_quick_create(request):
         try:
             product = create_product_from_form(form, user=request.user)
         except ValidationError as exc:
-            form.add_error(None, exc)
+            for message in exc.messages:
+                form.add_error(None, message)
         except IntegrityError:
             form.add_error(None, _('Ce produit existe déjà.'))
         else:
@@ -317,7 +340,6 @@ def product_update(request, pk):
     if form_valid and carton_valid and packaging_valid:
         try:
             with transaction.atomic():
-                target_quantity = form.stock_quantity_in_base(carton_form)
                 locked_product = Product.objects.select_for_update().get(pk=product.pk)
                 form.instance.quantity = locked_product.quantity
                 saved_product = form.save()
@@ -330,19 +352,13 @@ def product_update(request, pk):
                     carton_form.save_for(saved_product)
                 elif saved_product.unit_mode == Product.UnitMode.PIECE_ONLY:
                     CartonConfigurationForm.disable_for(saved_product)
-                if target_quantity != locked_product.quantity:
-                    record_stock_movement(
-                        product=saved_product,
-                        movement_type=StockMovement.ADJUSTMENT,
-                        quantity=target_quantity,
-                        reason=_('Modification du stock depuis la fiche produit'),
-                        user=request.user,
-                        source_type=StockMovement.SOURCE_PRODUCT,
-                        source_reference=saved_product.reference,
-                    )
         except ValidationError as exc:
-            for error in exc.messages:
-                form.add_error('quantity', error)
+            _add_product_validation_errors(form, exc)
+        except IntegrityError:
+            form.add_error(
+                'barcode',
+                _('Ce code-barres vient d’être utilisé. Générez-en un autre.'),
+            )
         else:
             messages.success(request, _('Produit mis à jour.'))
             return redirect('product_list')

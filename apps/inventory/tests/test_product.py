@@ -31,7 +31,7 @@ class ProductModelTests(TestCase):
             minimum_stock=1,
         )
         self.assertTrue(p.reference.startswith('PRD-'))
-        self.assertTrue(p.barcode.startswith('BC-PRD-'))
+        self.assertTrue(Product.is_valid_ean13(p.barcode))
         self.assertIsNotNone(p.barcode_image)
         self.assertTrue(default_storage.exists(p.barcode_image.name))
         self.assertIsNotNone(p.qr_code)
@@ -53,7 +53,7 @@ class ProductModelTests(TestCase):
         p = Product.objects.filter(name='View Product').first()
         self.assertIsNotNone(p)
         self.assertTrue(p.reference.startswith('PRD-'))
-        self.assertTrue(p.barcode.startswith('BC-PRD-'))
+        self.assertTrue(Product.is_valid_ean13(p.barcode))
         self.assertIsNotNone(p.barcode_image)
         self.assertTrue(default_storage.exists(p.barcode_image.name))
         self.assertIsNotNone(p.qr_code)
@@ -83,7 +83,7 @@ class ProductModelTests(TestCase):
         self.assertEqual(response.status_code, 200)
         product = Product.objects.get(name='Product Without Generated Media')
         self.assertTrue(product.reference.startswith('PRD-'))
-        self.assertTrue(product.barcode.startswith('BC-PRD-'))
+        self.assertTrue(Product.is_valid_ean13(product.barcode))
         self.assertFalse(product.barcode_image)
         self.assertFalse(product.qr_code)
         self.assertEqual(product.quantity, 2)
@@ -128,3 +128,54 @@ class ProductModelTests(TestCase):
         response = self.client.get(reverse('product_barcode_download', args=[product.pk]))
         self.assertEqual(response.status_code, 200)
         self.assertIn('attachment', response['Content-Disposition'])
+
+    def test_internal_ean13_has_a_valid_check_digit(self):
+        barcode = Product._generate_barcode('PRD-2026-000123')
+        self.assertRegex(barcode, r'^29\d{11}$')
+        self.assertTrue(Product.is_valid_ean13(barcode))
+        self.assertFalse(Product.is_valid_ean13(f'{barcode[:12]}{(int(barcode[-1]) + 1) % 10}'))
+
+    def test_product_create_proposes_and_preserves_manual_ean13(self):
+        self.client.login(username='tester', password='pass')
+        response = self.client.get(reverse('product_create'))
+        proposed = response.context['form'].initial['barcode']
+        self.assertTrue(Product.is_valid_ean13(proposed))
+
+        manual = Product.ean13_from_body('290000000123')
+        response = self.client.post(reverse('product_create'), {
+            'name': 'Manual Barcode', 'barcode': manual,
+            'purchase_price': '5.00', 'sale_price': '8.00',
+            'quantity': '0', 'minimum_stock': '0',
+        })
+        self.assertEqual(response.status_code, 302, response.context)
+        self.assertEqual(Product.objects.get(name='Manual Barcode').barcode, manual)
+
+    def test_generate_another_barcode_endpoint_returns_distinct_valid_values(self):
+        self.client.login(username='tester', password='pass')
+        url = reverse('product_generate_barcode')
+        values = {self.client.get(url).json()['barcode'] for _ in range(3)}
+        self.assertEqual(len(values), 3)
+        self.assertTrue(all(Product.is_valid_ean13(value) for value in values))
+
+    def test_invalid_or_duplicate_manual_barcode_is_rejected(self):
+        self.client.login(username='tester', password='pass')
+        existing = Product.objects.create(
+            name='Existing EAN', category=self.cat, brand=self.brand, unit=self.unit,
+            barcode=Product.ean13_from_body('290000000456'),
+            purchase_price='10.00', sale_price='15.00', quantity=0,
+        )
+        base = {
+            'purchase_price': '10.00', 'sale_price': '15.00',
+            'quantity': '0', 'minimum_stock': '0',
+        }
+        invalid = self.client.post(reverse('product_create'), {
+            **base, 'name': 'Invalid EAN', 'barcode': '2900000004560',
+        })
+        self.assertEqual(invalid.status_code, 200)
+        self.assertIn('barcode', invalid.context['form'].errors)
+
+        duplicate = self.client.post(reverse('product_create'), {
+            **base, 'name': 'Duplicate EAN', 'barcode': existing.barcode,
+        })
+        self.assertEqual(duplicate.status_code, 200)
+        self.assertIn('barcode', duplicate.context['form'].errors)

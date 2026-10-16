@@ -7,10 +7,12 @@
 
 {% block content %}
 <form method="post" enctype="multipart/form-data" id="product-unit-form" class="product-editor"
+      data-generate-barcode-url="{% url 'product_generate_barcode' %}"
       data-factor-prompt="{% trans 'Renseignez le nombre de pièces par carton.' %}"
       data-equivalence-template="{% trans '1 carton = __FACTOR__ pièce(s)' %}"
       data-carton-conversion-template="{% trans '__ENTERED__ carton(s) × __FACTOR__ = __BASE__ pièce(s)' %}"
       data-piece-conversion-template="{% trans '__BASE__ pièce(s)' %}"
+      data-mixed-conversion-template="{% trans '__CARTONS__ carton(s) × __FACTOR__ + __PIECES__ pièce(s) = __BASE__ pièce(s)' %}"
       data-cost-template="{% trans 'Coût indicatif : __COST__ DZD/pièce. Le prix pièce saisi reste inchangé.' %}"
       data-cost-prompt="{% trans 'Le coût pièce indicatif sera calculé sans remplacer votre saisie.' %}"
       data-new-product="{% trans 'Nouveau produit' %}"
@@ -31,7 +33,12 @@
                     {% if form.instance.pk %}
                     <div class="col-md-6"><label class="form-label">{% trans "Référence" %}</label><input type="text" class="form-control" value="{{ form.instance.reference }}" readonly></div>
                     {% endif %}
-                    <div class="col-md-6">{{ form.barcode_display.label_tag }}{{ form.barcode_display }}{{ form.barcode_display.errors }}</div>
+                    <div class="col-md-6">
+                        {{ form.barcode.label_tag }}
+                        <div class="input-group">{{ form.barcode }}<button class="btn btn-outline-primary" type="button" id="generate-product-barcode"><i class="bi bi-arrow-clockwise me-1"></i>{% trans "Générer un autre code" %}</button></div>
+                        {{ form.barcode.errors }}
+                        <div class="form-text">{% trans "EAN-13 interne (préfixe 29), non présenté comme un identifiant GS1 attribué." %}</div>
+                    </div>
                     <div class="col-md-6">{{ form.brand_text.label_tag }}{{ form.brand_text }}{{ form.brand_text.errors }}</div>
                     <div class="col-md-6">{{ form.photo.label_tag }}{{ form.photo }}{{ form.photo.errors }}</div>
                 </div>
@@ -51,6 +58,10 @@
                 <div class="row g-3">
                     <div class="col-md-6">{{ form.purchase_price.label_tag }}{{ form.purchase_price }}{{ form.purchase_price.errors }}<div class="form-text">{% trans "Prix d’achat de référence par pièce." %}</div></div>
                     <div class="col-md-6 carton-field">{{ carton_form.reference_purchase_price.label_tag }}{{ carton_form.reference_purchase_price }}{{ carton_form.reference_purchase_price.errors }}<div class="form-text" id="piece-cost-hint"></div></div>
+                    <div class="col-12 carton-field price-conversion-actions" data-piece-id="id_purchase_price" data-carton-id="id_carton-reference_purchase_price">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-price-convert="piece-to-carton"><i class="bi bi-arrow-right"></i> {% trans "Pièce vers carton" %}</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-price-convert="carton-to-piece"><i class="bi bi-arrow-left"></i> {% trans "Carton vers pièce" %}</button>
+                    </div>
                 </div>
             </section>
 
@@ -58,23 +69,29 @@
                 <div class="product-section-heading"><span class="product-section-icon"><i class="bi bi-tags"></i></span><div><h2>{% trans "Prix de vente" %}</h2><p>{% trans "Les prix carton et pièce sont indépendants pour chaque niveau tarifaire." %}</p></div></div>
                 <div class="table-responsive pricing-matrix-wrap">
                     <table class="table pricing-matrix align-middle mb-0">
-                        <thead><tr><th>{% trans "Niveau" %}</th><th>{% trans "Prix pièce" %}</th><th class="carton-field">{% trans "Prix carton" %}</th></tr></thead>
+                        <thead><tr><th>{% trans "Niveau" %}</th><th>{% trans "Prix pièce" %}</th><th class="carton-field">{% trans "Conversion" %}</th><th class="carton-field">{% trans "Prix carton" %}</th></tr></thead>
                         <tbody>
-                            <tr><th>{% trans "Super gros" %}</th><td>{{ form.super_wholesale_price }}{{ form.super_wholesale_price.errors }}</td><td class="carton-field">{{ carton_form.super_wholesale_price }}{{ carton_form.super_wholesale_price.errors }}</td></tr>
-                            <tr><th>{% trans "Gros" %}</th><td>{{ form.wholesale_price }}{{ form.wholesale_price.errors }}</td><td class="carton-field">{{ carton_form.wholesale_price }}{{ carton_form.wholesale_price.errors }}</td></tr>
-                            <tr><th>{% trans "Détail" %}</th><td>{{ form.retail_price }}{{ form.retail_price.errors }}</td><td class="carton-field">{{ carton_form.retail_price }}{{ carton_form.retail_price.errors }}</td></tr>
+                            <tr data-piece-id="id_super_wholesale_price" data-carton-id="id_carton-super_wholesale_price"><th>{% trans "Super gros" %}</th><td>{{ form.super_wholesale_price }}{{ form.super_wholesale_price.errors }}</td><td class="carton-field price-conversion-actions"><button type="button" class="btn btn-sm btn-outline-secondary" data-price-convert="piece-to-carton" title="{% trans 'Pièce vers carton' %}">→</button><button type="button" class="btn btn-sm btn-outline-secondary" data-price-convert="carton-to-piece" title="{% trans 'Carton vers pièce' %}">←</button></td><td class="carton-field">{{ carton_form.super_wholesale_price }}{{ carton_form.super_wholesale_price.errors }}</td></tr>
+                            <tr data-piece-id="id_wholesale_price" data-carton-id="id_carton-wholesale_price"><th>{% trans "Gros" %}</th><td>{{ form.wholesale_price }}{{ form.wholesale_price.errors }}</td><td class="carton-field price-conversion-actions"><button type="button" class="btn btn-sm btn-outline-secondary" data-price-convert="piece-to-carton" title="{% trans 'Pièce vers carton' %}">→</button><button type="button" class="btn btn-sm btn-outline-secondary" data-price-convert="carton-to-piece" title="{% trans 'Carton vers pièce' %}">←</button></td><td class="carton-field">{{ carton_form.wholesale_price }}{{ carton_form.wholesale_price.errors }}</td></tr>
+                            <tr data-piece-id="id_retail_price" data-carton-id="id_carton-retail_price"><th>{% trans "Détail" %}</th><td>{{ form.retail_price }}{{ form.retail_price.errors }}</td><td class="carton-field price-conversion-actions"><button type="button" class="btn btn-sm btn-outline-secondary" data-price-convert="piece-to-carton" title="{% trans 'Pièce vers carton' %}">→</button><button type="button" class="btn btn-sm btn-outline-secondary" data-price-convert="carton-to-piece" title="{% trans 'Carton vers pièce' %}">←</button></td><td class="carton-field">{{ carton_form.retail_price }}{{ carton_form.retail_price.errors }}</td></tr>
                         </tbody>
                     </table>
                 </div>
+                <div class="form-text mt-2 carton-field">{% trans "Les flèches appliquent une conversion ponctuelle. Vos prix personnalisés ne sont jamais remplacés silencieusement, y compris lorsque le facteur change." %}</div>
                 <div class="mt-3 carton-field">{{ carton_form.barcode.label_tag }}{{ carton_form.barcode }}{{ carton_form.barcode.errors }}</div>
             </section>
 
             <section class="card card-dashboard product-section mb-4">
                 <div class="product-section-heading"><span class="product-section-icon"><i class="bi bi-archive"></i></span><div><h2>{% if form.instance.pk %}{% trans "Stock physique" %}{% else %}{% trans "Stock initial" %}{% endif %}</h2><p>{% trans "La conversion est calculée avant l’écriture dans le journal de stock." %}</p></div></div>
                 <div class="row g-3">
-                    <div class="col-md-6">{{ form.quantity.label_tag }}{{ form.quantity }}{{ form.quantity.errors }}</div>
-                    <div class="col-md-6">{{ form.stock_unit.label_tag }}{{ form.stock_unit }}{{ form.stock_unit.errors }}</div>
+                    {{ form.quantity }}{{ form.quantity.errors }}
+                    {% if form.instance.pk %}
+                    <div class="col-12"><div class="stock-conversion-preview"><strong>{% trans "Stock actuel" %} :</strong> {{ form.instance.format_stock_quantity }}</div><div class="form-text mt-2">{% trans "Le stock réel n’est jamais modifié depuis cette fiche." %} <a href="{% url 'stock_movement_create' %}">{% trans "Effectuer un ajustement de stock distinct" %}</a>.</div></div>
+                    {% else %}
+                    <div class="col-md-6 initial-carton-field">{{ form.initial_cartons.label_tag }}{{ form.initial_cartons }}{{ form.initial_cartons.errors }}</div>
+                    <div class="col-md-6"><label class="form-label" for="{{ form.initial_pieces.id_for_label }}" id="initial-pieces-label">{% trans "Quantité initiale en pièces" %}</label>{{ form.initial_pieces }}{{ form.initial_pieces.errors }}<div class="form-text carton-field">{% trans "En mode carton uniquement, ce reliquat reste comptabilisé en interne mais n’est pas vendable à la pièce." %}</div></div>
                     <div class="col-12"><div class="stock-conversion-preview" id="stock-conversion-preview">—</div></div>
+                    {% endif %}
                     <div class="col-md-6">{{ form.minimum_stock.label_tag }}{{ form.minimum_stock }}{{ form.minimum_stock.errors }}<div class="form-text">{{ form.minimum_stock.help_text }}</div></div>
                 </div>
             </section>
@@ -135,4 +152,4 @@
 </div>
 {% endblock %}
 
-{% block extra_js %}{% get_static_prefix as static_prefix %}<script src="{{ static_prefix }}js/product-unit-form.js?v=2"></script><script src="{{ static_prefix }}js/category-quick-create.js?v=1"></script>{% endblock %}
+{% block extra_js %}{% get_static_prefix as static_prefix %}<script src="{{ static_prefix }}js/product-unit-form.js?v=3"></script><script src="{{ static_prefix }}js/category-quick-create.js?v=1"></script>{% endblock %}

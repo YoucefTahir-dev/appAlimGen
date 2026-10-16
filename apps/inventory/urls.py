@@ -2,6 +2,7 @@ from django.urls import path
 from .views import (
     product_list,
     product_create,
+    product_generate_barcode,
     product_quick_create,
     product_update,
     product_delete,
@@ -51,6 +52,7 @@ urlpatterns = [
     path('loading-orders/<int:pk>/close/', loading_order_close, name='loading_order_close'),
     path('products/', product_list, name='product_list'),
     path('products/new/', product_create, name='product_create'),
+    path('products/generate-barcode/', product_generate_barcode, name='product_generate_barcode'),
     path('products/quick-create/', product_quick_create, name='product_quick_create'),
     path('products/<int:pk>/edit/', product_update, name='product_update'),
     path('products/<int:pk>/delete/', product_delete, name='product_delete'),

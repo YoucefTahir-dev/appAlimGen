@@ -441,6 +441,8 @@ body.rtl .text-end {
 .pricing-matrix-wrap { border: 1px solid var(--bs-border-color); border-radius: .85rem; }
 .pricing-matrix th { background: #f7faf8; }
 .pricing-matrix input { min-width: 10rem; }
+.price-conversion-actions { display: flex; flex-wrap: wrap; gap: .4rem; justify-content: center; }
+.pricing-matrix .price-conversion-actions { min-width: 6.5rem; }
 .product-preview-card { top: 1rem; padding: 1.5rem; overflow: hidden; background: linear-gradient(155deg, #123f31, #176d50); color: #fff; }
 .preview-kicker { text-transform: uppercase; letter-spacing: .08em; font-size: .72rem; opacity: .75; }
 .product-preview-card h2 { margin: .45rem 0 .1rem; font-size: 1.45rem; overflow-wrap: anywhere; }

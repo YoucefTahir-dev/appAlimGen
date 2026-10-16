@@ -21,7 +21,7 @@ from playwright.sync_api import expect, sync_playwright
     },
 )
 class ProductUnitFormBrowserTests(StaticLiveServerTestCase):
-    def test_carton_preview_updates_without_overwriting_piece_price(self):
+    def test_price_conversions_and_mixed_stock_are_explicit_and_safe(self):
         user = get_user_model().objects.create_user(
             username='product-unit-browser', password='StrongPass123!', role='manager',
         )
@@ -43,19 +43,38 @@ class ProductUnitFormBrowserTests(StaticLiveServerTestCase):
 
                 expect(page.locator('#id_unit_mode option[value="legacy"]')).to_have_count(0)
                 page.select_option('#id_unit_mode', 'carton_and_piece')
-                page.fill('#id_carton-conversion_factor', '24')
-                page.fill('#id_quantity', '100')
-                page.select_option('#id_stock_unit', 'carton')
-                page.fill('#id_purchase_price', '160')
-                page.fill('#id_carton-reference_purchase_price', '4000')
+                page.fill('#id_carton-conversion_factor', '30')
+                page.fill('#id_initial_cartons', '40')
+                page.fill('#id_initial_pieces', '15')
+                page.fill('#id_carton-reference_purchase_price', '4500')
+                page.locator('#id_carton-reference_purchase_price').blur()
 
                 expect(page.locator('#carton-equivalence')).to_have_text(
-                    '1 carton = 24 pièce(s)',
+                    '1 carton = 30 pièce(s)',
                 )
                 expect(page.locator('#stock-conversion-preview')).to_contain_text(
-                    '2400 pièce(s)',
+                    '1215 pièce(s)',
                 )
-                expect(page.locator('#piece-cost-hint')).to_contain_text('166.67 DZD/pièce')
+                expect(page.locator('#id_purchase_price')).to_have_value('150.00')
+
+                page.fill('#id_purchase_price', '160')
+                page.locator('[data-piece-id="id_purchase_price"] [data-price-convert="piece-to-carton"]').click()
+                expect(page.locator('#id_carton-reference_purchase_price')).to_have_value('4800.00')
+
+                page.fill('#id_carton-reference_purchase_price', '4700')
+                page.fill('#id_carton-conversion_factor', '25')
                 expect(page.locator('#id_purchase_price')).to_have_value('160')
+                expect(page.locator('#id_carton-reference_purchase_price')).to_have_value('4700')
+
+                for piece_id, carton_id in (
+                    ('id_super_wholesale_price', 'id_carton-super_wholesale_price'),
+                    ('id_wholesale_price', 'id_carton-wholesale_price'),
+                    ('id_retail_price', 'id_carton-retail_price'),
+                ):
+                    page.fill(f'#{piece_id}', '200')
+                    page.locator(
+                        f'[data-piece-id="{piece_id}"] [data-price-convert="piece-to-carton"]'
+                    ).click()
+                    expect(page.locator(f'#{carton_id}')).to_have_value('5000.00')
             finally:
                 browser.close()

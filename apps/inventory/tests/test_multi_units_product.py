@@ -102,6 +102,38 @@ class MultiUnitProductLotOneTests(TestCase):
         self.assertEqual(movements.count(), 1)
         self.assertEqual(movements.get().applied_delta, 2400)
 
+    def test_mixed_initial_stock_is_canonical_and_recorded_once(self):
+        response = self.client.post(reverse('product_create'), self.product_payload(
+            name='Stock mixte', initial_cartons='40', initial_pieces='15',
+            **{'carton-conversion_factor': '30'},
+        ))
+        self.assertRedirects(response, reverse('product_list'))
+        product = Product.objects.get(name='Stock mixte')
+        self.assertEqual(product.quantity, 1215)
+        movements = StockMovement.objects.filter(product=product)
+        self.assertEqual(movements.count(), 1)
+        self.assertEqual(movements.get().applied_delta, 1215)
+
+    def test_carton_only_keeps_extra_pieces_as_internal_stock(self):
+        response = self.client.post(reverse('product_create'), self.product_payload(
+            name='Carton mixte interne', unit_mode=Product.UnitMode.CARTON_ONLY,
+            initial_cartons='2', initial_pieces='5',
+        ))
+        self.assertRedirects(response, reverse('product_list'))
+        product = Product.objects.get(name='Carton mixte interne')
+        self.assertEqual(product.quantity, 53)
+        self.assertEqual(product.format_stock_quantity(), '2 carton(s) et 5 pièce(s)')
+
+    def test_piece_only_uses_piece_initial_quantity(self):
+        response = self.client.post(reverse('product_create'), self.product_payload(
+            name='Pièces initiales', unit_mode=Product.UnitMode.PIECE_ONLY,
+            initial_cartons='0', initial_pieces='37',
+        ))
+        self.assertRedirects(response, reverse('product_list'))
+        product = Product.objects.get(name='Pièces initiales')
+        self.assertEqual(product.quantity, 37)
+        self.assertEqual(StockMovement.objects.get(product=product).applied_delta, 37)
+
     def test_carton_only_accepts_initial_stock_entered_in_pieces(self):
         response = self.client.post(reverse('product_create'), self.product_payload(
             name='Carton vendu entier', unit_mode=Product.UnitMode.CARTON_ONLY,
@@ -132,7 +164,35 @@ class MultiUnitProductLotOneTests(TestCase):
             product.retail_price * carton.conversion_factor,
         )
 
-    def test_carton_product_update_applies_only_the_stock_difference(self):
+    def test_carton_margin_validation_compares_carton_prices_to_carton_cost(self):
+        accepted = self.client.post(reverse('product_create'), self.product_payload(
+            name='Marge carton valide',
+            **{
+                'carton-reference_purchase_price': '4500.00',
+                'carton-super_wholesale_price': '4600.00',
+                'carton-wholesale_price': '4700.00',
+                'carton-retail_price': '4800.00',
+            },
+        ))
+        self.assertRedirects(accepted, reverse('product_list'))
+
+        rejected = self.client.post(reverse('product_create'), self.product_payload(
+            name='Marge carton invalide',
+            initial_cartons='40', initial_pieces='15',
+            **{
+                'carton-reference_purchase_price': '4500.00',
+                'carton-super_wholesale_price': '4499.99',
+                'carton-wholesale_price': '4700.00',
+                'carton-retail_price': '4800.00',
+            },
+        ))
+        self.assertEqual(rejected.status_code, 200)
+        self.assertIn('super_wholesale_price', rejected.context['carton_form'].errors)
+        self.assertEqual(rejected.context['form']['initial_cartons'].value(), '40')
+        self.assertEqual(rejected.context['form']['initial_pieces'].value(), '15')
+        self.assertFalse(Product.objects.filter(name='Marge carton invalide').exists())
+
+    def test_carton_product_update_never_reapplies_initial_stock(self):
         self.client.post(reverse('product_create'), self.product_payload())
         product = Product.objects.get(name='Chocolat test')
 
@@ -143,12 +203,31 @@ class MultiUnitProductLotOneTests(TestCase):
 
         self.assertRedirects(response, reverse('product_list'))
         product.refresh_from_db()
-        self.assertEqual(product.quantity, 2424)
+        self.assertEqual(product.quantity, 2400)
         movements = list(StockMovement.objects.filter(product=product).order_by('pk'))
-        self.assertEqual([movement.applied_delta for movement in movements], [2400, 24])
+        self.assertEqual([movement.applied_delta for movement in movements], [2400])
         self.assertEqual(
             product.packagings.filter(kind=ProductPackaging.CARTON).count(), 1,
         )
+
+    def test_factor_change_preserves_custom_prices_and_real_stock(self):
+        self.client.post(reverse('product_create'), self.product_payload())
+        product = Product.objects.get(name='Chocolat test')
+        response = self.client.post(
+            reverse('product_update', args=[product.pk]),
+            self.product_payload(
+                quantity='999', initial_cartons='99', initial_pieces='99',
+                **{'carton-conversion_factor': '30'},
+            ),
+        )
+        self.assertRedirects(response, reverse('product_list'))
+        product.refresh_from_db()
+        carton = product.packagings.get(kind=ProductPackaging.CARTON)
+        self.assertEqual(product.quantity, 2400)
+        self.assertEqual(carton.conversion_factor, 30)
+        self.assertEqual(carton.reference_purchase_price, Decimal('4000.00'))
+        self.assertEqual(carton.retail_price, Decimal('4800.00'))
+        self.assertEqual(StockMovement.objects.filter(product=product).count(), 1)
 
     def test_legacy_generic_packaging_can_still_be_created(self):
         payload = self.product_payload(

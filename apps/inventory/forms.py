@@ -58,11 +58,13 @@ class ProductForm(forms.ModelForm):
         initial=STOCK_BASE,
         widget=forms.Select(attrs={'class': 'form-select'}),
     )
-    barcode_display = forms.CharField(
-        label=_('Code-barres'),
-        required=False,
-        disabled=True,
-        widget=forms.TextInput(attrs={'class': 'form-control', 'readonly': 'readonly'})
+    initial_cartons = forms.IntegerField(
+        label=_('Cartons'), required=False, min_value=0, initial=0,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'min': 0, 'step': 1}),
+    )
+    initial_pieces = forms.IntegerField(
+        label=_('Pièces supplémentaires'), required=False, min_value=0, initial=0,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'min': 0, 'step': 1}),
     )
     brand_text = forms.CharField(
         label=_('Marque'),
@@ -75,6 +77,7 @@ class ProductForm(forms.ModelForm):
         fields = [
             'name',
             'category',
+            'barcode',
             'unit_mode',
             'purchase_price',
             'super_wholesale_price',
@@ -88,6 +91,10 @@ class ProductForm(forms.ModelForm):
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'category': forms.Select(attrs={'class': 'form-select'}),
+            'barcode': forms.TextInput(attrs={
+                'class': 'form-control', 'inputmode': 'numeric', 'maxlength': 13,
+                'autocomplete': 'off',
+            }),
             'unit_mode': forms.Select(attrs={'class': 'form-select'}),
             'purchase_price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'super_wholesale_price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': 0}),
@@ -156,14 +163,15 @@ class ProductForm(forms.ModelForm):
                 (self.STOCK_CARTON, _('Carton')),
             )
         if 'quantity' in self.fields:
-            self.fields['quantity'].label = _('Quantité de stock')
+            self.fields['quantity'].required = False
+            self.fields['quantity'].widget = forms.HiddenInput()
         if 'minimum_stock' in self.fields:
             self.fields['minimum_stock'].help_text = _('Toujours exprimé dans l’unité de base.')
-        if 'barcode_display' in self.fields:
-            self.fields['barcode_display'].initial = (
-                self.instance.barcode if self.instance and self.instance.pk
-                else _('Généré automatiquement')
-            )
+        if 'barcode' in self.fields and not self.is_bound:
+            if self.instance and self.instance.pk:
+                self.initial['barcode'] = self.instance.barcode
+            else:
+                self.initial['barcode'] = Product.generate_available_barcode()
         if 'brand_text' in self.fields and self.instance and self.instance.pk and self.instance.brand:
             self.fields['brand_text'].initial = self.instance.brand.name
 
@@ -184,7 +192,10 @@ class ProductForm(forms.ModelForm):
         cleaned_data = super().clean()
         mode = cleaned_data.get('unit_mode')
         stock_unit = cleaned_data.get('stock_unit')
-        if mode == Product.UnitMode.PIECE_ONLY and stock_unit == self.STOCK_CARTON:
+        uses_mixed_fields = self.is_bound and (
+            'initial_cartons' in self.data or 'initial_pieces' in self.data
+        )
+        if not uses_mixed_fields and mode == Product.UnitMode.PIECE_ONLY and stock_unit == self.STOCK_CARTON:
             self.add_error('stock_unit', _('Le stock en cartons exige un mode autorisant le carton.'))
         if mode == Product.UnitMode.LEGACY and stock_unit == self.STOCK_CARTON:
             self.add_error('stock_unit', _('Confirmez d’abord l’unité historique de ce produit.'))
@@ -204,6 +215,18 @@ class ProductForm(forms.ModelForm):
             )
         return cleaned_data
 
+    def clean_barcode(self):
+        barcode = (self.cleaned_data.get('barcode') or '').strip()
+        if not barcode:
+            return barcode
+        unchanged_legacy = (
+            self.instance.pk and barcode == self.instance.barcode
+            and not Product.is_valid_ean13(barcode)
+        )
+        if not unchanged_legacy and not Product.is_valid_ean13(barcode):
+            raise ValidationError(_('Saisissez un code EAN-13 numérique avec un chiffre de contrôle valide.'))
+        return barcode
+
     def _legacy_product_is_safely_piece_based(self):
         unit_name = (self.instance.unit.name if self.instance.unit_id else '').strip().casefold()
         explicitly_piece = unit_name in {'pièce', 'piece', 'pieces', 'pièces'}
@@ -217,6 +240,27 @@ class ProductForm(forms.ModelForm):
         return explicitly_piece or (self.instance.quantity == 0 and not has_history)
 
     def stock_quantity_in_base(self, carton_form=None):
+        if self.instance.pk:
+            return int(self.instance.quantity)
+
+        # New Web editor contract: one canonical quantity calculated from the
+        # two explicit inputs. Keep the legacy quantity/stock_unit fallback for
+        # old posts and integrations that do not submit these fields.
+        uses_mixed_fields = self.is_bound and (
+            'initial_cartons' in self.data or 'initial_pieces' in self.data
+        )
+        if uses_mixed_fields:
+            cartons = int(self.cleaned_data.get('initial_cartons') or 0)
+            pieces = int(self.cleaned_data.get('initial_pieces') or 0)
+            mode = self.cleaned_data.get('unit_mode')
+            if mode == Product.UnitMode.PIECE_ONLY:
+                if cartons:
+                    raise ValidationError({'initial_cartons': _('Le mode pièce uniquement n’accepte pas de cartons.')})
+                return pieces
+            if carton_form is None or not carton_form.is_valid():
+                raise ValidationError({'initial_cartons': _('Le conditionnement carton est invalide.')})
+            return cartons * int(carton_form.cleaned_data['conversion_factor']) + pieces
+
         quantity = int(self.cleaned_data.get('quantity') or 0)
         if self.cleaned_data.get('stock_unit') != self.STOCK_CARTON:
             return quantity
@@ -369,6 +413,8 @@ class QuickProductForm(ProductForm):
         # The purchase quick-create contract has no stock or packaging input;
         # the purchase line remains the sole source of its stock movement.
         self.fields.pop('stock_unit', None)
+        self.fields.pop('initial_cartons', None)
+        self.fields.pop('initial_pieces', None)
 
 
 class ProductPackagingForm(forms.ModelForm):

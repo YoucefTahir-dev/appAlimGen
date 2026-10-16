@@ -1,6 +1,8 @@
 import io
 from decimal import Decimal
 import logging
+import secrets
+import re
 
 import qrcode
 from django.conf import settings
@@ -233,13 +235,45 @@ class Product(models.Model):
 
     @classmethod
     def _generate_barcode(cls, reference):
-        return f'BC-{reference}'
+        """Build an internal-use EAN-13 from the concurrency-safe reference.
+
+        Prefix 29 is reserved here for internal catalogue identifiers.  This
+        is not presented as a GS1 allocation.  The database unique constraint
+        remains the final guard against concurrent/manual collisions.
+        """
+        digits = ''.join(re.findall(r'\d', reference or ''))[-10:].zfill(10)
+        return cls.ean13_from_body(f'29{digits}')
+
+    @staticmethod
+    def ean13_from_body(body):
+        body = ''.join(character for character in str(body) if character.isdigit())
+        if len(body) != 12:
+            raise ValueError('An EAN-13 body must contain exactly 12 digits.')
+        weighted_sum = sum(int(value) if index % 2 == 0 else int(value) * 3
+                           for index, value in enumerate(body))
+        check_digit = (10 - weighted_sum % 10) % 10
+        return f'{body}{check_digit}'
+
+    @classmethod
+    def is_valid_ean13(cls, value):
+        value = str(value or '').strip()
+        return len(value) == 13 and value.isdigit() and cls.ean13_from_body(value[:12]) == value
+
+    @classmethod
+    def generate_available_barcode(cls):
+        """Suggest an unused internal EAN-13 without reserving database state."""
+        for _attempt in range(100):
+            candidate = cls.ean13_from_body(f'29{secrets.randbelow(10 ** 10):010d}')
+            if not cls.objects.filter(barcode=candidate).exists():
+                return candidate
+        raise ValidationError(_('Impossible de générer un code-barres unique. Réessayez.'))
 
     @staticmethod
     def _build_barcode_svg(barcode_value):
+        barcode_type = 'EAN13' if Product.is_valid_ean13(barcode_value) else 'Code128'
         drawing = createBarcodeDrawing(
-            'Code128',
-            value=barcode_value,
+            barcode_type,
+            value=barcode_value[:12] if barcode_type == 'EAN13' else barcode_value,
             barHeight=44,
             humanReadable=True,
         )
@@ -261,6 +295,15 @@ class Product(models.Model):
 
         if not self.barcode and self.reference:
             self.barcode = self._generate_barcode(self.reference)
+            if Product.objects.filter(barcode=self.barcode).exclude(pk=self.pk).exists():
+                raise ValidationError({
+                    'barcode': _('Le code-barres généré existe déjà. Générez-en un autre.'),
+                })
+
+        if self.pk and self.barcode:
+            previous_barcode = Product.objects.filter(pk=self.pk).values_list('barcode', flat=True).first()
+            if previous_barcode and previous_barcode != self.barcode:
+                self.barcode_image = None
 
         if self.barcode and not self.barcode_image:
             try:

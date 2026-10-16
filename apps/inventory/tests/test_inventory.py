@@ -61,12 +61,10 @@ class InventoryViewTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.product.refresh_from_db()
         self.assertEqual(self.product.name, 'Updated Product')
-        self.assertEqual(self.product.quantity, 5)
-        movement = StockMovement.objects.get(source_type=StockMovement.SOURCE_PRODUCT)
-        self.assertEqual(movement.applied_delta, -5)
-        self.assertEqual(movement.balance_before, 10)
-        self.assertEqual(movement.balance_after, 5)
-        self.assertEqual(movement.created_by, self.user)
+        self.assertEqual(self.product.quantity, 10)
+        self.assertFalse(
+            StockMovement.objects.filter(source_type=StockMovement.SOURCE_PRODUCT).exists()
+        )
 
     def test_product_import_journals_new_and_existing_stock(self):
         workbook = openpyxl.Workbook()
