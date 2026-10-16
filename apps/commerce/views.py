@@ -1,10 +1,13 @@
 from decimal import Decimal, ROUND_HALF_UP
+import time
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import DecimalField, ExpressionWrapper, F, Sum, Value
+from django.db.models import DecimalField, ExpressionWrapper, F, Q, Sum, Value
 from django.db.models.deletion import ProtectedError
 from django.db.models.functions import Coalesce
 from django.http import HttpResponse, JsonResponse
@@ -26,6 +29,20 @@ from .product_search import commercial_products, search_products
 
 
 MONEY_QUANTUM = Decimal('0.01')
+
+
+def _client_search_rate_limited(user):
+    limit = int(getattr(settings, 'SALE_CLIENT_SEARCH_RATE_LIMIT', 60))
+    window = int(time.time()) // 60
+    key = f'sale-client-search:{user.pk}:{window}'
+    if cache.add(key, 1, timeout=70):
+        return False
+    try:
+        count = cache.incr(key)
+    except (ValueError, NotImplementedError):
+        count = int(cache.get(key, 1)) + 1
+        cache.set(key, count, timeout=70)
+    return count > limit
 
 
 def visible_sales(user, queryset=None):
@@ -54,6 +71,42 @@ def commercial_product_search(request):
     response = JsonResponse({'results': search_products(
         user=request.user, query=query, context=context, customer=customer,
     )})
+    response['Cache-Control'] = 'private, no-store'
+    return response
+
+
+@require_GET
+@permission_required('commerce.add_sale', 'commerce.change_sale', any_permission=True)
+def sale_client_search(request):
+    if _client_search_rate_limited(request.user):
+        response = JsonResponse({'error': _('Trop de recherches. Réessayez dans un instant.')}, status=429)
+        response['Retry-After'] = '60'
+        response['Cache-Control'] = 'private, no-store'
+        return response
+
+    query = request.GET.get('q', '').strip()
+    if len(query) > 100:
+        return JsonResponse({'error': _('Recherche trop longue.')}, status=400)
+    if len(query) < 2:
+        response = JsonResponse({'results': []})
+        response['Cache-Control'] = 'private, no-store'
+        return response
+
+    clients = Client.objects.filter(
+        Q(name__icontains=query)
+        | Q(phone__icontains=query)
+        | Q(tax_number__icontains=query)
+    ).only('id', 'name', 'phone', 'tax_number', 'customer_type').order_by('name', 'pk')[:20]
+    response = JsonResponse({'results': [
+        {
+            'id': client.pk,
+            'name': client.name,
+            'phone': client.phone,
+            'tax_number': client.tax_number,
+            'customer_type': client.get_customer_type_display(),
+        }
+        for client in clients
+    ]})
     response['Cache-Control'] = 'private, no-store'
     return response
 

@@ -459,9 +459,9 @@ body.rtl .text-end {
     .pricing-matrix input { min-width: 8rem; }
     .product-preview-card { position: static !important; }
 }
-.product-results { max-height: 12rem; overflow-y: auto; margin-block-start: .25rem; }
-.product-result { text-align: start; white-space: normal; overflow-wrap: anywhere; }
-.product-picker { min-width: 0; }
+.product-results, .client-results { max-height: 12rem; overflow-y: auto; margin-block-start: .25rem; }
+.product-result, .client-result { text-align: start; white-space: normal; overflow-wrap: anywhere; }
+.product-picker, .client-picker { min-width: 0; position: relative; }
 
 @media (max-width: 575.98px) {
     #loading-order-form .table-responsive { overflow: visible; }

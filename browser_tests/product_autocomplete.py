@@ -23,7 +23,8 @@ class AutocompleteBrowserTests(StaticLiveServerTestCase):
         user = get_user_model().objects.create_user(username='search-browser', role='manager')
         self.client.force_login(user)
         first = Product.objects.create(name='Chocolat Noir', purchase_price=10, sale_price=20,
-            wholesale_price=18, super_wholesale_price=15, quantity=100)
+            wholesale_price=18, super_wholesale_price=15, quantity=100,
+            unit_mode=Product.UnitMode.CARTON_AND_PIECE)
         second = Product.objects.create(name='Biscuit', purchase_price=5, sale_price=10, quantity=100)
         pack = ProductPackaging.objects.create(product=first, name='Carton', conversion_factor=2, default_sale_price=40)
         cases = [(language, Client.objects.create(name='Customer ' + language, customer_type=kind), price)
@@ -47,7 +48,9 @@ class AutocompleteBrowserTests(StaticLiveServerTestCase):
                     field = page.locator('#id_lines-0-product_search')
                     expect(field).to_have_value('')
                     self.assertEqual(searches, [])
-                    page.locator('#id_client').select_option(str(customer.pk))
+                    page.locator('#id_client_search').fill(customer.name)
+                    page.locator('#id_client_results .client-result').click()
+                    expect(page.locator('#id_client')).to_have_value(str(customer.pk))
                     field.fill('C')
                     page.wait_for_timeout(400)
                     self.assertEqual(searches, [])

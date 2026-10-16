@@ -174,3 +174,162 @@
     });
     window.ProductAutocomplete = {select, close};
 })();
+
+(function () {
+    'use strict';
+    const states = new WeakMap();
+
+    function state(picker) {
+        if (!states.has(picker)) {
+            states.set(picker, {revision: 0, timer: null, controller: null, index: -1, results: []});
+        }
+        return states.get(picker);
+    }
+
+    function closeClientPicker(picker) {
+        const current = state(picker);
+        current.revision += 1;
+        clearTimeout(current.timer);
+        if (current.controller) current.controller.abort();
+        picker.querySelector('.client-results').hidden = true;
+        const input = picker.querySelector('.client-search');
+        input.setAttribute('aria-expanded', 'false');
+        input.removeAttribute('aria-activedescendant');
+        input.removeAttribute('aria-busy');
+        current.index = -1;
+    }
+
+    function clientLabel(client) {
+        const detail = client.phone || client.tax_number;
+        return detail ? `${client.name} — ${detail}` : client.name;
+    }
+
+    function selectClient(picker, client) {
+        closeClientPicker(picker);
+        const input = picker.querySelector('.client-search');
+        const hidden = picker.querySelector('.client-id');
+        input.value = clientLabel(client);
+        input.setCustomValidity('');
+        hidden.value = String(client.id);
+        picker.querySelector('.client-search-status').textContent = '';
+        const clientType = document.getElementById('sale-client-type');
+        if (clientType) clientType.textContent = client.customer_type || '';
+        hidden.dispatchEvent(new Event('change', {bubbles: true}));
+    }
+
+    async function searchClients(picker) {
+        const current = state(picker);
+        const input = picker.querySelector('.client-search');
+        const list = picker.querySelector('.client-results');
+        const status = picker.querySelector('.client-search-status');
+        const revision = current.revision;
+        current.controller = new AbortController();
+        const controller = current.controller;
+        const timeout = setTimeout(() => controller.abort(), 8000);
+        input.setAttribute('aria-busy', 'true');
+        status.textContent = picker.dataset.loading;
+        try {
+            const query = new URLSearchParams({q: input.value.trim()});
+            const response = await fetch(`${picker.dataset.url}?${query}`, {
+                credentials: 'same-origin', headers: {'Accept': 'application/json'}, signal: controller.signal,
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const payload = await response.json();
+            if (current.revision !== revision || !picker.isConnected) return;
+            if (!Array.isArray(payload.results)) throw new Error('Invalid results');
+            current.results = payload.results.slice(0, 20);
+            current.index = -1;
+            list.replaceChildren();
+            current.results.forEach((client, index) => {
+                const option = document.createElement('button');
+                option.type = 'button';
+                option.className = 'list-group-item list-group-item-action client-result';
+                option.setAttribute('role', 'option');
+                option.setAttribute('aria-selected', 'false');
+                option.tabIndex = -1;
+                option.id = `${list.id}_${index}`;
+                option.dataset.index = String(index);
+                const title = document.createElement('span');
+                title.className = 'd-block fw-semibold';
+                title.textContent = client.name;
+                const details = document.createElement('small');
+                details.className = 'd-block text-muted';
+                details.textContent = [client.phone, client.tax_number, client.customer_type].filter(Boolean).join(' · ');
+                option.append(title, details);
+                list.appendChild(option);
+            });
+            list.hidden = current.results.length === 0;
+            input.setAttribute('aria-expanded', String(current.results.length > 0));
+            status.textContent = current.results.length ? '' : picker.dataset.empty;
+        } catch (_error) {
+            if (current.revision === revision) status.textContent = picker.dataset.error;
+        } finally {
+            clearTimeout(timeout);
+            if (current.revision === revision) input.removeAttribute('aria-busy');
+        }
+    }
+
+    document.addEventListener('input', event => {
+        if (!event.target.matches('.client-search')) return;
+        const picker = event.target.closest('.client-picker');
+        closeClientPicker(picker);
+        const hidden = picker.querySelector('.client-id');
+        hidden.value = '';
+        hidden.dispatchEvent(new Event('change', {bubbles: true}));
+        const clientType = document.getElementById('sale-client-type');
+        if (clientType) clientType.textContent = '';
+        const query = event.target.value.trim();
+        event.target.setCustomValidity(query ? picker.dataset.invalid : '');
+        picker.querySelector('.client-search-status').textContent = query.length < 2 ? picker.dataset.minimum : '';
+        if (query.length >= 2 && !event.isComposing) {
+            state(picker).timer = setTimeout(() => searchClients(picker), 300);
+        }
+    });
+
+    document.addEventListener('click', event => {
+        const option = event.target.closest('.client-result');
+        if (option) {
+            const picker = option.closest('.client-picker');
+            selectClient(picker, state(picker).results[Number(option.dataset.index)]);
+            picker.querySelector('.client-search').focus();
+        }
+        document.querySelectorAll('.client-picker').forEach(picker => {
+            if (!picker.contains(event.target)) closeClientPicker(picker);
+        });
+    });
+
+    document.addEventListener('pointerdown', event => {
+        if (event.target.closest('.client-result')) event.preventDefault();
+    });
+    document.addEventListener('focusout', event => {
+        const picker = event.target.closest('.client-picker');
+        if (picker && !picker.contains(event.relatedTarget)) closeClientPicker(picker);
+    });
+    document.addEventListener('keydown', event => {
+        if (!event.target.matches('.client-search')) return;
+        const picker = event.target.closest('.client-picker');
+        const current = state(picker);
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            closeClientPicker(picker);
+            return;
+        }
+        if (picker.querySelector('.client-results').hidden) return;
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault();
+            current.index = (current.index + (event.key === 'ArrowDown' ? 1 : -1) + current.results.length) % current.results.length;
+            picker.querySelectorAll('.client-result').forEach((option, index) => {
+                const active = index === current.index;
+                option.classList.toggle('active', active);
+                option.setAttribute('aria-selected', String(active));
+                if (active) {
+                    event.target.setAttribute('aria-activedescendant', option.id);
+                    option.scrollIntoView({block: 'nearest'});
+                }
+            });
+        } else if (event.key === 'Enter' && current.results.length) {
+            event.preventDefault();
+            selectClient(picker, current.results[current.index >= 0 ? current.index : 0]);
+        }
+    });
+})();

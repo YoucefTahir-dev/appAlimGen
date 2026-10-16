@@ -1,0 +1,22 @@
+{% load i18n %}
+<div class="client-picker"
+     data-url="{% url 'sale_client_search' %}"
+     data-minimum="{% trans 'Tapez au moins 2 caractères' %}"
+     data-loading="{% trans 'Recherche…' %}"
+     data-empty="{% trans 'Aucun client trouvé' %}"
+     data-error="{% trans 'Recherche indisponible. Réessayez.' %}"
+     data-invalid="{% trans 'Veuillez sélectionner un client dans les résultats proposés.' %}">
+    <input type="hidden" name="{{ widget.name }}" id="{{ widget.attrs.id }}"
+           class="client-id" value="{{ widget.value|default_if_none:'' }}">
+    <input type="text" name="{{ widget.name }}_search" id="{{ widget.attrs.id }}_search"
+           class="form-control client-search" value="{{ widget.label }}" maxlength="100"
+           placeholder="{% trans 'Rechercher par nom, téléphone ou NIF' %}"
+           aria-label="{% trans 'Rechercher un client' %}" autocomplete="off"
+           role="combobox" aria-autocomplete="list" aria-expanded="false"
+           aria-controls="{{ widget.attrs.id }}_results"
+           aria-describedby="{{ widget.attrs.id }}_status">
+    <div class="client-results list-group" id="{{ widget.attrs.id }}_results"
+         role="listbox" hidden></div>
+    <small id="{{ widget.attrs.id }}_status" class="client-search-status form-text"
+           role="status" aria-live="polite"></small>
+</div>

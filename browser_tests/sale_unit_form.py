@@ -63,7 +63,9 @@ class SaleUnitFormBrowserTests(StaticLiveServerTestCase):
                     'url': self.live_server_url,
                 }])
                 page.goto(f'{self.live_server_url}/commerce/sales/new/')
-                page.select_option('#id_client', str(customer.pk))
+                page.fill('#id_client_search', customer.name)
+                page.locator('#id_client_results .client-result').click()
+                expect(page.locator('#id_client')).to_have_value(str(customer.pk))
                 selected_product = {
                     'id': product.pk,
                     'name': product.name,

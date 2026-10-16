@@ -10,7 +10,7 @@ from apps.inventory.models import ProductPackaging
 from apps.inventory.pricing import sale_base_unit_allowed, sale_packaging_allowed
 
 from .models import Payment, Purchase, PurchaseLine, Sale, SaleLine
-from .widgets import ProductAutocomplete
+from .widgets import ClientAutocomplete, ProductAutocomplete
 from .services import validate_tax_rate
 
 
@@ -73,7 +73,7 @@ class SaleForm(forms.ModelForm):
         model = Sale
         fields = ['client', 'discount', 'tax_rate', 'payment_type', 'show_legal_information']
         widgets = {
-            'client': forms.Select(attrs={'class': 'form-select'}),
+            'client': ClientAutocomplete(),
             'discount': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'tax_rate': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'payment_type': forms.Select(attrs={'class': 'form-select'}),
