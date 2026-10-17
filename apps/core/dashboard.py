@@ -224,7 +224,10 @@ def outstanding_count(model, start_dt, end_dt):
     return (
         queryset.annotate(
             paid=Coalesce(
-                Sum("payments__amount"),
+                Sum(
+                    "payments__amount",
+                    filter=Q(payments__cancelled_at__isnull=True),
+                ),
                 Value(ZERO),
                 output_field=DecimalField(max_digits=14, decimal_places=2),
             )

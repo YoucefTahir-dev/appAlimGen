@@ -10,9 +10,10 @@
     <form method="post" id="sale-form"
           data-price-url="{% url 'sale_price_lookup' %}"
           data-stock-label="{% trans 'Stock' %}"
-          data-auto-pricing="{% if form.instance.pk %}false{% else %}true{% endif %}"
+          data-auto-pricing="true"
           data-loading-label="{% trans 'Chargement…' %}"
           data-price-error-label="{% trans 'Impossible de récupérer le prix du produit.' %}"
+          data-manual-price-label="{% trans 'Prix manuel conservé : vérifiez-le après le changement de client ou de conditionnement.' %}"
           data-select-client-label="{% trans 'Sélectionnez d’abord un client.' %}"
           data-base-unit-label="{% trans 'Unité de base' %}"
           data-existing-paid="{% if form.instance.pk %}{{ form.instance.amount_paid|unlocalize }}{% else %}0.00{% endif %}">

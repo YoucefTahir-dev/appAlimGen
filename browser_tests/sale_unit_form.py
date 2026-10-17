@@ -128,5 +128,12 @@ class SaleUnitFormBrowserTests(StaticLiveServerTestCase):
                     }"""
                 )
                 self.assertEqual(submit_guard, {'first': True, 'second': False})
+
+                page.fill('#id_lines-0-unit_price', '4999.00')
+                page.select_option('#id_lines-0-packaging', '')
+                expect(page.locator('#id_lines-0-unit_price')).to_have_value('4999.00')
+                expect(
+                    page.locator('.sale-line-row').nth(0).locator('.sale-price-feedback')
+                ).to_contain_text('Prix manuel')
             finally:
                 browser.close()

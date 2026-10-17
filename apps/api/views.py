@@ -8,13 +8,18 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema
 from drf_spectacular.types import OpenApiTypes
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import serializers
 from apps.accounts.permissions import has_permission
 
 from apps.commerce.models import Payment, Purchase, Sale
+from apps.commerce.receivables import (
+    attach_receivable_counts,
+    receivable_account,
+    receivables_queryset,
+)
 from apps.commerce.product_search import search_products
 from apps.commerce.services import ensure_ticket_number
 from apps.commerce.utils import build_invoice_context, generate_invoice_pdf, qr_code_data_uri
@@ -43,6 +48,7 @@ from .serializers import (
     OperatorStockMovementSerializer,
     OperatorStockSerializer,
     PaymentSerializer,
+    ReceivableSerializer,
     ProductSerializer,
     ProductPackagingSerializer,
     PrinterProfileSerializer,
@@ -450,7 +456,9 @@ class PurchaseViewSet(AuditMutationMixin, mixins.CreateModelMixin, mixins.ListMo
 
 class PaymentViewSet(AuditMutationMixin, mixins.CreateModelMixin, mixins.ListModelMixin,
                      mixins.RetrieveModelMixin, viewsets.GenericViewSet):
-    queryset = Payment.objects.select_related('sale', 'purchase', 'created_by').order_by('-created_at', '-pk')
+    queryset = Payment.objects.select_related(
+        'sale', 'purchase', 'created_by', 'cancelled_by',
+    ).order_by('-created_at', '-pk')
     serializer_class = PaymentSerializer
     filterset_fields = ('sale', 'purchase', 'payment_type')
     ordering_fields = ('created_at', 'amount')
@@ -476,6 +484,84 @@ class PaymentViewSet(AuditMutationMixin, mixins.CreateModelMixin, mixins.ListMod
     @extend_schema(parameters=[IDEMPOTENCY_PARAMETER])
     def create(self, request, *args, **kwargs):
         return idempotent(request, 'payment.create', lambda: super(PaymentViewSet, self).create(request, *args, **kwargs), required=False)
+
+    @action(detail=True, methods=('post',))
+    def cancel(self, request, pk=None):
+        payment = self.get_object()
+        permission = (
+            'commerce.cancel_customerpayment'
+            if payment.sale_id else 'commerce.change_purchase'
+        )
+        if not has_permission(request.user, permission):
+            raise PermissionDenied(_('Vous ne disposez pas de la permission requise.'))
+        reason = str(request.data.get('reason') or '').strip()
+        if not reason:
+            raise ValidationError({'reason': _('Le motif dâ€™annulation est obligatoire.')})
+        payment = payment.cancel(user=request.user, reason=reason)
+        self._audit('cancel', status.HTTP_200_OK)
+        return Response(self.get_serializer(payment).data)
+
+
+class ReceivableViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Client.objects.none()
+    serializer_class = ReceivableSerializer
+    required_permissions = {'*': 'commerce.view_receivables'}
+    search_fields = ('name', 'phone', 'email', 'tax_number')
+    ordering_fields = ('name', 'created_at')
+
+    def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return self.queryset
+        queryset = receivables_queryset(self.request.user)
+        status_filter = self.request.query_params.get('status', 'debtors')
+        queryset = queryset.annotate(
+            receivable_balance=F('receivable_invoiced') - F('receivable_paid'),
+        )
+        if status_filter == 'settled':
+            queryset = queryset.filter(
+                receivable_invoice_count__gt=0, receivable_balance__lte=0,
+            )
+        elif status_filter != 'all':
+            queryset = queryset.filter(receivable_balance__gt=0)
+        return queryset.order_by('-receivable_balance', 'name', 'pk')
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            attach_receivable_counts(page)
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        clients = list(queryset)
+        attach_receivable_counts(clients)
+        return Response(self.get_serializer(clients, many=True).data)
+
+    def retrieve(self, request, *args, **kwargs):
+        client = self.get_object()
+        account = receivable_account(request.user, client)
+        invoices = [
+            {
+                'id': sale.pk,
+                'invoice_number': sale.invoice_number,
+                'created_at': sale.created_at,
+                'total': str(sale.total),
+                'amount_paid': str(sale.amount_paid),
+                'balance_due': str(sale.balance_due),
+                'payment_status': sale.payment_status,
+            }
+            for sale in account['sales']
+        ]
+        return Response({
+            'client': ClientSerializer(client, context={'request': request}).data,
+            'total_invoiced': str(account['total_invoiced']),
+            'total_paid': str(account['total_paid']),
+            'balance_due': str(account['balance_due']),
+            'unreconciled_invoice_count': account['unreconciled_count'],
+            'invoices': invoices,
+            'payments': PaymentSerializer(
+                account['payments'], many=True, context={'request': request},
+            ).data,
+        })
 
 
 class LoadingOrderViewSet(AuditMutationMixin, viewsets.ModelViewSet):

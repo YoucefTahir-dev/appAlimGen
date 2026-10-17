@@ -1,0 +1,19 @@
+{% extends 'base/base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "Relevé client" %} - {{ client.name }}{% endblock %}
+{% block page_title %}{% trans "Relevé de compte client" %}{% endblock %}
+
+{% block content %}
+<style>@media print {.no-print,.sidebar,.navbar{display:none!important}.main-content{margin:0!important}.card{border:0!important;box-shadow:none!important}}</style>
+<div class="no-print d-flex gap-2 justify-content-end mb-3"><button class="btn btn-primary" onclick="window.print()">{% trans "Imprimer" %}</button><a class="btn btn-outline-secondary" href="{% url 'receivable_detail' client.pk %}">{% trans "Retour" %}</a></div>
+<div class="card p-4 bg-white">
+    <h3>{% trans "Relevé de compte" %}</h3><h5>{{ client.name }}</h5>
+    <p>{{ client.address }}{% if client.phone %}<br>{{ client.phone }}{% endif %}{% if client.tax_number %}<br>NIF : {{ client.tax_number }}{% endif %}</p>
+    <p><strong>{% trans "Total facturé" %} :</strong> {{ total_invoiced|floatformat:2 }} DZD &nbsp; <strong>{% trans "Total encaissé" %} :</strong> {{ total_paid|floatformat:2 }} DZD &nbsp; <strong>{% trans "Solde" %} :</strong> {{ balance_due|floatformat:2 }} DZD</p>
+    <table class="table table-bordered"><thead><tr><th>{% trans "Date" %}</th><th>{% trans "Facture" %}</th><th class="text-end">{% trans "Débit" %}</th><th class="text-end">{% trans "Crédit" %}</th><th>{% trans "Observation" %}</th></tr></thead><tbody>
+        {% for sale in sales %}<tr><td>{{ sale.created_at|date:'d/m/Y' }}</td><td>{{ sale.invoice_number }}</td><td class="text-end">{{ sale.total|floatformat:2 }}</td><td></td><td>{% trans "Facture" %}</td></tr>{% endfor %}
+        {% for payment in payments %}<tr><td>{{ payment.created_at|date:'d/m/Y' }}</td><td>{{ payment.sale.invoice_number }}</td><td></td><td class="text-end">{% if not payment.is_cancelled %}{{ payment.amount|floatformat:2 }}{% endif %}</td><td>{{ payment.reference }}{% if payment.is_cancelled %} — {% trans "Annulé" %}: {{ payment.cancellation_reason }}{% endif %}</td></tr>{% endfor %}
+    </tbody></table>
+</div>
+{% endblock %}

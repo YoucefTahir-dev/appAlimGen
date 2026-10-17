@@ -22,11 +22,19 @@ from .views import (
     purchase_payment_delete,
     purchase_payment_list,
     purchase_payment_tracking_initialize,
+    receivable_detail,
+    receivable_list,
+    receivable_payment_create,
+    receivable_statement,
 )
 
 urlpatterns = [
     path('products/search/', commercial_product_search, name='commercial_product_search'),
     path('clients/search/', sale_client_search, name='sale_client_search'),
+    path('receivables/', receivable_list, name='receivable_list'),
+    path('receivables/<int:pk>/', receivable_detail, name='receivable_detail'),
+    path('receivables/<int:pk>/statement/', receivable_statement, name='receivable_statement'),
+    path('receivables/<int:pk>/payments/new/', receivable_payment_create, name='receivable_payment_create'),
     path('sales/', sale_list, name='sale_list'),
     path('sales/new/', sale_create, name='sale_create'),
     path('sales/price/', sale_price_lookup, name='sale_price_lookup'),

@@ -511,10 +511,15 @@ class SaleSerializer(serializers.ModelSerializer):
             {
                 'id': payment.pk,
                 'reference': payment.reference,
+                'external_reference': payment.external_reference,
+                'notes': payment.notes,
                 'amount': str(payment.amount),
                 'payment_type': payment.payment_type,
                 'payment_type_display': payment.get_payment_type_display(),
                 'created_at': payment.created_at,
+                'is_cancelled': payment.is_cancelled,
+                'cancelled_at': payment.cancelled_at,
+                'cancellation_reason': payment.cancellation_reason,
             }
             for payment in obj.payments.all()
         ]
@@ -690,16 +695,28 @@ class PurchaseSerializer(serializers.ModelSerializer):
 
 
 class PaymentSerializer(serializers.ModelSerializer):
+    is_cancelled = serializers.BooleanField(read_only=True)
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True)
+    cancelled_by_name = serializers.CharField(source='cancelled_by.username', read_only=True)
+
     class Meta:
         model = Payment
-        fields = ('id', 'reference', 'sale', 'purchase', 'amount', 'payment_type', 'created_by', 'created_at')
-        read_only_fields = ('reference', 'created_by', 'created_at')
+        fields = (
+            'id', 'reference', 'external_reference', 'notes', 'sale', 'purchase',
+            'amount', 'payment_type', 'created_by', 'created_by_name', 'created_at',
+            'is_cancelled', 'cancelled_at', 'cancelled_by', 'cancelled_by_name',
+            'cancellation_reason',
+        )
+        read_only_fields = (
+            'reference', 'created_by', 'created_by_name', 'is_cancelled',
+            'cancelled_at', 'cancelled_by', 'cancelled_by_name', 'cancellation_reason',
+        )
 
     def validate(self, attrs):
         if bool(attrs.get('sale')) == bool(attrs.get('purchase')):
             raise serializers.ValidationError(_('Indiquez exactement une vente ou un achat.'))
         request = self.context['request']
-        permission = 'commerce.change_sale' if attrs.get('sale') else 'commerce.change_purchase'
+        permission = 'commerce.add_customerpayment' if attrs.get('sale') else 'commerce.change_purchase'
         if not has_permission(request.user, permission):
             raise PermissionDenied(_('Vous ne disposez pas de la permission requise.'))
         sale = attrs.get('sale')
@@ -715,6 +732,39 @@ class PaymentSerializer(serializers.ModelSerializer):
         except DjangoValidationError as exc:
             details = exc.message_dict if hasattr(exc, 'message_dict') else {'non_field_errors': exc.messages}
             raise BusinessAPIException('PAYMENT_VALIDATION_ERROR', ' '.join(str(v) for values in details.values() for v in values), details) from exc
+
+
+class ReceivableSerializer(serializers.ModelSerializer):
+    total_invoiced = serializers.DecimalField(
+        source='receivable_invoiced', max_digits=14, decimal_places=2, read_only=True,
+    )
+    total_paid = serializers.DecimalField(
+        source='receivable_paid', max_digits=14, decimal_places=2, read_only=True,
+    )
+    balance_due = serializers.SerializerMethodField()
+    invoice_count = serializers.IntegerField(source='receivable_invoice_count', read_only=True)
+    unpaid_invoice_count = serializers.SerializerMethodField()
+    last_payment_at = serializers.DateTimeField(source='receivable_last_payment', read_only=True)
+    unreconciled_invoice_count = serializers.IntegerField(
+        source='receivable_unreconciled_count', read_only=True,
+    )
+
+    class Meta:
+        model = Client
+        fields = (
+            'id', 'name', 'phone', 'email', 'tax_number', 'total_invoiced',
+            'total_paid', 'balance_due', 'invoice_count', 'unpaid_invoice_count',
+            'last_payment_at', 'unreconciled_invoice_count',
+        )
+
+    def get_balance_due(self, obj) -> Decimal:
+        return max(obj.receivable_invoiced - obj.receivable_paid, Decimal('0.00'))
+
+    def get_unpaid_invoice_count(self, obj) -> int:
+        cached = getattr(obj, 'receivable_unpaid_count', None)
+        if cached is not None:
+            return cached
+        return sum(1 for sale in obj.receivable_sales_cache if sale.balance_due > 0)
 
 
 class LoadingOrderLineSerializer(serializers.ModelSerializer):

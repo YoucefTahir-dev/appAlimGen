@@ -25,6 +25,7 @@ from .views import (
     LoadingOrderViewSet,
     OperatorStockViewSet,
     PaymentViewSet,
+    ReceivableViewSet,
     ProductViewSet,
     ProductPackagingViewSet,
     PrinterProfileViewSet,
@@ -51,6 +52,7 @@ router.register('suppliers', SupplierViewSet, basename='api-supplier')
 router.register('sales', SaleViewSet, basename='api-sale')
 router.register('purchases', PurchaseViewSet, basename='api-purchase')
 router.register('payments', PaymentViewSet, basename='api-payment')
+router.register('receivables', ReceivableViewSet, basename='api-receivable')
 router.register('loading-orders', LoadingOrderViewSet, basename='api-loading-order')
 router.register('operator-stock', OperatorStockViewSet, basename='api-operator-stock')
 router.register('invoices', InvoiceViewSet, basename='api-invoice')

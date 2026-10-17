@@ -22,6 +22,7 @@
     {% has_access 'inventory.view_supplier' as can_view_suppliers %}
     {% has_access 'accounts.view_stock' as can_view_stock %}
     {% has_access 'commerce.view_sale' as can_view_sales %}
+    {% has_access 'commerce.view_receivables' as can_view_receivables %}
     {% has_access 'commerce.view_purchase' as can_view_purchases %}
     {% has_access 'expenses.view_expense' as can_view_expenses %}
     {% has_access 'accounts.view_user' as can_view_users %}
@@ -51,6 +52,7 @@
                 {% if can_view_stock %}<li class="nav-item"><a class="nav-link text-white" data-sidebar-link href="{% url 'stock_movement_list' %}"><i class="bi bi-arrow-left-right me-2"></i> {% trans "Stock" %}</a></li>{% endif %}
                 <li class="nav-item"><a class="nav-link text-white" data-sidebar-link href="{% url 'loading_order_list' %}"><i class="bi bi-box-arrow-up-right me-2"></i> {% trans "Chargements" %}</a></li>
                 {% if can_view_sales %}<li class="nav-item"><a class="nav-link text-white" data-sidebar-link href="{% url 'sale_list' %}"><i class="bi bi-receipt me-2"></i> {% trans "Ventes" %}</a></li>{% endif %}
+                {% if can_view_receivables %}<li class="nav-item"><a class="nav-link text-white" data-sidebar-link href="{% url 'receivable_list' %}"><i class="bi bi-wallet2 me-2"></i> {% trans "Créances clients" %}</a></li>{% endif %}
                 {% if can_view_purchases %}<li class="nav-item"><a class="nav-link text-white" data-sidebar-link href="{% url 'purchase_list' %}"><i class="bi bi-cart-plus me-2"></i> {% trans "Achats" %}</a></li>{% endif %}
                 {% if can_view_expenses %}<li class="nav-item"><a class="nav-link text-white" data-sidebar-link href="{% url 'expense_list' %}"><i class="bi bi-cash-coin me-2"></i> {% trans "Charges" %}</a></li>{% endif %}
                 {% if can_view_users %}<li class="nav-item"><a class="nav-link text-white" data-sidebar-link href="{% url 'user_list' %}"><i class="bi bi-person-gear me-2"></i> {% trans "Utilisateurs" %}</a></li>{% endif %}

@@ -80,6 +80,14 @@ PERMISSION_MATRIX = OrderedDict(
             ],
         ),
         (
+            _('Créances clients'),
+            [
+                ('commerce.view_receivables', _('Voir')),
+                ('commerce.add_customerpayment', _('Enregistrer un règlement')),
+                ('commerce.cancel_customerpayment', _('Annuler un règlement')),
+            ],
+        ),
+        (
             _('Factures'),
             [
                 ('accounts.view_invoices', _('Voir')),
@@ -351,6 +359,10 @@ ROUTE_PERMISSIONS = {
     'sale_create': ('commerce.add_sale',),
     'sale_update': ('commerce.change_sale',),
     'sale_delete': ('commerce.delete_sale',),
+    'receivable_list': ('commerce.view_receivables',),
+    'receivable_detail': ('commerce.view_receivables',),
+    'receivable_statement': ('commerce.view_receivables',),
+    'receivable_payment_create': ('commerce.add_customerpayment',),
     'sale_invoice_preview': ('accounts.view_invoices',),
     'sale_invoice_pdf': ('accounts.download_invoice_pdf',),
     'sale_ticket_preview': ('accounts.print_invoice',),

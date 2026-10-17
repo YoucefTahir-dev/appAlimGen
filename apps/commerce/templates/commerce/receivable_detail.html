@@ -1,0 +1,48 @@
+{% extends 'base/base.html' %}
+{% load i18n access_tags %}
+
+{% block title %}{{ client.name }} - {% trans "Créances" %}{% endblock %}
+{% block page_title %}{% trans "Compte client" %} — {{ client.name }}{% endblock %}
+
+{% block content %}
+{% has_access 'commerce.add_customerpayment' as can_add_payment %}
+<div class="d-flex flex-wrap gap-2 justify-content-end mb-3">
+    <a class="btn btn-outline-secondary" href="{% url 'receivable_list' %}">{% trans "Retour" %}</a>
+    <a class="btn btn-outline-primary" href="{% url 'receivable_statement' client.pk %}">{% trans "Relevé imprimable" %}</a>
+    {% if can_add_payment and balance_due > 0 %}<a class="btn btn-success" href="{% url 'receivable_payment_create' client.pk %}">{% trans "Nouveau règlement" %}</a>{% endif %}
+</div>
+
+{% if unreconciled_count %}
+<div class="alert alert-warning">{% blocktrans %}{{ unreconciled_count }} facture(s) historique(s) ne sont pas incluses dans le solde tant que leur suivi de règlement n’est pas rapproché.{% endblocktrans %}</div>
+{% endif %}
+
+<div class="row g-3 mb-4">
+    <div class="col-md-4"><div class="card p-3 h-100"><span class="text-muted">{% trans "Total facturé" %}</span><strong class="fs-4">{{ total_invoiced|floatformat:2 }} DZD</strong></div></div>
+    <div class="col-md-4"><div class="card p-3 h-100"><span class="text-muted">{% trans "Total encaissé" %}</span><strong class="fs-4 text-success">{{ total_paid|floatformat:2 }} DZD</strong></div></div>
+    <div class="col-md-4"><div class="card p-3 h-100"><span class="text-muted">{% trans "Solde à recevoir" %}</span><strong class="fs-4 {% if balance_due > 0 %}text-danger{% else %}text-success{% endif %}">{{ balance_due|floatformat:2 }} DZD</strong></div></div>
+</div>
+
+<div class="card card-dashboard p-4 bg-white mb-4">
+    <h5>{% trans "Factures suivies" %}</h5>
+    <div class="table-responsive"><table class="table table-hover align-middle">
+        <thead><tr><th>{% trans "Facture" %}</th><th>{% trans "Date" %}</th><th class="text-end">{% trans "Total" %}</th><th class="text-end">{% trans "Réglé" %}</th><th class="text-end">{% trans "Reste" %}</th><th>{% trans "Statut" %}</th><th></th></tr></thead>
+        <tbody>{% for sale in sales %}<tr>
+            <td>{{ sale.invoice_number }}</td><td>{{ sale.created_at|date:'d/m/Y H:i' }}</td>
+            <td class="text-end">{{ sale.total|floatformat:2 }} DZD</td><td class="text-end">{{ sale.amount_paid|floatformat:2 }} DZD</td><td class="text-end fw-bold">{{ sale.balance_due|floatformat:2 }} DZD</td>
+            <td>{% if sale.payment_status == 'paid' %}<span class="badge bg-success">{% trans "Soldée" %}</span>{% elif sale.payment_status == 'partial' %}<span class="badge bg-info text-dark">{% trans "Partielle" %}</span>{% else %}<span class="badge bg-danger">{% trans "Impayée" %}</span>{% endif %}</td>
+            <td><a class="btn btn-sm btn-outline-secondary" href="{% url 'sale_payment_list' sale.pk %}">{% trans "Détails" %}</a></td>
+        </tr>{% empty %}<tr><td colspan="7" class="text-center text-muted">{% trans "Aucune facture suivie." %}</td></tr>{% endfor %}</tbody>
+    </table></div>
+</div>
+
+<div class="card card-dashboard p-4 bg-white">
+    <h5>{% trans "Historique des règlements" %}</h5>
+    <div class="table-responsive"><table class="table table-hover align-middle">
+        <thead><tr><th>{% trans "Date" %}</th><th>{% trans "Référence" %}</th><th>{% trans "Facture" %}</th><th>{% trans "Mode" %}</th><th class="text-end">{% trans "Montant" %}</th><th>{% trans "Statut" %}</th></tr></thead>
+        <tbody>{% for payment in payments %}<tr class="{% if payment.is_cancelled %}text-muted text-decoration-line-through{% endif %}">
+            <td>{{ payment.created_at|date:'d/m/Y H:i' }}</td><td>{{ payment.reference }}{% if payment.external_reference %}<div class="small">{{ payment.external_reference }}</div>{% endif %}</td><td>{{ payment.sale.invoice_number }}</td><td>{{ payment.get_payment_type_display }}</td><td class="text-end">{{ payment.amount|floatformat:2 }} DZD</td>
+            <td>{% if payment.is_cancelled %}<span class="badge bg-secondary">{% trans "Annulé" %}</span><div class="small text-decoration-none">{{ payment.cancellation_reason }}</div>{% else %}<span class="badge bg-success">{% trans "Validé" %}</span>{% endif %}</td>
+        </tr>{% empty %}<tr><td colspan="6" class="text-center text-muted">{% trans "Aucun règlement." %}</td></tr>{% endfor %}</tbody>
+    </table></div>
+</div>
+{% endblock %}

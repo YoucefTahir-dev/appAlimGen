@@ -1,9 +1,11 @@
 from decimal import Decimal
+from uuid import uuid4
 
 from django import forms
 from django.core.exceptions import ValidationError
 from django.forms import BaseInlineFormSet, inlineformset_factory
 from django.db.models import Q
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from apps.inventory.models import ProductPackaging
@@ -116,17 +118,30 @@ class SaleForm(forms.ModelForm):
 
 
 class PaymentForm(forms.ModelForm):
+    request_token = forms.CharField(widget=forms.HiddenInput, required=False)
+
     class Meta:
         model = Payment
-        fields = ['amount', 'payment_type']
+        fields = [
+            'amount', 'payment_type', 'created_at', 'external_reference', 'notes',
+        ]
         widgets = {
             'amount': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0.01'}),
             'payment_type': forms.Select(attrs={'class': 'form-select'}),
+            'created_at': forms.DateTimeInput(
+                attrs={'class': 'form-control', 'type': 'datetime-local'},
+                format='%Y-%m-%dT%H:%M',
+            ),
+            'external_reference': forms.TextInput(attrs={'class': 'form-control'}),
+            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         }
 
     def __init__(self, *args, document=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.document = document
+        self.fields['request_token'].initial = uuid4().hex
+        self.fields['created_at'].input_formats = ('%Y-%m-%dT%H:%M',)
+        self.fields['created_at'].required = False
         if isinstance(document, Sale):
             self.instance.sale = document
             self.instance.purchase = None
@@ -136,6 +151,7 @@ class PaymentForm(forms.ModelForm):
             self.instance.sale = None
         if document is not None and not self.is_bound:
             self.fields['amount'].initial = document.balance_due
+            self.fields['created_at'].initial = timezone.localtime().strftime('%Y-%m-%dT%H:%M')
 
     def clean_amount(self):
         amount = self.cleaned_data['amount']
@@ -146,6 +162,55 @@ class PaymentForm(forms.ModelForm):
                 _('Surpaiement interdit : le montant dépasse le solde restant.')
             )
         return amount
+
+    def clean_created_at(self):
+        return self.cleaned_data.get('created_at') or timezone.now()
+
+
+class CustomerPaymentForm(PaymentForm):
+    sale = forms.ModelChoiceField(
+        label=_('Facture concernée'), queryset=Sale.objects.none(),
+        widget=forms.Select(attrs={'class': 'form-select'}),
+    )
+
+    class Meta(PaymentForm.Meta):
+        fields = ['sale', *PaymentForm.Meta.fields]
+
+    def __init__(self, *args, client=None, user=None, **kwargs):
+        self.client = client
+        super().__init__(*args, document=None, **kwargs)
+        sales = Sale.objects.none()
+        if client is not None:
+            from .receivables import receivable_sales
+
+            candidates = list(
+                receivable_sales(user).filter(client=client)
+                .prefetch_related('payments').order_by('created_at', 'pk')
+            )
+            sales = Sale.objects.filter(
+                pk__in=[sale.pk for sale in candidates if sale.balance_due > 0],
+            ).order_by('created_at', 'pk')
+        self.fields['sale'].queryset = sales
+        self.fields['sale'].label_from_instance = lambda sale: (
+            f'{sale.invoice_number} — {sale.balance_due:.2f} DZD'
+        )
+
+    def clean(self):
+        cleaned = super().clean()
+        sale = cleaned.get('sale')
+        amount = cleaned.get('amount')
+        if sale and self.client and sale.client_id != self.client.pk:
+            self.add_error('sale', _('Cette facture n’appartient pas au client sélectionné.'))
+        if sale and amount is not None and amount > sale.balance_due:
+            self.add_error('amount', _('Surpaiement interdit : le montant dépasse le solde restant.'))
+        return cleaned
+
+
+class PaymentCancellationForm(forms.Form):
+    reason = forms.CharField(
+        label=_('Motif d’annulation'),
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+    )
 
 
 class SaleLineForm(forms.ModelForm):

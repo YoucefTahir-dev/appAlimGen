@@ -11,11 +11,14 @@
         · {% trans "Solde restant" %}: {{ due_total|floatformat:2 }} DZD
     </p>
     <form method="post">
-        {% csrf_token %}
+        {% csrf_token %}{{ form.request_token }}
         {{ form.non_field_errors }}
         <div class="row g-3">
             <div class="col-md-6">{{ form.amount.label_tag }}{{ form.amount }}{{ form.amount.errors }}</div>
             <div class="col-md-6">{{ form.payment_type.label_tag }}{{ form.payment_type }}{{ form.payment_type.errors }}</div>
+            <div class="col-md-6">{{ form.created_at.label_tag }}{{ form.created_at }}{{ form.created_at.errors }}</div>
+            <div class="col-md-6">{{ form.external_reference.label_tag }}{{ form.external_reference }}{{ form.external_reference.errors }}</div>
+            <div class="col-12">{{ form.notes.label_tag }}{{ form.notes }}{{ form.notes.errors }}</div>
         </div>
         <div class="form-actions mt-3">
             <button class="btn btn-success">{% trans "Enregistrer" %}</button>

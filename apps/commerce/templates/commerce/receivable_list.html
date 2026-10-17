@@ -1,0 +1,61 @@
+{% extends 'base/base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "Créances clients" %} - El Amine ERP{% endblock %}
+{% block page_title %}{% trans "Créances clients" %}{% endblock %}
+
+{% block content %}
+<div class="card card-dashboard p-4 bg-white">
+    <form method="get" class="row g-2 align-items-end mb-4">
+        <div class="col-md-6">
+            <label class="form-label" for="receivable-search">{% trans "Rechercher un client" %}</label>
+            <input id="receivable-search" class="form-control" name="q" value="{{ query }}" placeholder="{% trans 'Nom, téléphone ou NIF' %}">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label" for="receivable-status">{% trans "Situation" %}</label>
+            <select id="receivable-status" class="form-select" name="status">
+                <option value="debtors" {% if status_filter == 'debtors' %}selected{% endif %}>{% trans "Clients débiteurs" %}</option>
+                <option value="settled" {% if status_filter == 'settled' %}selected{% endif %}>{% trans "Comptes soldés" %}</option>
+                <option value="all" {% if status_filter == 'all' %}selected{% endif %}>{% trans "Tous les clients" %}</option>
+            </select>
+        </div>
+        <div class="col-md-3"><button class="btn btn-primary w-100">{% trans "Filtrer" %}</button></div>
+    </form>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead><tr>
+                <th>{% trans "Client" %}</th>
+                <th class="text-end">{% trans "Facturé" %}</th>
+                <th class="text-end">{% trans "Encaissé" %}</th>
+                <th class="text-end">{% trans "Solde" %}</th>
+                <th class="text-center">{% trans "Factures impayées" %}</th>
+                <th>{% trans "Dernier règlement" %}</th>
+                <th></th>
+            </tr></thead>
+            <tbody>
+            {% for client in page_obj %}
+                <tr>
+                    <td>
+                        <strong>{{ client.name }}</strong>
+                        {% if client.phone %}<div class="small text-muted">{{ client.phone }}</div>{% endif %}
+                        {% if client.receivable_unreconciled_count %}
+                            <span class="badge bg-warning text-dark">{{ client.receivable_unreconciled_count }} {% trans "à rapprocher" %}</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">{{ client.receivable_invoiced|floatformat:2 }} DZD</td>
+                    <td class="text-end">{{ client.receivable_paid|floatformat:2 }} DZD</td>
+                    <td class="text-end fw-bold {% if client.receivable_balance > 0 %}text-danger{% else %}text-success{% endif %}">{{ client.receivable_balance|floatformat:2 }} DZD</td>
+                    <td class="text-center">{{ client.receivable_unpaid_count }}</td>
+                    <td>{{ client.receivable_last_payment|date:'d/m/Y H:i'|default:'—' }}</td>
+                    <td><a class="btn btn-sm btn-outline-primary" href="{% url 'receivable_detail' client.pk %}">{% trans "Voir le compte" %}</a></td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="7" class="text-center text-muted py-4">{% trans "Aucun client ne correspond à ces critères." %}</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% include 'base/pagination.html' %}
+</div>
+{% endblock %}

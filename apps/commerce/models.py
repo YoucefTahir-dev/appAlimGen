@@ -98,8 +98,13 @@ class CommercialDocumentQuerySet(StockAwareDeleteQuerySet):
 def _document_paid_amount(document):
     cached = getattr(document, '_prefetched_objects_cache', {}).get('payments')
     if cached is not None:
-        return sum((payment.amount for payment in cached), ZERO)
-    return document.payments.aggregate(total=Sum('amount'))['total'] or ZERO
+        return sum(
+            (payment.amount for payment in cached if payment.cancelled_at is None),
+            ZERO,
+        )
+    return document.payments.filter(cancelled_at__isnull=True).aggregate(
+        total=Sum('amount'),
+    )['total'] or ZERO
 
 
 def _payment_status(document):
@@ -737,6 +742,13 @@ class Payment(models.Model):
         blank=True,
         editable=False,
     )
+    external_reference = models.CharField(
+        _('Référence externe'), max_length=100, blank=True,
+    )
+    notes = models.TextField(_('Observation'), blank=True)
+    idempotency_key = models.CharField(
+        max_length=64, null=True, blank=True, unique=True, editable=False,
+    )
     sale = models.ForeignKey(Sale, on_delete=models.PROTECT, null=True, blank=True, related_name='payments')
     purchase = models.ForeignKey(Purchase, on_delete=models.PROTECT, null=True, blank=True, related_name='payments')
     amount = models.DecimalField('Montant', max_digits=14, decimal_places=2)
@@ -750,6 +762,12 @@ class Payment(models.Model):
         related_name='recorded_payments',
     )
     created_at = models.DateTimeField('Date', default=timezone.now, db_index=True)
+    cancelled_at = models.DateTimeField(_('Annulé le'), null=True, blank=True, editable=False)
+    cancelled_by = models.ForeignKey(
+        'accounts.User', on_delete=models.SET_NULL, null=True, blank=True,
+        editable=False, related_name='cancelled_payments',
+    )
+    cancellation_reason = models.TextField(_('Motif d’annulation'), blank=True, editable=False)
 
     objects = PaymentQuerySet.as_manager()
 
@@ -780,10 +798,19 @@ class Payment(models.Model):
                 name='commerce_pay_buy_date_idx',
             ),
         ]
+        permissions = [
+            ('view_receivables', 'Peut consulter les créances clients'),
+            ('add_customerpayment', 'Peut enregistrer un règlement client'),
+            ('cancel_customerpayment', 'Peut annuler un règlement client'),
+        ]
 
     @property
     def document(self):
         return self.sale or self.purchase
+
+    @property
+    def is_cancelled(self):
+        return self.cancelled_at is not None
 
     def clean(self):
         super().clean()
@@ -805,16 +832,8 @@ class Payment(models.Model):
 
     @transaction.atomic
     def save(self, *args, **kwargs):
-        old = None
-        if self.pk:
-            old = Payment.objects.select_for_update().get(pk=self.pk)
-            if self.reference != old.reference:
-                raise ValidationError(
-                    {'reference': _('La rÃ©fÃ©rence dâ€™un rÃ¨glement est immuable.')}
-                )
-
-        sale_ids = {value for value in (self.sale_id, getattr(old, 'sale_id', None)) if value}
-        purchase_ids = {value for value in (self.purchase_id, getattr(old, 'purchase_id', None)) if value}
+        sale_ids = {self.sale_id} if self.sale_id else set()
+        purchase_ids = {self.purchase_id} if self.purchase_id else set()
         locked_sales = {
             sale.pk: sale
             for sale in Sale.objects.select_for_update().filter(pk__in=sale_ids).order_by('pk')
@@ -824,6 +843,19 @@ class Payment(models.Model):
             for purchase in Purchase.objects.select_for_update().filter(pk__in=purchase_ids).order_by('pk')
         }
 
+        if self.pk:
+            old = Payment.objects.select_for_update().get(pk=self.pk)
+            immutable_fields = (
+                'reference', 'sale_id', 'purchase_id', 'amount', 'payment_type',
+                'created_at', 'external_reference', 'notes',
+            )
+            if old.cancelled_at is not None:
+                raise ValidationError(_('Un règlement annulé est immuable.'))
+            if any(getattr(self, field) != getattr(old, field) for field in immutable_fields):
+                raise ValidationError(
+                    _('Un règlement enregistré est immuable. Annulez-le puis recréez-le.')
+                )
+
         self.full_clean()
         document = locked_sales.get(self.sale_id) or locked_purchases.get(self.purchase_id)
         if document is None:
@@ -832,6 +864,7 @@ class Payment(models.Model):
             Payment.objects.filter(
                 sale_id=self.sale_id if self.sale_id else None,
                 purchase_id=self.purchase_id if self.purchase_id else None,
+                cancelled_at__isnull=True,
             )
             .exclude(pk=self.pk)
             .aggregate(total=Sum('amount'))['total']
@@ -859,13 +892,34 @@ class Payment(models.Model):
         return result
 
     @transaction.atomic
-    def delete(self, *args, **kwargs):
-        locked = Payment.objects.select_for_update().get(pk=self.pk)
-        if locked.sale_id:
-            Sale.objects.select_for_update().get(pk=locked.sale_id)
+    def cancel(self, *, user, reason):
+        reason = str(reason or '').strip()
+        if not reason:
+            raise ValidationError({'cancellation_reason': _('Le motif d’annulation est obligatoire.')})
+        if self.sale_id:
+            Sale.objects.select_for_update().get(pk=self.sale_id)
         else:
-            Purchase.objects.select_for_update().get(pk=locked.purchase_id)
-        return super().delete(*args, **kwargs)
+            Purchase.objects.select_for_update().get(pk=self.purchase_id)
+        locked = Payment.objects.select_for_update().get(pk=self.pk)
+        if locked.cancelled_at is not None:
+            return locked
+        locked.cancelled_at = timezone.now()
+        locked.cancelled_by = user
+        locked.cancellation_reason = reason
+        models.Model.save(
+            locked,
+            update_fields=('cancelled_at', 'cancelled_by', 'cancellation_reason'),
+        )
+        self.cancelled_at = locked.cancelled_at
+        self.cancelled_by = locked.cancelled_by
+        self.cancellation_reason = locked.cancellation_reason
+        return locked
+
+    @transaction.atomic
+    def delete(self, *args, **kwargs):
+        raise ValidationError(
+            _('Un règlement ne peut pas être supprimé. Utilisez une annulation traçable.')
+        )
 
     def __str__(self):
         return self.reference

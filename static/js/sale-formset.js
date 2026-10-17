@@ -23,6 +23,7 @@
         const labels = {
             loading: saleForm ? saleForm.dataset.loadingLabel : 'Chargement…',
             error: saleForm ? saleForm.dataset.priceErrorLabel : 'Impossible de récupérer le prix du produit.',
+            manualPrice: saleForm ? saleForm.dataset.manualPriceLabel : 'Prix manuel conservé : vérifiez-le.',
             selectClient: saleForm ? saleForm.dataset.selectClientLabel : 'Sélectionnez d’abord un client.',
             baseUnit: saleForm ? saleForm.dataset.baseUnitLabel : 'Unité de base',
         };
@@ -103,13 +104,14 @@
             if (amountReceivedInput) amountReceivedInput.required = settlementSelect?.value === 'pay_partial';
         }
 
-        function setFeedback(row, message, isError) {
+        function setFeedback(row, message, kind = '') {
             const feedback = row.querySelector('.sale-price-feedback');
             if (!feedback) {
                 return;
             }
             feedback.textContent = message || '';
-            feedback.classList.toggle('text-danger', Boolean(isError));
+            feedback.classList.toggle('text-danger', kind === 'error');
+            feedback.classList.toggle('text-warning', kind === 'warning');
         }
 
         function updatePackagingOptions(select, packagings, selectedValue, baseAllowed = true) {
@@ -140,7 +142,7 @@
             return select.value;
         }
 
-        async function updateRowPrice(row) {
+        async function updateRowPrice(row, preserveManualPrice = false) {
             if (!autoPricing || !priceUrl || !clientSelect) {
                 return;
             }
@@ -151,6 +153,12 @@
             if (!productSelect || !priceInput) {
                 return;
             }
+            const keepManualPrice = Boolean(
+                preserveManualPrice
+                && priceInput.dataset.priceSource === 'manual'
+                && priceInput.value,
+            );
+            const manualPrice = keepManualPrice ? priceInput.value : '';
             if (!productSelect.value) {
                 row.dataset.priceRequest = '';
                 priceInput.value = '';
@@ -161,19 +169,20 @@
                 if (productMeta) {
                     productMeta.textContent = '';
                 }
-                setFeedback(row, '', false);
+                priceInput.dataset.priceSource = 'auto';
+                setFeedback(row, '');
                 return;
             }
             if (!clientSelect.value) {
                 row.dataset.priceRequest = '';
                 priceInput.value = '';
-                setFeedback(row, labels.selectClient, true);
+                setFeedback(row, labels.selectClient, 'error');
                 return;
             }
             const packagingValue = packagingSelect ? packagingSelect.value : '';
             const requestKey = `${clientSelect.value}:${productSelect.value}:${packagingValue}:${++requestSequence}`;
             row.dataset.priceRequest = requestKey;
-            priceInput.value = '';
+            if (!keepManualPrice) priceInput.value = '';
             const query = new URLSearchParams({
                 client_id: clientSelect.value,
                 product_id: productSelect.value,
@@ -182,7 +191,7 @@
                 query.set('packaging_id', packagingValue);
             }
             priceInput.setAttribute('aria-busy', 'true');
-            setFeedback(row, labels.loading, false);
+            setFeedback(row, labels.loading);
             try {
                 const response = await fetch(`${priceUrl}?${query.toString()}`, {
                     headers: {'Accept': 'application/json'},
@@ -202,21 +211,29 @@
                     const selectedUnit = (payload.packagings || []).find(
                         item => String(item.id) === String(selectedPackaging),
                     );
-                    priceInput.value = selectedUnit && !packagingValue
+                    const suggestedPrice = selectedUnit && !packagingValue
                         ? selectedUnit.price
                         : payload.price;
+                    if (keepManualPrice) {
+                        priceInput.value = manualPrice;
+                        setFeedback(row, labels.manualPrice, 'warning');
+                    } else {
+                        priceInput.value = suggestedPrice;
+                        priceInput.dataset.priceSource = 'auto';
+                        priceInput.dataset.suggestedPrice = suggestedPrice;
+                        setFeedback(row, '');
+                    }
                     if (clientType) {
                         clientType.textContent = payload.customer_type_label || '';
                     }
                     if (productMeta) {
                         productMeta.textContent = `${payload.reference} · ${saleForm.dataset.stockLabel}: ${payload.stock}`;
                     }
-                    setFeedback(row, '', false);
                     refreshTotals();
                 }
             } catch (_error) {
                 if (row.dataset.priceRequest === requestKey) {
-                    setFeedback(row, labels.error, true);
+                    setFeedback(row, labels.error, 'error');
                 }
             } finally {
                 if (row.dataset.priceRequest === requestKey) {
@@ -253,16 +270,18 @@
                 if (packagingSelect) {
                     updatePackagingOptions(packagingSelect, [], '');
                 }
+                const priceInput = row.querySelector('input[name$="-unit_price"]');
+                if (priceInput) priceInput.dataset.priceSource = 'auto';
                 updateRowPrice(row);
             } else if (event.target.matches('select[name$="-packaging"]')) {
-                updateRowPrice(row);
+                updateRowPrice(row, true);
             }
             refreshTotals();
         });
 
         if (clientSelect && autoPricing) {
             clientSelect.addEventListener('change', function () {
-                body.querySelectorAll('.sale-line-row:not([hidden])').forEach(updateRowPrice);
+                body.querySelectorAll('.sale-line-row:not([hidden])').forEach(row => updateRowPrice(row, true));
             });
         }
 
@@ -274,6 +293,7 @@
             if (event.target.matches('input[name$="-unit_price"]')) {
                 event.target.closest('.sale-line-row').dataset.priceRequest = '';
                 event.target.removeAttribute('aria-busy');
+                event.target.dataset.priceSource = 'manual';
             }
             refreshTotals();
         });
@@ -309,6 +329,11 @@
             refreshTotals();
         });
 
+        body.querySelectorAll('.sale-line-row').forEach(row => {
+            const product = row.querySelector('.product-id');
+            const price = row.querySelector('input[name$="-unit_price"]');
+            if (product?.value && price?.value) price.dataset.priceSource = 'manual';
+        });
         refreshTotals();
     }
 

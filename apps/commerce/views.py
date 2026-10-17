@@ -6,7 +6,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import DecimalField, ExpressionWrapper, F, Q, Sum, Value
 from django.db.models.deletion import ProtectedError
 from django.db.models.functions import Coalesce
@@ -21,11 +21,15 @@ from apps.inventory.models import Client, LoadingOrder, Product, ProductPackagin
 from apps.inventory.forms import QuickProductForm
 from apps.inventory.pricing import get_sale_price_context, sale_packaging_allowed
 
-from .forms import PaymentForm, PurchaseForm, PurchaseLineFormSet, SaleForm, SaleLineFormSet
+from .forms import (
+    CustomerPaymentForm, PaymentCancellationForm, PaymentForm, PurchaseForm,
+    PurchaseLineFormSet, SaleForm, SaleLineFormSet,
+)
 from .models import Payment, Purchase, Sale
 from .services import create_sale, create_purchase, ensure_ticket_number, refresh_invoice_snapshot
 from .utils import build_invoice_context, generate_invoice_pdf, qr_code_data_uri
 from .product_search import commercial_products, search_products
+from .receivables import attach_receivable_counts, receivable_account, receivables_queryset
 
 
 MONEY_QUANTUM = Decimal('0.01')
@@ -142,7 +146,11 @@ def _record_remaining_sale_payment(sale, user):
 def _with_payment_totals(queryset):
     money_field = DecimalField(max_digits=14, decimal_places=2)
     return queryset.annotate(
-        paid_total=Coalesce(Sum('payments__amount'), Value(Decimal('0.00')), output_field=money_field)
+        paid_total=Coalesce(
+            Sum('payments__amount', filter=Q(payments__cancelled_at__isnull=True)),
+            Value(Decimal('0.00')),
+            output_field=money_field,
+        )
     ).annotate(
         due_total=ExpressionWrapper(F('total') - F('paid_total'), output_field=money_field)
     )
@@ -411,10 +419,21 @@ def purchase_payment_list(request, pk):
 def _payment_create(request, document, document_type):
     form = PaymentForm(request.POST or None, document=document)
     if form.is_valid():
+        request_token = form.cleaned_data.get('request_token') or None
+        existing = Payment.objects.filter(idempotency_key=request_token).first() if request_token else None
+        if existing is not None:
+            route = 'sale_payment_list' if document_type == 'sale' else 'purchase_payment_list'
+            return redirect(route, pk=document.pk)
         payment = form.save(commit=False)
         payment.created_by = request.user
+        payment.idempotency_key = request_token
         try:
             payment.save()
+        except IntegrityError:
+            if request_token and Payment.objects.filter(idempotency_key=request_token).exists():
+                route = 'sale_payment_list' if document_type == 'sale' else 'purchase_payment_list'
+                return redirect(route, pk=document.pk)
+            raise
         except ValidationError as exc:
             for error in exc.messages:
                 form.add_error('amount' if 'amount' in getattr(exc, 'message_dict', {}) else None, error)
@@ -446,19 +465,23 @@ def purchase_payment_create(request, pk):
 
 def _payment_delete(request, payment, document_type):
     document = payment.sale if document_type == 'sale' else payment.purchase
-    if request.method == 'POST':
-        payment.delete()
-        messages.success(request, _('Règlement supprimé.'))
+    form = PaymentCancellationForm(request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        payment.cancel(user=request.user, reason=form.cleaned_data['reason'])
+        messages.success(request, _('Règlement annulé avec traçabilité.'))
         route = 'sale_payment_list' if document_type == 'sale' else 'purchase_payment_list'
         return redirect(route, pk=document.pk)
     return render(
         request,
         'commerce/payment_confirm_delete.html',
-        {'payment': payment, 'document': document, 'document_type': document_type},
+        {
+            'payment': payment, 'document': document,
+            'document_type': document_type, 'form': form,
+        },
     )
 
 
-@permission_required('commerce.change_sale')
+@permission_required('commerce.cancel_customerpayment')
 def sale_payment_delete(request, sale_pk, pk):
     payment = get_object_or_404(Payment.objects.select_related('sale'), pk=pk, sale_id=sale_pk)
     return _payment_delete(request, payment, 'sale')
@@ -468,6 +491,81 @@ def sale_payment_delete(request, sale_pk, pk):
 def purchase_payment_delete(request, purchase_pk, pk):
     payment = get_object_or_404(Payment.objects.select_related('purchase'), pk=pk, purchase_id=purchase_pk)
     return _payment_delete(request, payment, 'purchase')
+
+
+@permission_required('commerce.view_receivables')
+def receivable_list(request):
+    clients = receivables_queryset(request.user)
+    query = request.GET.get('q', '').strip()
+    status = request.GET.get('status', 'debtors')
+    if query:
+        clients = clients.filter(
+            Q(name__icontains=query) | Q(phone__icontains=query) | Q(tax_number__icontains=query)
+        )
+    clients = clients.annotate(
+        receivable_balance=ExpressionWrapper(
+            F('receivable_invoiced') - F('receivable_paid'),
+            output_field=DecimalField(max_digits=14, decimal_places=2),
+        ),
+    )
+    if status == 'settled':
+        clients = clients.filter(receivable_invoice_count__gt=0, receivable_balance__lte=0)
+    elif status == 'all':
+        pass
+    else:
+        status = 'debtors'
+        clients = clients.filter(receivable_balance__gt=0)
+    clients = clients.order_by('-receivable_balance', 'name', 'pk')
+    page_obj, pagination_query = paginate_queryset(request, clients, per_page=25)
+    attach_receivable_counts(page_obj.object_list)
+    return render(request, 'commerce/receivable_list.html', {
+        'page_obj': page_obj,
+        'pagination_query': pagination_query,
+        'query': query,
+        'status_filter': status,
+    })
+
+
+@permission_required('commerce.view_receivables')
+def receivable_detail(request, pk):
+    client = get_object_or_404(Client, pk=pk)
+    return render(
+        request, 'commerce/receivable_detail.html',
+        receivable_account(request.user, client),
+    )
+
+
+@permission_required('commerce.view_receivables')
+def receivable_statement(request, pk):
+    client = get_object_or_404(Client, pk=pk)
+    return render(
+        request, 'commerce/receivable_statement.html',
+        receivable_account(request.user, client),
+    )
+
+
+@permission_required('commerce.add_customerpayment')
+def receivable_payment_create(request, pk):
+    client = get_object_or_404(Client, pk=pk)
+    form = CustomerPaymentForm(request.POST or None, client=client, user=request.user)
+    if form.is_valid():
+        request_token = form.cleaned_data.get('request_token') or None
+        existing = Payment.objects.filter(idempotency_key=request_token).first() if request_token else None
+        if existing is None:
+            payment = form.save(commit=False)
+            payment.created_by = request.user
+            payment.purchase = None
+            payment.idempotency_key = request_token
+            try:
+                payment.save()
+            except IntegrityError:
+                if not request_token or not Payment.objects.filter(idempotency_key=request_token).exists():
+                    raise
+        messages.success(request, _('Règlement client enregistré.'))
+        return redirect('receivable_detail', pk=client.pk)
+    return render(request, 'commerce/receivable_payment_form.html', {
+        'client': client, 'form': form,
+    })
 
 
 def _initialize_payment_tracking(document, document_type):

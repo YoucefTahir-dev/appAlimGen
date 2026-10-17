@@ -856,7 +856,7 @@ class PaymentAndHistoricalCostTests(TestCase):
         payment.refresh_from_db()
         self.assertRegex(payment.reference, r'^PAY-\d{4}-[A-F0-9]{16}$')
 
-    def test_payment_routes_create_list_and_delete_with_audit_user(self):
+    def test_payment_routes_create_list_and_cancel_with_audit_user(self):
         create_response = self.client.post(
             reverse('sale_payment_create', args=[self.sale.pk]),
             {'amount': '35.00', 'payment_type': Payment.TRANSFER},
@@ -871,10 +871,13 @@ class PaymentAndHistoricalCostTests(TestCase):
         self.assertContains(list_response, '35,00')
 
         delete_response = self.client.post(
-            reverse('sale_payment_delete', args=[self.sale.pk, payment.pk])
+            reverse('sale_payment_delete', args=[self.sale.pk, payment.pk]),
+            {'reason': 'Erreur de saisie'},
         )
         self.assertEqual(delete_response.status_code, 302)
-        self.assertFalse(Payment.objects.filter(pk=payment.pk).exists())
+        payment.refresh_from_db()
+        self.assertTrue(payment.is_cancelled)
+        self.assertEqual(payment.cancellation_reason, 'Erreur de saisie')
         self.assertEqual(self.sale.balance_due, Decimal('100.00'))
 
         purchase_create = self.client.post(
@@ -892,10 +895,12 @@ class PaymentAndHistoricalCostTests(TestCase):
             reverse(
                 'purchase_payment_delete',
                 args=[self.purchase.pk, supplier_payment.pk],
-            )
+            ),
+            {'reason': 'Chèque rejeté'},
         )
         self.assertEqual(purchase_delete.status_code, 302)
-        self.assertFalse(Payment.objects.filter(pk=supplier_payment.pk).exists())
+        supplier_payment.refresh_from_db()
+        self.assertTrue(supplier_payment.is_cancelled)
 
     def test_payment_mutations_require_the_standard_document_change_permission(self):
         self.client.force_login(self.seller)

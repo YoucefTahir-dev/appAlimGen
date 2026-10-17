@@ -1,102 +1,85 @@
-# Recherche client, prix et créances — état d'avancement
+# Recherche client, prix carton/pièce et créances clients
 
-Date : 16 octobre 2026
-Périmètre de cette livraison : **lot 1 uniquement — recherche intelligente des clients dans les ventes Web**.
+Date : 17 octobre 2026
 
-## Résultat du lot 1
+## Résultat livré
 
-Le sélecteur qui chargeait tout le catalogue clients a été remplacé, sur la création et la modification d'une vente, par une autocomplétion distante :
+Les trois lots sont maintenant couverts sur le Web et, lorsque pertinent, dans l’application Android :
 
-- le champ est vide sur une nouvelle vente ;
-- aucune requête n'est envoyée avant deux caractères ;
-- la saisie est temporisée de 300 ms ;
-- la recherche utilise l'ORM Django et `icontains` sur le nom, le téléphone et le NIF ;
-- les résultats sont triés et limités à 20 ;
-- chaque résultat transporte l'identifiant réel du client et permet de distinguer les homonymes par téléphone, NIF et type de client ;
-- le client déjà enregistré est restauré lors de la modification d'une vente ;
-- une saisie libre non sélectionnée est refusée par le navigateur et par le formulaire Django ;
-- le catalogue complet n'est jamais embarqué dans la page ;
-- l'endpoint est authentifié, soumis aux permissions de création/modification des ventes, non mis en cache et limité à 60 recherches par minute et par utilisateur par défaut.
+1. recherche distante et sécurisée des clients dans les ventes Web ;
+2. tarification automatique par type de client et conditionnement carton/pièce ;
+3. compte de créances client, règlements, historique et annulations traçables.
 
-Le modèle `Client` ne possède pas de champ séparé « raison sociale » ou « référence client ». Le champ `name` existant porte le nom ou la raison sociale. Le NIF (`tax_number`) et le téléphone ont donc été retenus comme critères complémentaires, sans migration de données.
+## Lot 1 — recherche client
 
-## Fichiers modifiés
+Le formulaire de vente utilise une autocomplétion distante à partir de deux caractères, temporisée, limitée à 20 résultats et soumise aux permissions. La recherche porte sur le nom, le téléphone et le NIF. Elle restaure le client existant en modification et refuse une saisie libre qui ne correspond à aucun identifiant valide.
 
-- `apps/commerce/forms.py` : branchement du nouveau widget sur `SaleForm.client`.
-- `apps/commerce/widgets.py` : widget composite et restauration sécurisée du libellé du client sélectionné.
-- `apps/commerce/templates/commerce/widgets/client_autocomplete.html` : champ accessible, liste de résultats et messages d'état.
-- `apps/commerce/templates/commerce/sale_form.html` : utilisation du module d'autocomplétion existant.
-- `apps/commerce/views.py` : recherche ORM bornée et limitation de fréquence.
-- `apps/commerce/urls.py` : route Web de recherche.
-- `static/js/product-autocomplete.js` : comportement client (debounce, annulation des requêtes obsolètes, clavier, clic et validation).
-- `static/css/styles.css` : positionnement et défilement de la liste.
-- `apps/commerce/tests/test_client_search.py` : tests serveur et formulaire.
-- `browser_tests/client_autocomplete.py` : parcours navigateur dédié.
-- `browser_tests/product_autocomplete.py` et `browser_tests/sale_unit_form.py` : adaptation des parcours existants au nouveau sélecteur.
+## Lot 2 — prix automatique carton/pièce
 
-## Services et mécanismes réutilisés
+Le moteur existant `apps.inventory.pricing` reste l’unique source des prix. Les tarifs détail, gros et super-gros sont indépendants pour l’unité de base et chaque conditionnement. Les lignes commerciales conservent leurs instantanés (`packaging_name`, facteur, quantité saisie, coût et prix unitaire) afin qu’une évolution future de la fiche produit ne réécrive pas l’historique.
 
-- modèle `apps.inventory.models.Client` ;
-- permissions granulaires `commerce.add_sale` et `commerce.change_sale` ;
-- cache Django pour la limite de fréquence ;
-- événement `change` sur l'identifiant `id_client`, déjà consommé par la tarification des lignes de vente ;
-- conventions d'autocomplétion produit existantes (requête distante bornée, annulation, navigation clavier).
+Évolutions ajoutées :
 
-## Évolution d'interface Web
+- recalcul du prix proposé lors de la sélection du produit, du client ou du conditionnement sur le Web et Android ;
+- conservation explicite d’un prix saisi manuellement au lieu de l’écraser silencieusement ;
+- avertissement visible demandant de vérifier le prix manuel après changement de client ou d’unité ;
+- remise à zéro du statut « manuel » quand l’utilisateur choisit un autre produit et accepte donc un nouveau tarif automatique ;
+- quantité de stock toujours enregistrée dans l’unité canonique, sans multiplier deux fois le facteur carton.
 
-Nouvelle route authentifiée :
+## Lot 3 — créances clients
 
-`GET /commerce/clients/search/?q=<texte>`
+La rubrique « Créances clients » est accessible par permission sur le Web et Android. La liste montre le total facturé, le total encaissé, le solde, le nombre de factures impayées, le dernier règlement et les factures historiques qui restent à rapprocher.
 
-Elle renvoie uniquement les champs utiles à la sélection : `id`, `name`, `phone`, `tax_number` et `customer_type`. Il s'agit d'un endpoint interne à l'interface Web, et non d'une évolution de l'API mobile versionnée.
+Le détail client fournit :
 
-## Android et API mobile
+- les factures suivies et leurs statuts impayé, partiel ou soldé ;
+- l’historique chronologique des règlements ;
+- un relevé imprimable Web ;
+- l’enregistrement d’un règlement avec date, mode, référence externe et observation ;
+- l’annulation traçable avec auteur, date et motif.
 
-Aucune modification Android ou DRF dans ce lot. Les lots 2 et 3 n'ont pas été commencés, conformément à la demande d'arrêt après le lot 1.
+### Source du solde
 
-## Migrations
+Le champ historique `Client.balance` n’est pas utilisé comme seconde source comptable. Le solde est calculé à partir des ventes dont `payment_tracking_initialized=True` moins les règlements actifs associés. Les paiements annulés et les factures historiques non rapprochées sont exclus du total ; ces dernières sont signalées séparément.
 
-Aucune migration de schéma ou de données. Aucune donnée de production n'a été lue ou modifiée.
+### Affectation retenue
 
-## Tests exécutés
+Chaque encaissement est affecté à une facture précise. Ce choix évite une ventilation implicite et invérifiable sur plusieurs factures. Le surpaiement est refusé sous verrou transactionnel. Une clé d’idempotence protège les doubles soumissions Web et l’API mobile conserve son mécanisme d’idempotence HTTP.
 
-- `manage.py check` : réussi.
-- suite Django complète : **415 tests réussis, 10 ignorés**.
-- 53 tests ciblés (`test_client_search`, `test_commerce`, `test_product_search`) : réussis.
-- parcours navigateur recherche client (champ vide, seuil de deux caractères, homonymes, sélection par identifiant, restauration en modification, absence du catalogue) : réussi.
-- parcours navigateur autocomplétion produit, tarification et ventes en français/arabe/anglais : réussi.
-- parcours navigateur vente carton/pièce et calculs instantanés : réussi.
+### Immutabilité et concurrence
 
-Les réponses 404 sur `/favicon.ico` observées dans les journaux des tests navigateur sont sans rapport avec la fonctionnalité et n'affectent pas les assertions.
+Un règlement n’est jamais supprimé physiquement. `Payment.delete()` est interdit et l’action d’annulation conserve la ligne. La création et l’annulation verrouillent le document commercial concerné ; le montant actif est contrôlé dans la même transaction. Les totaux des listes et du tableau de bord ignorent les paiements annulés.
 
-## Risques résiduels
+## API mobile
 
-- La limite de fréquence s'appuie sur le backend de cache configuré. Avec un cache local et plusieurs instances Render, elle est appliquée séparément par instance. Un cache partagé pourra être utilisé si le service est multiplié horizontalement.
-- Une recherche `%texte%` (`icontains`) ne bénéficie pas toujours d'un index B-tree PostgreSQL sur un catalogue très volumineux. La limite de résultats protège le volume retourné ; un index trigramme pourra être évalué sur mesures réelles sans être nécessaire pour ce lot.
-- Le nom/raison sociale reste un champ métier unique (`Client.name`). Ajouter ultérieurement une référence client ou une raison sociale distincte nécessiterait une décision métier et une migration additive.
+- `GET /api/v1/receivables/?status=debtors|settled|all&search=...`
+- `GET /api/v1/receivables/{client_id}/`
+- `POST /api/v1/payments/` avec facture, montant, mode, date, référence externe et observation
+- `POST /api/v1/payments/{payment_id}/cancel/` avec un motif obligatoire
 
-## Plan de déploiement proposé
+Les permissions dédiées sont :
 
-1. Valider fonctionnellement le lot 1 sur une branche ou un environnement de préproduction.
-2. Exécuter les tests Django et les trois parcours navigateur concernés.
-3. Déployer normalement via Render avec `collectstatic` ; aucune migration nouvelle n'est attendue.
-4. Vérifier la création d'une vente, la recherche avec deux caractères, un homonyme et la modification d'une vente existante.
-5. Surveiller les erreurs HTTP 4xx/5xx et le temps de réponse de la route de recherche.
+- `commerce.view_receivables` ;
+- `commerce.add_customerpayment` ;
+- `commerce.cancel_customerpayment`.
 
-Aucun déploiement n'a été lancé dans cette étape.
+## Migration
 
-## Plan de rollback
+La migration additive `commerce.0016` ajoute les métadonnées de règlement et d’annulation ainsi que la clé d’idempotence. Elle ne supprime ni ne transforme aucune donnée existante.
 
-Redéployer le commit précédent. Comme il n'existe aucune migration ni transformation de données, le rollback ne requiert aucune opération en base. Les ventes enregistrées restent compatibles : la valeur persistée est toujours la même clé étrangère `Sale.client_id`.
+## Validation avant déploiement
 
-## Décisions métier en attente
+- `manage.py check` et `makemigrations --check` ;
+- tests Django ciblés puis suite complète ;
+- tests API créances et paiements ;
+- tests navigateur recherche client et formulaire de vente ;
+- `flutter analyze`, tests Flutter et build APK release ;
+- contrôle manuel final du diff et des migrations.
 
-- Validation fonctionnelle du lot 1 avant tout commit, push ou déploiement.
-- Lot 2 : règle exacte de conservation/avertissement lorsqu'un prix manuel est présent et que le conditionnement change.
-- Lot 3 : règle d'affectation explicite des règlements globaux à une ou plusieurs factures, gestion des surpaiements et annulations.
-- Décider si une référence client et une raison sociale séparée doivent être ajoutées au modèle.
+Les résultats exacts sont reportés dans le compte rendu du commit. Aucun changement direct des données de production n’est nécessaire.
 
-## Lots non démarrés
+## Déploiement et rollback
 
-- Lot 2 — prix automatique carton/pièce Web et Android : **non démarré dans cette étape**.
-- Lot 3 — créances clients et paiements : **non démarré dans cette étape**.
+Déploiement : sauvegarder la base, déployer le backend, exécuter les migrations, vérifier `/healthz/` et `/readyz/`, puis publier l’APK Android. Affecter les trois nouvelles permissions aux rôles personnalisés qui doivent utiliser la rubrique.
+
+Rollback applicatif : redéployer les commits précédents. La migration étant additive, les colonnes peuvent rester en place sans risque pour l’ancienne version. Ne pas supprimer les colonnes si des règlements ont déjà été annulés ou enrichis après déploiement.

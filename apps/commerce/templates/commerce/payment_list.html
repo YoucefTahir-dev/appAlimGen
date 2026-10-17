@@ -7,8 +7,10 @@
 {% block content %}
 {% if document_type == 'sale' %}
     {% has_access 'commerce.change_sale' as can_manage_payments %}
+    {% has_access 'commerce.cancel_customerpayment' as can_cancel_payments %}
 {% else %}
     {% has_access 'commerce.change_purchase' as can_manage_payments %}
+    {% has_access 'commerce.change_purchase' as can_cancel_payments %}
 {% endif %}
 <div class="card card-dashboard p-4 bg-white">
     <div class="page-toolbar mb-3">
@@ -60,31 +62,37 @@
                     <th>{% trans "Référence" %}</th>
                     <th>{% trans "Date" %}</th>
                     <th>{% trans "Mode" %}</th>
+                    <th>{% trans "Référence externe" %}</th>
                     <th>{% trans "Montant" %}</th>
                     <th>{% trans "Saisi par" %}</th>
-                    {% if can_manage_payments %}<th>{% trans "Actions" %}</th>{% endif %}
+                    <th>{% trans "Statut" %}</th>
+                    {% if can_cancel_payments %}<th>{% trans "Actions" %}</th>{% endif %}
                 </tr>
             </thead>
             <tbody>
                 {% for payment in payments %}
-                    <tr>
+                    <tr class="{% if payment.is_cancelled %}text-muted{% endif %}">
                         <td>{{ payment.reference }}</td>
                         <td>{{ payment.created_at|date:'d/m/Y H:i' }}</td>
                         <td>{{ payment.get_payment_type_display }}</td>
+                        <td>{{ payment.external_reference|default:'—' }}{% if payment.notes %}<div class="small">{{ payment.notes }}</div>{% endif %}</td>
                         <td>{{ payment.amount|floatformat:2 }} DZD</td>
                         <td>{{ payment.created_by|default:'—' }}</td>
-                        {% if can_manage_payments %}
+                        <td>{% if payment.is_cancelled %}<span class="badge bg-secondary">{% trans "Annulé" %}</span><div class="small">{{ payment.cancellation_reason }}</div>{% else %}<span class="badge bg-success">{% trans "Validé" %}</span>{% endif %}</td>
+                        {% if can_cancel_payments %}
                             <td>
-                                {% if document_type == 'sale' %}
-                                    <a class="btn btn-sm btn-outline-danger" href="{% url 'sale_payment_delete' document.pk payment.pk %}">{% trans "Supprimer" %}</a>
-                                {% else %}
-                                    <a class="btn btn-sm btn-outline-danger" href="{% url 'purchase_payment_delete' document.pk payment.pk %}">{% trans "Supprimer" %}</a>
+                                {% if not payment.is_cancelled %}
+                                    {% if document_type == 'sale' %}
+                                        <a class="btn btn-sm btn-outline-danger" href="{% url 'sale_payment_delete' document.pk payment.pk %}">{% trans "Annuler" %}</a>
+                                    {% else %}
+                                        <a class="btn btn-sm btn-outline-danger" href="{% url 'purchase_payment_delete' document.pk payment.pk %}">{% trans "Annuler" %}</a>
+                                    {% endif %}
                                 {% endif %}
                             </td>
                         {% endif %}
                     </tr>
                 {% empty %}
-                    <tr><td colspan="{% if can_manage_payments %}6{% else %}5{% endif %}" class="text-center">{% trans "Aucun règlement." %}</td></tr>
+                    <tr><td colspan="{% if can_cancel_payments %}8{% else %}7{% endif %}" class="text-center">{% trans "Aucun règlement." %}</td></tr>
                 {% endfor %}
             </tbody>
         </table>
