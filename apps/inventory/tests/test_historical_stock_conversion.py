@@ -324,7 +324,7 @@ class HistoricalStockConversionTests(TestCase):
         self.assertEqual(product.quantity, 10)
         self.assertFalse(HistoricalStockConversion.objects.filter(product=product).exists())
 
-    def test_regular_product_editor_cannot_bypass_stock_regularization(self):
+    def test_regular_product_editor_can_change_factor_without_stock_regularization(self):
         product = self.legacy_product()
         apply_historical_stock_conversion(product=product, user=self.manager)
         carton = ProductPackaging.objects.get(product=product, kind=ProductPackaging.CARTON)
@@ -340,8 +340,12 @@ class HistoricalStockConversionTests(TestCase):
             instance=carton,
             required=True,
         )
-        self.assertFalse(form.is_valid())
-        self.assertIn('conversion_factor', form.errors)
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save()
+        product.refresh_from_db()
+        carton.refresh_from_db()
+        self.assertEqual(carton.conversion_factor, 24)
+        self.assertEqual(product.quantity, 3000)
 
     def test_command_is_read_only_by_default_and_application_is_guarded(self):
         product = self.legacy_product()

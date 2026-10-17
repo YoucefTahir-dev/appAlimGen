@@ -492,16 +492,8 @@ class CartonConfigurationForm(forms.ModelForm):
         factor = cleaned_data.get('conversion_factor')
         if factor is not None and factor <= 1:
             self.add_error('conversion_factor', _('Un carton doit contenir plus d’une pièce.'))
-        if (
-            self.instance.pk
-            and factor is not None
-            and int(factor) != int(self.instance.conversion_factor)
-            and HistoricalStockConversion.objects.filter(product_id=self.instance.product_id).exists()
-        ):
-            self.add_error(
-                'conversion_factor',
-                _('Utilisez l’outil de correction du conditionnement pour modifier ce facteur et tracer le stock.'),
-            )
+        # Packaging metadata is independent from canonical piece stock and
+        # historical transaction snapshots; it remains editable at any time.
         prices = [
             cleaned_data.get('super_wholesale_price'),
             cleaned_data.get('wholesale_price'),

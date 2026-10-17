@@ -361,6 +361,12 @@ def product_update(request, pk):
                 if saved_product.unit_mode in (
                     Product.UnitMode.CARTON_ONLY, Product.UnitMode.CARTON_AND_PIECE,
                 ):
+                    # Serialize packaging edits with sales/purchases that
+                    # snapshot the factor.  This lock protects only metadata;
+                    # it never recalculates canonical piece stock.
+                    ProductPackaging.objects.select_for_update().filter(
+                        product=saved_product, kind=ProductPackaging.CARTON,
+                    ).first()
                     carton_form.save_for(saved_product)
                 elif saved_product.unit_mode == Product.UnitMode.PIECE_ONLY:
                     CartonConfigurationForm.disable_for(saved_product)
