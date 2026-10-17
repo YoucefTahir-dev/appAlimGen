@@ -75,6 +75,7 @@
 
     <div class="form-actions mt-4">
         {% if can_change_product %}<a href="{% url 'product_update' product.pk %}" class="btn btn-primary">{% trans "Modifier" %}</a>{% endif %}
+        {% if can_regularize_conditioning and product.unit_mode == 'legacy' %}<a href="{% url 'product_conditioning_convert' product.pk %}" class="btn btn-warning">{% trans "Confirmer et convertir le stock historique" %}</a>{% endif %}
         {% if can_regularize_conditioning and product.historical_stock_conversion %}<a href="{% url 'product_conditioning_correct' product.pk %}" class="btn btn-outline-danger">{% trans "Corriger le conditionnement et régulariser le stock" %}</a>{% endif %}
         <a href="{% url 'product_list' %}" class="btn btn-secondary">{% trans "Retour" %}</a>
     </div>

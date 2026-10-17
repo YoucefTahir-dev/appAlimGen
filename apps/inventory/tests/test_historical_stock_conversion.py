@@ -271,6 +271,59 @@ class HistoricalStockConversionTests(TestCase):
         self.assertEqual(product.quantity, 2400)
         self.assertEqual(product.conditioning_corrections.count(), 1)
 
+    def test_web_conversion_uses_manager_confirmed_factor_and_backup(self):
+        product = self.legacy_product(quantity=10, minimum_stock=2)
+        OperatorStock.objects.create(operator=self.seller, product=product, quantity=3)
+        self.client.force_login(self.manager)
+
+        preview = self.client.get(reverse('product_conditioning_convert', args=[product.pk]))
+        self.assertEqual(preview.status_code, 200)
+        self.assertContains(preview, 'Confirmer et convertir le stock historique')
+
+        response = self.client.post(
+            reverse('product_conditioning_convert', args=[product.pk]),
+            {
+                'factor': '24',
+                'backup_reference': 'neon-snapshot-2026-10-17',
+                'confirm': 'on',
+            },
+        )
+        self.assertRedirects(response, reverse('product_update', args=[product.pk]))
+        product.refresh_from_db()
+        operator_stock = OperatorStock.objects.get(operator=self.seller, product=product)
+        conversion = product.historical_stock_conversion
+        self.assertEqual(product.quantity, 240)
+        self.assertEqual(product.minimum_stock, 48)
+        self.assertEqual(operator_stock.quantity, 72)
+        self.assertEqual(product.unit_mode, Product.UnitMode.CARTON_AND_PIECE)
+        self.assertEqual(product.conditioning_status, Product.ConditioningStatus.CONFIRMED)
+        self.assertEqual(conversion.factor, 24)
+        self.assertFalse(conversion.used_default_factor)
+        self.assertEqual(conversion.backup_reference, 'neon-snapshot-2026-10-17')
+        self.assertEqual(len(conversion.simulation_checksum), 64)
+
+    def test_web_conversion_is_blocked_by_open_loading_order(self):
+        product = self.legacy_product(quantity=10)
+        order = LoadingOrder.objects.create(
+            number='CHG-WEB-BLOCK', operator=self.seller, created_by=self.manager,
+        )
+        LoadingOrderLine.objects.create(loading_order=order, product=product, quantity=1)
+        self.client.force_login(self.manager)
+
+        response = self.client.post(
+            reverse('product_conditioning_convert', args=[product.pk]),
+            {
+                'factor': '24',
+                'backup_reference': 'neon-snapshot-2026-10-17',
+                'confirm': 'on',
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Fermez ou annulez les bons de chargement ouverts')
+        product.refresh_from_db()
+        self.assertEqual(product.quantity, 10)
+        self.assertFalse(HistoricalStockConversion.objects.filter(product=product).exists())
+
     def test_regular_product_editor_cannot_bypass_stock_regularization(self):
         product = self.legacy_product()
         apply_historical_stock_conversion(product=product, user=self.manager)

@@ -1,4 +1,5 @@
 from decimal import Decimal, InvalidOperation
+import hashlib
 
 import openpyxl
 from django.contrib import messages
@@ -22,6 +23,7 @@ from .forms import (
     QuickProductForm,
     CartonConfigurationForm,
     ConditioningCorrectionForm,
+    HistoricalStockConversionForm,
     OtherProductPackagingFormSet,
     LoadingOrderForm,
     LoadingOrderLineFormSet,
@@ -36,7 +38,12 @@ from .services import (
     cancel_loading_order, close_loading_order, create_product_from_form, generate_loading_number,
     record_stock_movement, reverse_stock_movement, validate_loading_order,
 )
-from .historical_stock import correct_conditioning, correction_preview
+from .historical_stock import (
+    apply_historical_stock_conversion,
+    build_conversion_plans,
+    correct_conditioning,
+    correction_preview,
+)
 from .location import audit_location, location_snapshot
 from .geocoding import GeocodingService, GeocodingUnavailable
 from django import forms
@@ -332,7 +339,7 @@ def product_update(request, pk):
     posted_mode = request.POST.get('unit_mode') if request.method == 'POST' else product.unit_mode
     carton_required = posted_mode in (Product.UnitMode.CARTON_ONLY, Product.UnitMode.CARTON_AND_PIECE)
     carton_form = CartonConfigurationForm(
-        request.POST if carton_required else None,
+        request.POST if request.method == 'POST' and carton_required else None,
         instance=carton,
         prefix='carton',
         required=carton_required,
@@ -846,6 +853,82 @@ def product_conditioning_correct(request, pk):
             for field_name in form.fields
             if field_name.startswith('operator_')
         ],
+    })
+
+
+@permission_required('inventory.regularize_product_conditioning')
+def product_conditioning_convert(request, pk):
+    product = get_object_or_404(
+        Product.objects.prefetch_related('packagings', 'operator_stocks__operator'),
+        pk=pk,
+    )
+    if product.unit_mode != Product.UnitMode.LEGACY:
+        messages.info(request, _('Le conditionnement de ce produit est déjà confirmé.'))
+        return redirect('product_detail', pk=product.pk)
+    if HistoricalStockConversion.objects.filter(product=product).exists():
+        messages.info(request, _('La conversion historique de ce produit a déjà été appliquée.'))
+        return redirect('product_detail', pk=product.pk)
+
+    form = HistoricalStockConversionForm(request.POST or None, product=product)
+    raw_factor = request.POST.get('factor') if request.method == 'POST' else form.fields['factor'].initial
+    try:
+        factor = max(2, int(raw_factor))
+    except (TypeError, ValueError):
+        factor = HistoricalStockConversion.DEFAULT_FACTOR
+    plan = build_conversion_plans(
+        default_factor=factor,
+        queryset=Product.objects.filter(pk=product.pk),
+    )[0]
+
+    if request.method == 'POST' and form.is_valid():
+        factor = form.cleaned_data['factor']
+        checksum_source = '|'.join((
+            str(product.pk), str(product.quantity), str(product.minimum_stock), str(factor),
+            ','.join(
+                f'{stock.operator_id}:{stock.quantity}'
+                for stock in product.operator_stocks.all().order_by('operator_id')
+            ),
+        ))
+        checksum = hashlib.sha256(checksum_source.encode('utf-8')).hexdigest()
+        try:
+            conversion, created = apply_historical_stock_conversion(
+                product=product,
+                user=request.user,
+                confirmed_factor=factor,
+                backup_reference=form.cleaned_data['backup_reference'],
+                simulation_checksum=checksum,
+            )
+        except ValidationError as exc:
+            _add_product_validation_errors(form, exc, fallback=None)
+        else:
+            log_security_event(
+                request,
+                f'web.product.historical_stock_convert product={product.pk} conversion={conversion.pk}',
+                status_code=200,
+            )
+            if created:
+                messages.success(
+                    request,
+                    _('Le stock historique a été converti en pièces avec succès.'),
+                )
+            return redirect('product_update', pk=product.pk)
+
+    operator_preview = [
+        {
+            'name': stock.operator.get_full_name() or stock.operator.get_username(),
+            'before': stock.quantity,
+            'after': stock.quantity * factor,
+        }
+        for stock in product.operator_stocks.all().order_by('operator_id')
+    ]
+    return render(request, 'inventory/product_conditioning_convert.html', {
+        'product': product,
+        'form': form,
+        'factor': factor,
+        'plan': plan,
+        'depot_after': product.quantity * factor,
+        'minimum_after': product.minimum_stock * factor,
+        'operator_preview': operator_preview,
     })
 
 

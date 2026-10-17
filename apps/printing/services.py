@@ -117,6 +117,7 @@ def invoice_print_data(sale, *, paper_width=80, language='bilingual'):
     with translation.override('fr' if language == 'bilingual' else language):
         context = build_invoice_context(sale)
         company = context['company'] or CompanySettings()
+        complete_80mm = paper_width == 80
         return {
             'invoice_number': sale.invoice_number,
             'ticket_number': sale.ticket_number,
@@ -130,7 +131,10 @@ def invoice_print_data(sale, *, paper_width=80, language='bilingual'):
             'language': language,
             'paper_width': paper_width,
             'characters_per_line': 32 if paper_width == 58 else 48,
-            'show_legal_information': sale.show_legal_information,
+            # The 80 mm layout is the complete commercial ticket requested by
+            # the business. The 58 mm layout keeps honoring the compact option.
+            'show_legal_information': complete_80mm or sale.show_legal_information,
+            'show_complete_customer_details': complete_80mm,
             'company': {
                 'name_fr': company.company_name,
                 'name_ar': context['company_name_ar'],

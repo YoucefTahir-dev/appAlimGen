@@ -171,7 +171,7 @@
         <div class="company-ar">الأمين للمواد الغذائية و غير الغذائية</div>
         <div class="muted">{{ company.address|default:"" }}</div>
         <div>Tél : {{ company.phone|default:"" }}</div>
-        {% if sale.show_legal_information %}<div>NIF : {{ company.tax_number|default:"-" }} | NIS : {{ company.nis|default:"-" }}</div>
+        {% if ticket_width == '80' or sale.show_legal_information %}<div>NIF : {{ company.tax_number|default:"-" }} | NIS : {{ company.nis|default:"-" }}</div>
         <div>{% trans "RC" %} : {{ company.rc_number|default:"-" }} | AI : {{ company.article_number|default:"-" }}</div>{% endif %}
     </header>
 
@@ -185,7 +185,15 @@
         <div class="row"><span>{% trans "Caissier" %}</span><span>{{ cashier_name }}</span></div>
         {% if invoice_client %}
             <div class="row"><span>{% trans "Client" %}</span><span>{{ invoice_client.name }}</span></div>
-            {% if sale.show_legal_information %}{% for label, value in client_legal_identifiers %}
+            {% if ticket_width == '80' %}
+                <div class="row"><span>{% trans "Type de client" %}</span><span>{{ invoice_client.get_customer_type_display }}</span></div>
+                <div class="row"><span>{% trans "Téléphone" %}</span><span>{{ invoice_client.phone|default:"-" }}</span></div>
+                <div class="row"><span>{% trans "Adresse" %}</span><span>{{ invoice_client.address|default:"-" }}</span></div>
+                <div class="row"><span>NIF</span><span>{{ invoice_client.tax_number|default:"-" }}</span></div>
+                <div class="row"><span>NIS</span><span>{{ invoice_client.nis|default:"-" }}</span></div>
+                <div class="row"><span>{% trans "N° article" %}</span><span>{{ invoice_client.article_number|default:"-" }}</span></div>
+                <div class="row"><span>{% trans "RC" %}</span><span>{{ invoice_client.trade_register_number|default:"-" }}</span></div>
+            {% elif sale.show_legal_information %}{% for label, value in client_legal_identifiers %}
                 <div class="row"><span>{{ label }}</span><span>{{ value }}</span></div>
             {% endfor %}{% endif %}
         {% endif %}

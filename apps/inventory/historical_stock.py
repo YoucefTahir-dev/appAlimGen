@@ -173,7 +173,8 @@ def _ensure_no_open_loading(product_id):
 
 @transaction.atomic
 def apply_historical_stock_conversion(
-    *, product, user=None, default_factor=30, backup_reference='', simulation_checksum='',
+    *, product, user=None, default_factor=30, confirmed_factor=None,
+    backup_reference='', simulation_checksum='',
 ):
     """Convert one legacy product exactly once; callers must opt in explicitly."""
     product_id = product.pk if isinstance(product, Product) else int(product)
@@ -194,8 +195,13 @@ def apply_historical_stock_conversion(
         raise ValidationError(
             _('Un ancien conditionnement nommé Carton doit être validé manuellement avant la conversion.')
         )
-    used_default = carton is None or carton.conversion_factor < 2
-    factor = int(default_factor if used_default else carton.conversion_factor)
+    explicitly_confirmed = confirmed_factor is not None
+    used_default = not explicitly_confirmed and (carton is None or carton.conversion_factor < 2)
+    factor = int(
+        confirmed_factor
+        if explicitly_confirmed
+        else (default_factor if used_default else carton.conversion_factor)
+    )
     if factor < 2:
         raise ValidationError(_('Le facteur de conversion doit être au moins égal à 2.'))
     if carton is None:
@@ -209,6 +215,9 @@ def apply_historical_stock_conversion(
             sale_enabled=False,
             is_active=False,
         )
+    elif explicitly_confirmed and carton.conversion_factor != factor:
+        carton.conversion_factor = factor
+        carton.save(update_fields=('conversion_factor',))
 
     operator_stocks = list(
         OperatorStock.objects.select_for_update().filter(product=locked).select_related(

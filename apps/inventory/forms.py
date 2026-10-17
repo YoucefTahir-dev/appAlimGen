@@ -606,6 +606,46 @@ class ConditioningCorrectionForm(forms.Form):
             if f'operator_{stock.operator_id}' in self.cleaned_data
         }
 
+
+class HistoricalStockConversionForm(forms.Form):
+    factor = forms.IntegerField(
+        label=_('Nombre confirmé de pièces par carton'), min_value=2,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'min': 2}),
+    )
+    backup_reference = forms.CharField(
+        label=_('Référence de la sauvegarde'), max_length=255,
+        help_text=_(
+            'Indiquez la sauvegarde vérifiée avant cette conversion '
+            '(par exemple : sauvegarde Neon du 17/10/2026).'
+        ),
+        widget=forms.TextInput(attrs={'class': 'form-control', 'autocomplete': 'off'}),
+    )
+    confirm = forms.BooleanField(
+        label=_(
+            'Je confirme que les stocks actuels de ce produit sont exprimés en cartons '
+            'et j’autorise leur conversion définitive en pièces.'
+        ),
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+    )
+
+    def __init__(self, *args, product, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.product = product
+        carton = product.carton_packaging
+        self.fields['factor'].initial = (
+            carton.conversion_factor
+            if carton and carton.conversion_factor >= 2
+            else HistoricalStockConversion.DEFAULT_FACTOR
+        )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if self.product.unit_mode != Product.UnitMode.LEGACY:
+            raise ValidationError(_('Ce produit a déjà été classifié.'))
+        if HistoricalStockConversion.objects.filter(product=self.product).exists():
+            raise ValidationError(_('Ce produit a déjà été converti.'))
+        return cleaned_data
+
 class ClientForm(forms.ModelForm):
     class Meta:
         model = Client

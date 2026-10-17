@@ -6,6 +6,7 @@ from .views import (
     product_quick_create,
     product_update,
     product_conditioning_correct,
+    product_conditioning_convert,
     product_delete,
     product_import,
     product_export,
@@ -56,6 +57,11 @@ urlpatterns = [
     path('products/generate-barcode/', product_generate_barcode, name='product_generate_barcode'),
     path('products/quick-create/', product_quick_create, name='product_quick_create'),
     path('products/<int:pk>/edit/', product_update, name='product_update'),
+    path(
+        'products/<int:pk>/conditioning/convert/',
+        product_conditioning_convert,
+        name='product_conditioning_convert',
+    ),
     path(
         'products/<int:pk>/conditioning/correct/',
         product_conditioning_correct,

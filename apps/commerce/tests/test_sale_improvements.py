@@ -77,16 +77,23 @@ class SalePaymentAndLegalInformationTests(TestCase):
         self.assertEqual(sale.amount_paid, Decimal('40.00'))
         self.assertEqual(sale.payments.count(), 1)
 
-    def test_ticket_can_hide_legal_information_but_official_invoice_keeps_it(self):
+    def test_80mm_ticket_is_complete_while_58mm_can_hide_legal_information(self):
         sale = self._sale(show_legal_information=False)
-        ticket = self.client.get(reverse('sale_ticket_preview', args=[sale.pk, 80]))
-        self.assertNotContains(ticket, 'NIF-SOCIETE')
-        self.assertNotContains(ticket, 'NIF-CLIENT')
+        ticket_80 = self.client.get(reverse('sale_ticket_preview', args=[sale.pk, 80]))
+        self.assertContains(ticket_80, 'NIF-SOCIETE')
+        self.assertContains(ticket_80, 'NIF-CLIENT')
+        ticket_58 = self.client.get(reverse('sale_ticket_preview', args=[sale.pk, 58]))
+        self.assertNotContains(ticket_58, 'NIF-SOCIETE')
+        self.assertNotContains(ticket_58, 'NIF-CLIENT')
         invoice = self.client.get(reverse('sale_invoice_preview', args=[sale.pk]))
         self.assertContains(invoice, 'NIF-SOCIETE')
         self.assertContains(invoice, 'NIF-CLIENT')
-        thermal = invoice_print_data(sale, paper_width=80, language='fr')
-        self.assertFalse(thermal['show_legal_information'])
+        thermal_80 = invoice_print_data(sale, paper_width=80, language='fr')
+        self.assertTrue(thermal_80['show_legal_information'])
+        self.assertTrue(thermal_80['show_complete_customer_details'])
+        thermal_58 = invoice_print_data(sale, paper_width=58, language='fr')
+        self.assertFalse(thermal_58['show_legal_information'])
+        self.assertFalse(thermal_58['show_complete_customer_details'])
 
     def test_historical_and_new_documents_default_to_visible_legal_information(self):
         sale = self._sale()

@@ -46,6 +46,12 @@
 
             <section class="card card-dashboard product-section mb-4">
                 <div class="product-section-heading"><span class="product-section-icon"><i class="bi bi-boxes"></i></span><div><h2>{% trans "Conditionnement et unités" %}</h2><p>{% trans "Le stock reste unique et est conservé en pièces pour les produits confirmés." %}</p></div></div>
+                {% if form.instance.pk and form.instance.unit_mode == 'legacy' %}
+                <div class="alert alert-warning d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+                    <div><strong>{% trans "Stock historique non confirmé." %}</strong><br>{% trans "Utilisez la conversion contrôlée avant d’activer la vente par carton." %}</div>
+                    <a class="btn btn-warning text-nowrap" href="{% url 'product_conditioning_convert' form.instance.pk %}">{% trans "Confirmer et convertir" %}</a>
+                </div>
+                {% endif %}
                 <div class="row g-3">
                     <div class="col-md-6">{{ form.unit_mode.label_tag }}{{ form.unit_mode }}{{ form.unit_mode.errors }}<div class="form-text">{{ form.unit_mode.help_text }}</div></div>
                     <div class="col-md-6 carton-field">{{ carton_form.conversion_factor.label_tag }}{{ carton_form.conversion_factor }}{{ carton_form.conversion_factor.errors }}</div>
@@ -142,7 +148,7 @@
                     <div class="carton-field"><dt>{% trans "Vente détail carton" %}</dt><dd id="preview-retail-carton">—</dd></div>
                     <div><dt>{% trans "Stock converti" %}</dt><dd id="preview-stock">—</dd></div>
                 </dl>
-                {% if form.instance.pk and form.instance.unit_mode == 'legacy' %}<div class="alert alert-warning small mb-0"><i class="bi bi-shield-exclamation me-1"></i>{% trans "Produit historique : aucune conversion ne sera faite sans confirmation de son unité réelle." %}</div>{% endif %}
+                {% if form.instance.pk and form.instance.unit_mode == 'legacy' %}<div class="alert alert-warning small mb-0"><i class="bi bi-shield-exclamation me-1"></i>{% trans "Produit historique : aucune conversion ne sera faite sans confirmation de son unité réelle." %} <a href="{% url 'product_conditioning_convert' form.instance.pk %}">{% trans "Ouvrir la conversion" %}</a>.</div>{% endif %}
             </aside>
         </div>
     </div>

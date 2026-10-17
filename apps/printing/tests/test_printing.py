@@ -211,6 +211,8 @@ class PrintingApiTests(APITestCase):
             self.assertEqual(payload['items'][0]['quantity'], 2)
             self.assertEqual(payload['items'][0]['stock_quantity'], 12)
             self.assertEqual(payload['paper_width'], 80)
+            self.assertTrue(payload['show_complete_customer_details'])
+            self.assertTrue(payload['show_legal_information'])
             self.assertEqual(payload['language'], language)
             self.assertEqual(payload['printer']['id'], printer.pk)
             self.assertEqual(payload['company']['tax_number'], '002610028552077')

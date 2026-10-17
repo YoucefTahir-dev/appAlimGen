@@ -1,0 +1,55 @@
+{% extends 'base/base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "Convertir le stock historique" %} - {{ product.name }}{% endblock %}
+{% block page_title %}{% trans "Confirmer et convertir le stock historique" %}{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+  <div class="col-lg-7">
+    <form method="post" class="card card-dashboard p-4 bg-white">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+      <h2 class="h4">{{ product.name }}</h2>
+      <p class="text-muted">{% trans "Cette opération transforme une seule fois les quantités historiques en pièces. Les prix et les anciennes factures ne sont pas modifiés." %}</p>
+
+      {% if plan.blockers %}
+      <div class="alert alert-danger">
+        <strong>{% trans "Conversion bloquée." %}</strong>
+        {% for blocker in plan.blockers %}<div>{% if blocker == 'open_loading_order' %}{% trans "Fermez ou annulez les bons de chargement ouverts pour ce produit." %}{% else %}{% trans "Un conditionnement Carton ambigu doit d’abord être vérifié." %}{% endif %}</div>{% endfor %}
+      </div>
+      {% endif %}
+
+      <div class="mb-3">{{ form.factor.label_tag }}{{ form.factor }}{{ form.factor.errors }}</div>
+      <div class="table-responsive mb-3">
+        <table class="table table-bordered align-middle">
+          <thead><tr><th>{% trans "Emplacement" %}</th><th>{% trans "Avant (cartons)" %}</th><th>{% trans "Après (pièces)" %}</th></tr></thead>
+          <tbody>
+            <tr><td>{% trans "Dépôt" %}</td><td>{{ product.quantity }}</td><td>{{ depot_after }}</td></tr>
+            {% for row in operator_preview %}<tr><td>{{ row.name }}</td><td>{{ row.before }}</td><td>{{ row.after }}</td></tr>{% endfor %}
+            <tr><td>{% trans "Seuil minimum" %}</td><td>{{ product.minimum_stock }}</td><td>{{ minimum_after }}</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="mb-3">{{ form.backup_reference.label_tag }}{{ form.backup_reference }}{{ form.backup_reference.errors }}<div class="form-text">{{ form.backup_reference.help_text }}</div></div>
+      <div class="form-check mb-4">{{ form.confirm }} {{ form.confirm.label_tag }}{{ form.confirm.errors }}</div>
+      <div class="form-actions">
+        <button class="btn btn-danger" type="submit" {% if plan.blockers %}disabled{% endif %}>{% trans "Convertir définitivement" %}</button>
+        <a class="btn btn-outline-secondary" href="{% url 'product_update' product.pk %}">{% trans "Annuler" %}</a>
+      </div>
+    </form>
+  </div>
+  <div class="col-lg-5">
+    <div class="card card-dashboard p-4 bg-white">
+      <h2 class="h5">{% trans "Règles appliquées" %}</h2>
+      <ul class="mb-0">
+        <li>{% trans "Le stock du dépôt et des opérateurs est multiplié par le facteur confirmé." %}</li>
+        <li>{% trans "Le stock minimum est converti de la même manière." %}</li>
+        <li>{% trans "Une écriture d’audit immuable est conservée." %}</li>
+        <li>{% trans "Les factures et leurs conditionnements historiques restent inchangés." %}</li>
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}
