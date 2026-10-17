@@ -9,8 +9,8 @@ from rest_framework.exceptions import PermissionDenied
 
 from apps.accounts.permissions import has_permission
 from apps.core.models import CompanySettings
-from apps.commerce.models import Payment, Purchase, PurchaseLine, Sale, SaleLine
-from apps.commerce.services import create_purchase, create_sale, update_sale
+from apps.commerce.models import OpeningBalancePayment, Payment, Purchase, PurchaseLine, Sale, SaleLine
+from apps.commerce.services import create_purchase, create_sale, update_purchase, update_sale
 from apps.commerce.utils import legacy_snapshot_warning
 from apps.expenses.models import Expense, ExpenseCategory
 from apps.inventory.models import (
@@ -149,12 +149,14 @@ class ProductSerializer(serializers.ModelSerializer):
     unit_name = serializers.CharField(source='unit.name', read_only=True)
     stock_status = serializers.SerializerMethodField()
     conditionnements = ProductPackagingSerializer(source='packagings', many=True, read_only=True)
+    has_historical_conversion = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
         fields = (
             'id', 'reference', 'barcode', 'name', 'category', 'category_name',
-            'brand', 'brand_name', 'unit', 'unit_name', 'unit_mode', 'purchase_price',
+            'brand', 'brand_name', 'unit', 'unit_name', 'unit_mode', 'conditioning_status',
+            'has_historical_conversion', 'purchase_price',
             'sale_price', 'super_wholesale_price', 'wholesale_price', 'retail_price',
             'quantity', 'minimum_stock', 'description', 'photo',
             'qr_code', 'barcode_image', 'stock_status', 'conditionnements', 'created_at',
@@ -230,6 +232,9 @@ class ProductSerializer(serializers.ModelSerializer):
         if quantity <= product.minimum_stock + 5:
             return 'low'
         return 'normal'
+
+    def get_has_historical_conversion(self, product) -> bool:
+        return hasattr(product, 'historical_stock_conversion')
 
     def _effective_quantity(self, product):
         request = self.context.get('request')
@@ -666,6 +671,7 @@ class PurchaseLineWriteSerializer(serializers.Serializer):
 
 
 class PurchaseSerializer(serializers.ModelSerializer):
+    supplier_name = serializers.CharField(source='supplier.name', read_only=True)
     lines = PurchaseLineReadSerializer(many=True, read_only=True)
     items = PurchaseLineWriteSerializer(many=True, write_only=True)
     amount_paid = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
@@ -675,7 +681,7 @@ class PurchaseSerializer(serializers.ModelSerializer):
     class Meta:
         model = Purchase
         fields = (
-            'id', 'reference', 'supplier', 'total', 'tax_rate', 'payment_tracking_initialized',
+            'id', 'reference', 'supplier', 'supplier_name', 'total', 'tax_rate', 'payment_tracking_initialized',
             'created_at', 'amount_paid', 'balance_due', 'payment_status', 'lines', 'items',
         )
         read_only_fields = ('total', 'payment_tracking_initialized', 'created_at')
@@ -687,6 +693,22 @@ class PurchaseSerializer(serializers.ModelSerializer):
         except Exception as exc:
             from django.core.exceptions import ValidationError as DjangoValidationError
 
+            if not isinstance(exc, DjangoValidationError):
+                raise
+            details = exc.message_dict if hasattr(exc, 'message_dict') else {'non_field_errors': exc.messages}
+            message = ' '.join(str(item) for messages in details.values() for item in messages)
+            raise BusinessAPIException('PURCHASE_VALIDATION_ERROR', message, details) from exc
+
+    def update(self, instance, validated_data):
+        items = validated_data.pop('items', None)
+        try:
+            return update_purchase(
+                purchase=instance,
+                lines=items,
+                user=self.context['request'].user,
+                **validated_data,
+            )
+        except Exception as exc:
             if not isinstance(exc, DjangoValidationError):
                 raise
             details = exc.message_dict if hasattr(exc, 'message_dict') else {'non_field_errors': exc.messages}
@@ -742,7 +764,7 @@ class ReceivableSerializer(serializers.ModelSerializer):
         source='receivable_paid', max_digits=14, decimal_places=2, read_only=True,
     )
     balance_due = serializers.SerializerMethodField()
-    invoice_count = serializers.IntegerField(source='receivable_invoice_count', read_only=True)
+    invoice_count = serializers.SerializerMethodField()
     unpaid_invoice_count = serializers.SerializerMethodField()
     last_payment_at = serializers.DateTimeField(source='receivable_last_payment', read_only=True)
     unreconciled_invoice_count = serializers.IntegerField(
@@ -760,11 +782,41 @@ class ReceivableSerializer(serializers.ModelSerializer):
     def get_balance_due(self, obj) -> Decimal:
         return max(obj.receivable_invoiced - obj.receivable_paid, Decimal('0.00'))
 
+    def get_invoice_count(self, obj) -> int:
+        has_opening = bool(
+            obj.balance > 0 or getattr(obj, 'receivable_opening_payment_count', 0)
+        )
+        return obj.receivable_invoice_count + int(has_opening)
+
     def get_unpaid_invoice_count(self, obj) -> int:
         cached = getattr(obj, 'receivable_unpaid_count', None)
         if cached is not None:
             return cached
         return sum(1 for sale in obj.receivable_sales_cache if sale.balance_due > 0)
+
+
+class ReceivablePaymentAllocationSerializer(serializers.Serializer):
+    amount = serializers.DecimalField(max_digits=14, decimal_places=2, min_value=Decimal('0.01'))
+    payment_type = serializers.ChoiceField(choices=Payment.PAYMENT_CHOICES)
+    created_at = serializers.DateTimeField(required=False)
+    external_reference = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    notes = serializers.CharField(required=False, allow_blank=True)
+
+
+class OpeningBalancePaymentSerializer(serializers.ModelSerializer):
+    is_cancelled = serializers.BooleanField(read_only=True)
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True)
+    cancelled_by_name = serializers.CharField(source='cancelled_by.username', read_only=True)
+
+    class Meta:
+        model = OpeningBalancePayment
+        fields = (
+            'id', 'reference', 'client', 'amount', 'payment_type',
+            'external_reference', 'notes', 'created_by_name', 'created_at',
+            'is_cancelled', 'cancelled_at', 'cancelled_by_name',
+            'cancellation_reason',
+        )
+        read_only_fields = fields
 
 
 class LoadingOrderLineSerializer(serializers.ModelSerializer):
@@ -852,6 +904,32 @@ class LoadingOrderSerializer(serializers.ModelSerializer):
             instance.lines.all().delete()
             self._create_lines(instance, lines)
         return instance
+
+
+class HistoricalStockConversionRequestSerializer(serializers.Serializer):
+    factor = serializers.IntegerField(min_value=2)
+    backup_reference = serializers.CharField(max_length=255)
+    confirm = serializers.BooleanField()
+
+    def validate_confirm(self, value):
+        if not value:
+            raise serializers.ValidationError(_('La confirmation explicite est obligatoire.'))
+        return value
+
+
+class ConditioningCorrectionRequestSerializer(serializers.Serializer):
+    new_factor = serializers.IntegerField(min_value=2)
+    reason = serializers.CharField(max_length=500)
+    physical_depot_quantity = serializers.IntegerField(min_value=0, required=False)
+    physical_operator_quantities = serializers.DictField(
+        child=serializers.IntegerField(min_value=0), required=False,
+    )
+    confirm = serializers.BooleanField()
+
+    def validate_confirm(self, value):
+        if not value:
+            raise serializers.ValidationError(_('La confirmation explicite est obligatoire.'))
+        return value
 
 
 class OperatorStockSerializer(serializers.ModelSerializer):

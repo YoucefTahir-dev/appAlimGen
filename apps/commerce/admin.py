@@ -1,5 +1,14 @@
 from django.contrib import admin
-from .models import InvoiceSequence, Purchase, PurchaseLine, Sale, SaleLine, Payment, TicketSequence
+from .models import (
+    InvoiceSequence,
+    OpeningBalancePayment,
+    Payment,
+    Purchase,
+    PurchaseLine,
+    Sale,
+    SaleLine,
+    TicketSequence,
+)
 
 @admin.register(Purchase)
 class PurchaseAdmin(admin.ModelAdmin):
@@ -97,3 +106,29 @@ class PaymentAdmin(admin.ModelAdmin):
         if obj.created_by_id is None:
             obj.created_by = request.user
         super().save_model(request, obj, form, change)
+
+
+@admin.register(OpeningBalancePayment)
+class OpeningBalancePaymentAdmin(admin.ModelAdmin):
+    """Read-only audit trail; creation and cancellation go through the service API."""
+
+    actions = None
+    list_display = (
+        'reference', 'client', 'payment_type', 'amount', 'created_at', 'cancelled_at',
+    )
+    list_filter = ('payment_type', 'cancelled_at')
+    search_fields = ('reference', 'client__name', 'external_reference')
+    readonly_fields = (
+        'reference', 'client', 'amount', 'payment_type', 'external_reference',
+        'notes', 'created_by', 'created_at', 'cancelled_at', 'cancelled_by',
+        'cancellation_reason',
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_active and request.user.is_staff
+
+    def has_delete_permission(self, request, obj=None):
+        return False

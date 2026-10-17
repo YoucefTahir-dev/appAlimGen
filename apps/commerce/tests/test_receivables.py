@@ -8,7 +8,7 @@ from django.test import TestCase, TransactionTestCase
 from django.urls import reverse
 from rest_framework.test import APITestCase
 
-from apps.commerce.models import Payment, Sale
+from apps.commerce.models import OpeningBalancePayment, Payment, Sale
 from apps.inventory.models import Client
 
 
@@ -162,6 +162,115 @@ class ReceivableApiTests(APITestCase):
         self.assertEqual(response.status_code, 403, response.data)
         payment.refresh_from_db()
         self.assertFalse(payment.is_cancelled)
+
+    def test_allocate_payment_fifo_across_multiple_invoices(self):
+        second = Sale.objects.create(
+            invoice_number='FAC-API-CRE-002', client=self.customer,
+            total=Decimal('50.00'), payment_tracking_initialized=True,
+        )
+        url = reverse('api-receivable-allocate-payment', args=[self.customer.pk])
+        response = self.client.post(
+            url,
+            {
+                'amount': '100.00', 'payment_type': Payment.CASH,
+                'external_reference': 'VERSEMENT-CLIENT',
+            },
+            format='json', HTTP_IDEMPOTENCY_KEY='allocation-fifo-1',
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(Payment.objects.filter(sale=self.sale).get().amount, Decimal('80.00'))
+        self.assertEqual(Payment.objects.filter(sale=second).get().amount, Decimal('20.00'))
+        self.assertEqual(second.balance_due, Decimal('30.00'))
+
+        replay = self.client.post(
+            url,
+            {
+                'amount': '100.00', 'payment_type': Payment.CASH,
+                'external_reference': 'VERSEMENT-CLIENT',
+            },
+            format='json', HTTP_IDEMPOTENCY_KEY='allocation-fifo-1',
+        )
+        self.assertEqual(replay.status_code, 201, replay.data)
+        self.assertEqual(Payment.objects.filter(sale__client=self.customer).count(), 2)
+
+    def test_allocate_payment_rejects_amount_above_total_client_debt(self):
+        response = self.client.post(
+            reverse('api-receivable-allocate-payment', args=[self.customer.pk]),
+            {'amount': '80.01', 'payment_type': Payment.CASH},
+            format='json', HTTP_IDEMPOTENCY_KEY='allocation-too-high',
+        )
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertFalse(Payment.objects.filter(sale=self.sale).exists())
+
+    def test_settled_account_remains_retrievable_and_allocation_replayable(self):
+        url = reverse('api-receivable-allocate-payment', args=[self.customer.pk])
+        payload = {'amount': '80.00', 'payment_type': Payment.CASH}
+        first = self.client.post(
+            url, payload, format='json', HTTP_IDEMPOTENCY_KEY='allocation-full',
+        )
+        self.assertEqual(first.status_code, 201, first.data)
+        replay = self.client.post(
+            url, payload, format='json', HTTP_IDEMPOTENCY_KEY='allocation-full',
+        )
+        self.assertEqual(replay.status_code, 201, replay.data)
+        detail = self.client.get(reverse('api-receivable-detail', args=[self.customer.pk]))
+        self.assertEqual(detail.status_code, 200, detail.data)
+        self.assertEqual(detail.data['balance_due'], '0.00')
+
+    def test_prior_debt_is_included_paid_and_cancellable(self):
+        self.customer.balance = Decimal('40.00')
+        self.customer.save(update_fields=('balance',))
+        url = reverse('api-receivable-allocate-payment', args=[self.customer.pk])
+        response = self.client.post(
+            url,
+            {'amount': '100.00', 'payment_type': Payment.CASH},
+            format='json', HTTP_IDEMPOTENCY_KEY='allocation-opening-balance',
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        opening_payment = OpeningBalancePayment.objects.get(client=self.customer)
+        self.assertEqual(opening_payment.amount, Decimal('20.00'))
+        self.customer.refresh_from_db()
+        self.assertEqual(self.customer.balance, Decimal('20.00'))
+
+        detail = self.client.get(reverse('api-receivable-detail', args=[self.customer.pk]))
+        self.assertEqual(detail.status_code, 200, detail.data)
+        self.assertEqual(detail.data['opening_balance'], '20.00')
+        self.assertEqual(detail.data['balance_due'], '20.00')
+        self.assertEqual(len(detail.data['opening_balance_payments']), 1)
+
+        cancelled = self.client.post(
+            reverse('api-receivable-cancel-opening-payment', args=[self.customer.pk]),
+            {'payment_id': opening_payment.pk, 'reason': 'Erreur de saisie'},
+            format='json',
+        )
+        self.assertEqual(cancelled.status_code, 200, cancelled.data)
+        self.customer.refresh_from_db()
+        self.assertEqual(self.customer.balance, Decimal('40.00'))
+        opening_payment.refresh_from_db()
+        self.assertTrue(opening_payment.is_cancelled)
+
+    def test_cancel_prior_debt_payment_requires_dedicated_permission(self):
+        self.customer.balance = Decimal('20.00')
+        self.customer.save(update_fields=('balance',))
+        opening_payment = OpeningBalancePayment.objects.create(
+            client=self.customer,
+            amount=Decimal('10.00'),
+            payment_type=Payment.CASH,
+            created_by=self.admin,
+        )
+        self.client.force_authenticate(self.seller)
+
+        response = self.client.post(
+            reverse('api-receivable-cancel-opening-payment', args=[self.customer.pk]),
+            {'payment_id': opening_payment.pk, 'reason': 'Tentative non autorisée'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 403, response.data)
+        opening_payment.refresh_from_db()
+        self.customer.refresh_from_db()
+        self.assertFalse(opening_payment.is_cancelled)
+        self.assertEqual(self.customer.balance, Decimal('10.00'))
 
 
 class PostgreSQLPaymentConcurrencyTests(TransactionTestCase):

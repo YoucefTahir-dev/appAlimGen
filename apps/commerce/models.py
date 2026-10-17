@@ -3,7 +3,7 @@ from uuid import uuid4
 
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
-from django.db.models import Q, Sum
+from django.db.models import F, Q, Sum
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
@@ -913,6 +913,115 @@ class Payment(models.Model):
         self.cancelled_at = locked.cancelled_at
         self.cancelled_by = locked.cancelled_by
         self.cancellation_reason = locked.cancellation_reason
+        return locked
+
+    @transaction.atomic
+    def delete(self, *args, **kwargs):
+        raise ValidationError(
+            _('Un règlement ne peut pas être supprimé. Utilisez une annulation traçable.')
+        )
+
+    def __str__(self):
+        return self.reference
+
+
+class OpeningBalancePayment(models.Model):
+    """Immutable, auditable payment applied to a client's pre-existing debt."""
+
+    reference = models.CharField(
+        _('Référence paiement'), max_length=100, unique=True, blank=True, editable=False,
+    )
+    client = models.ForeignKey(
+        Client, on_delete=models.PROTECT, related_name='opening_balance_payments',
+    )
+    amount = models.DecimalField(_('Montant'), max_digits=14, decimal_places=2)
+    payment_type = models.CharField(
+        _('Type paiement'), max_length=20, choices=Payment.PAYMENT_CHOICES,
+    )
+    external_reference = models.CharField(
+        _('Référence externe'), max_length=100, blank=True,
+    )
+    notes = models.TextField(_('Observation'), blank=True)
+    created_by = models.ForeignKey(
+        'accounts.User', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='recorded_opening_balance_payments',
+    )
+    created_at = models.DateTimeField(_('Date'), default=timezone.now, db_index=True)
+    cancelled_at = models.DateTimeField(_('Annulé le'), null=True, blank=True, editable=False)
+    cancelled_by = models.ForeignKey(
+        'accounts.User', on_delete=models.SET_NULL, null=True, blank=True,
+        editable=False, related_name='cancelled_opening_balance_payments',
+    )
+    cancellation_reason = models.TextField(
+        _('Motif d’annulation'), blank=True, editable=False,
+    )
+
+    class Meta:
+        ordering = ('-created_at', '-pk')
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(amount__gt=0),
+                name='commerce_opening_payment_amount_positive',
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=('client', '-created_at'),
+                name='commerce_open_client_date_idx',
+            ),
+        ]
+
+    @property
+    def is_cancelled(self):
+        return self.cancelled_at is not None
+
+    def _generate_reference(self):
+        year = (self.created_at or timezone.now()).year
+        for _attempt in range(10):
+            candidate = f'OBP-{year}-{uuid4().hex[:16].upper()}'
+            if not OpeningBalancePayment.objects.filter(reference=candidate).exists():
+                return candidate
+        raise ValidationError(_('Impossible de générer une référence de règlement unique.'))
+
+    @transaction.atomic
+    def save(self, *args, **kwargs):
+        if self.pk:
+            raise ValidationError(
+                _('Un règlement enregistré est immuable. Annulez-le si nécessaire.')
+            )
+        client = Client.objects.select_for_update().get(pk=self.client_id)
+        self.amount = _decimal(self.amount).quantize(Decimal('0.01'))
+        if self.amount <= ZERO:
+            raise ValidationError({'amount': _('Le montant doit être strictement positif.')})
+        if self.amount > client.balance:
+            raise ValidationError({
+                'amount': _('Le montant dépasse la créance antérieure restante.'),
+            })
+        if not self.reference:
+            self.reference = self._generate_reference()
+        self.full_clean()
+        result = super().save(*args, **kwargs)
+        Client.objects.filter(pk=client.pk).update(balance=F('balance') - self.amount)
+        self.client.balance = client.balance - self.amount
+        return result
+
+    @transaction.atomic
+    def cancel(self, *, user, reason):
+        reason = str(reason or '').strip()
+        if not reason:
+            raise ValidationError({'cancellation_reason': _('Le motif d’annulation est obligatoire.')})
+        client = Client.objects.select_for_update().get(pk=self.client_id)
+        locked = OpeningBalancePayment.objects.select_for_update().get(pk=self.pk)
+        if locked.cancelled_at is not None:
+            return locked
+        Client.objects.filter(pk=client.pk).update(balance=F('balance') + locked.amount)
+        locked.cancelled_at = timezone.now()
+        locked.cancelled_by = user
+        locked.cancellation_reason = reason
+        models.Model.save(
+            locked,
+            update_fields=('cancelled_at', 'cancelled_by', 'cancellation_reason'),
+        )
         return locked
 
     @transaction.atomic

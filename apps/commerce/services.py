@@ -556,3 +556,98 @@ def create_purchase(*, reference, supplier, lines, tax_rate=0, user=None):
         purchase_line._stock_user = user
         purchase_line.save()
     return purchase
+
+
+@transaction.atomic
+def update_purchase(*, purchase, reference=None, supplier=None, lines=None, tax_rate=None, user=None):
+    """Replace a purchase atomically while keeping every stock mutation journaled."""
+    purchase = Purchase.objects.select_for_update().get(pk=purchase.pk)
+    list(Payment.objects.select_for_update().filter(purchase=purchase).order_by('pk'))
+    old_lines = list(purchase.lines.select_for_update().order_by('pk'))
+    reference = purchase.reference if reference is None else reference
+    supplier = supplier or purchase.supplier
+    tax_rate = validate_tax_rate(money(purchase.tax_rate if tax_rate is None else tax_rate))
+
+    if lines is None:
+        normalized_lines = None
+        subtotal = sum((line.line_total() for line in old_lines), Decimal('0'))
+    else:
+        if not lines:
+            raise ValidationError({'lines': _('Un achat doit contenir au moins un produit.')})
+        product_ids = sorted({
+            line['product'].pk if isinstance(line['product'], Product) else int(line['product'])
+            for line in lines
+        } | {line.product_id for line in old_lines})
+        products = {
+            product.pk: product
+            for product in Product.objects.select_for_update().filter(pk__in=product_ids).order_by('pk')
+        }
+        if len(products) != len(product_ids):
+            raise ValidationError({'lines': _('Un produit est introuvable.')})
+        packaging_ids = sorted({
+            line['packaging'].pk if isinstance(line.get('packaging'), ProductPackaging) else int(line['packaging'])
+            for line in lines if line.get('packaging')
+        })
+        packagings = {
+            packaging.pk: packaging
+            for packaging in ProductPackaging.objects.select_for_update().filter(pk__in=packaging_ids).order_by('pk')
+        }
+        if len(packagings) != len(packaging_ids):
+            raise ValidationError({'packaging': _('Conditionnement d’achat invalide ou inactif.')})
+
+        normalized_lines = []
+        subtotal = Decimal('0')
+        for raw_line in lines:
+            product_id = raw_line['product'].pk if isinstance(raw_line['product'], Product) else int(raw_line['product'])
+            product = products[product_id]
+            entered_quantity = int(raw_line['quantity'])
+            if entered_quantity <= 0:
+                raise ValidationError({'quantity': _('La quantité doit être strictement positive.')})
+            purchase_price = money(raw_line['purchase_price'])
+            if purchase_price < 0:
+                raise ValidationError({'purchase_price': _('Le prix ne peut pas être négatif.')})
+            packaging_value = raw_line.get('packaging')
+            packaging_id = packaging_value.pk if isinstance(packaging_value, ProductPackaging) else packaging_value
+            packaging = packagings.get(int(packaging_id)) if packaging_id else None
+            if packaging and (
+                packaging.product_id != product.pk
+                or not packaging.is_active
+                or not packaging.purchase_enabled
+            ):
+                raise ValidationError({'packaging': _('Conditionnement d’achat invalide ou inactif.')})
+            if packaging and product.unit_mode in {Product.UnitMode.LEGACY, Product.UnitMode.PIECE_ONLY}:
+                raise ValidationError({'packaging': _('Ce produit ne peut être acheté qu’en unité de base.')})
+            if product.unit_mode == Product.UnitMode.CARTON_ONLY and (
+                not packaging or packaging.kind != ProductPackaging.CARTON
+            ):
+                raise ValidationError({'packaging': _('Ce produit doit être acheté en carton.')})
+            factor = packaging.conversion_factor if packaging else 1
+            subtotal += entered_quantity * purchase_price
+            normalized_lines.append({
+                'product_id': product.pk,
+                'quantity': entered_quantity * factor,
+                'packaging': packaging,
+                'packaging_quantity': entered_quantity,
+                'purchase_price': purchase_price,
+            })
+
+    total = money(subtotal + subtotal * tax_rate / Decimal('100'))
+    if total < purchase.amount_paid:
+        raise ValidationError({'total': _('Le total ne peut pas être inférieur aux règlements déjà enregistrés.')})
+
+    purchase.reference = reference
+    purchase.supplier = supplier
+    purchase.tax_rate = tax_rate
+    purchase.total = total
+    purchase.payment_tracking_initialized = True
+    purchase.save()
+
+    if normalized_lines is not None:
+        for old_line in old_lines:
+            old_line._stock_user = user
+            old_line.delete()
+        for line in normalized_lines:
+            replacement = PurchaseLine(purchase=purchase, **line)
+            replacement._stock_user = user
+            replacement.save()
+    return purchase

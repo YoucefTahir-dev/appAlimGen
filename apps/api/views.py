@@ -1,3 +1,7 @@
+import hashlib
+from decimal import Decimal
+
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.db.models import F, Q
 from django.db.models.deletion import ProtectedError
@@ -14,8 +18,9 @@ from rest_framework.views import APIView
 from rest_framework import serializers
 from apps.accounts.permissions import has_permission
 
-from apps.commerce.models import Payment, Purchase, Sale
+from apps.commerce.models import OpeningBalancePayment, Payment, Purchase, Sale
 from apps.commerce.receivables import (
+    allocate_client_payment,
     attach_receivable_counts,
     receivable_account,
     receivables_queryset,
@@ -29,7 +34,13 @@ from apps.core.security import log_security_event
 from apps.expenses.models import Expense, ExpenseCategory
 from apps.inventory.models import (
     Brand, Category, Client, LoadingOrder, OperatorStock, OperatorStockMovement,
-    Product, ProductPackaging, StockMovement, Supplier, Unit,
+    HistoricalStockConversion, Product, ProductPackaging, StockMovement, Supplier, Unit,
+)
+from apps.inventory.historical_stock import (
+    apply_historical_stock_conversion,
+    build_conversion_plans,
+    correct_conditioning,
+    correction_preview,
 )
 from apps.inventory.services import cancel_loading_order, close_loading_order, validate_loading_order
 from apps.inventory.pricing import get_sale_price_context, sale_packaging_allowed
@@ -49,8 +60,12 @@ from .serializers import (
     OperatorStockSerializer,
     PaymentSerializer,
     ReceivableSerializer,
+    ReceivablePaymentAllocationSerializer,
+    OpeningBalancePaymentSerializer,
     ProductSerializer,
     ProductPackagingSerializer,
+    HistoricalStockConversionRequestSerializer,
+    ConditioningCorrectionRequestSerializer,
     PrinterProfileSerializer,
     PrintProfileSerializer,
     PurchaseSerializer,
@@ -149,7 +164,9 @@ def date_filters(request):
 
 class ProductViewSet(AuditMutationMixin, viewsets.ModelViewSet):
     serializer_class = ProductSerializer
-    queryset = Product.objects.select_related('category', 'brand', 'unit').prefetch_related('packagings').all()
+    queryset = Product.objects.select_related(
+        'category', 'brand', 'unit', 'historical_stock_conversion',
+    ).prefetch_related('packagings').all()
     search_fields = ('name', 'reference', 'barcode')
     ordering_fields = ('name', 'reference', 'quantity', 'sale_price', 'created_at')
     filterset_fields = ('category', 'brand', 'unit')
@@ -158,6 +175,10 @@ class ProductViewSet(AuditMutationMixin, viewsets.ModelViewSet):
         'list': 'inventory.view_product', 'retrieve': 'inventory.view_product',
         'barcode': 'inventory.view_product', 'qr': 'inventory.view_product',
         'price': 'inventory.view_product',
+        'historical_conversion_preview': 'inventory.regularize_product_conditioning',
+        'historical_conversion': 'inventory.regularize_product_conditioning',
+        'conditioning_correction_preview': 'inventory.regularize_product_conditioning',
+        'conditioning_correction': 'inventory.regularize_product_conditioning',
         'create': 'inventory.add_product', 'update': 'inventory.change_product',
         'partial_update': 'inventory.change_product', 'destroy': 'inventory.delete_product',
     }
@@ -251,6 +272,125 @@ class ProductViewSet(AuditMutationMixin, viewsets.ModelViewSet):
             if not sale_packaging_allowed(product, packaging):
                 raise ValidationError({'packaging_id': _('Conditionnement de vente invalide ou inactif.')})
         return Response(get_sale_price_context(product, customer, packaging))
+
+    @staticmethod
+    def _conversion_plan_data(plan):
+        return {
+            'product_id': plan.product_id,
+            'reference': plan.reference,
+            'name': plan.name,
+            'factor': plan.factor,
+            'factor_source': plan.factor_source,
+            'conditioning_status': plan.conditioning_status,
+            'depot_cartons_before': plan.depot_cartons_before,
+            'depot_pieces_after': plan.depot_pieces_after,
+            'minimum_cartons_before': plan.minimum_cartons_before,
+            'minimum_pieces_after': plan.minimum_pieces_after,
+            'operator_locations': [vars(location) for location in plan.operator_locations],
+            'blockers': list(plan.blockers),
+            'already_converted': plan.already_converted,
+            'eligible': plan.eligible,
+        }
+
+    @action(detail=True, methods=('get',), url_path='historical-conversion-preview')
+    def historical_conversion_preview(self, request, pk=None):
+        product = self.get_object()
+        factor = serializers.IntegerField(min_value=2).run_validation(
+            request.query_params.get('factor', 30),
+        )
+        plan = build_conversion_plans(
+            default_factor=factor, queryset=Product.objects.filter(pk=product.pk),
+        )[0]
+        return Response(self._conversion_plan_data(plan))
+
+    @action(detail=True, methods=('post',), url_path='historical-conversion')
+    def historical_conversion(self, request, pk=None):
+        product = self.get_object()
+        serializer = HistoricalStockConversionRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        operator_values = ','.join(
+            f'{stock.operator_id}:{stock.quantity}'
+            for stock in product.operator_stocks.all().order_by('operator_id')
+        )
+        checksum_source = '|'.join((
+            str(product.pk), str(product.quantity), str(product.minimum_stock),
+            str(data['factor']), operator_values,
+        ))
+        try:
+            conversion, created = apply_historical_stock_conversion(
+                product=product,
+                user=request.user,
+                confirmed_factor=data['factor'],
+                backup_reference=data['backup_reference'],
+                simulation_checksum=hashlib.sha256(checksum_source.encode('utf-8')).hexdigest(),
+            )
+        except DjangoValidationError as exc:
+            raise ValidationError(
+                exc.message_dict if hasattr(exc, 'message_dict') else exc.messages,
+            ) from exc
+        product.refresh_from_db()
+        self._audit('historical_conversion', 201 if created else 200)
+        return Response(
+            {'created': created, 'conversion_id': conversion.pk, 'product': self.get_serializer(product).data},
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+    @action(detail=True, methods=('get',), url_path='conditioning-correction-preview')
+    def conditioning_correction_preview(self, request, pk=None):
+        product = self.get_object()
+        try:
+            conversion = product.historical_stock_conversion
+        except HistoricalStockConversion.DoesNotExist as exc:
+            raise ValidationError({'product': _('Ce produit ne possède pas de conversion historique.')}) from exc
+        factor = serializers.IntegerField(min_value=2).run_validation(
+            request.query_params.get('new_factor', conversion.factor),
+        )
+        preview = correction_preview(conversion=conversion, new_factor=factor)
+        preview['operator_targets'] = {
+            str(key): value for key, value in preview['operator_targets'].items()
+        }
+        current_by_operator = dict(
+            product.operator_stocks.values_list('operator_id', 'quantity')
+        )
+        preview['operator_locations'] = [
+            {
+                'operator_id': location.operator_id,
+                'operator_name': location.operator.get_full_name()
+                or location.operator.get_username(),
+                'current_quantity': current_by_operator.get(location.operator_id, 0),
+                'target_quantity': preview['operator_targets'].get(str(location.operator_id)),
+            }
+            for location in conversion.operator_locations.select_related('operator').order_by('operator_id')
+        ]
+        preview['current_depot_quantity'] = product.quantity
+        return Response(preview)
+
+    @action(detail=True, methods=('post',), url_path='conditioning-correction')
+    def conditioning_correction(self, request, pk=None):
+        product = self.get_object()
+        serializer = ConditioningCorrectionRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        try:
+            correction = correct_conditioning(
+                product=product,
+                new_factor=data['new_factor'],
+                reason=data['reason'],
+                user=request.user,
+                physical_depot_quantity=data.get('physical_depot_quantity'),
+                physical_operator_quantities=data.get('physical_operator_quantities'),
+            )
+        except DjangoValidationError as exc:
+            raise ValidationError(
+                exc.message_dict if hasattr(exc, 'message_dict') else exc.messages,
+            ) from exc
+        product.refresh_from_db()
+        self._audit('conditioning_correction')
+        return Response({
+            'correction_id': correction.pk,
+            'product': self.get_serializer(product).data,
+        })
 
 
 class ProductPackagingViewSet(AuditMutationMixin, viewsets.ModelViewSet):
@@ -424,7 +564,8 @@ class SaleViewSet(AuditMutationMixin, mixins.CreateModelMixin, mixins.ListModelM
 
 
 class PurchaseViewSet(AuditMutationMixin, mixins.CreateModelMixin, mixins.ListModelMixin,
-                      mixins.RetrieveModelMixin, mixins.DestroyModelMixin, viewsets.GenericViewSet):
+                      mixins.RetrieveModelMixin, mixins.UpdateModelMixin,
+                      mixins.DestroyModelMixin, viewsets.GenericViewSet):
     queryset = Purchase.objects.select_related('supplier').prefetch_related('lines__product', 'payments').order_by('-created_at', '-pk')
     serializer_class = PurchaseSerializer
     search_fields = ('reference', 'supplier__name')
@@ -433,7 +574,8 @@ class PurchaseViewSet(AuditMutationMixin, mixins.CreateModelMixin, mixins.ListMo
     audit_name = 'purchase'
     required_permissions = {
         'list': 'commerce.view_purchase', 'retrieve': 'commerce.view_purchase',
-        'create': 'commerce.add_purchase', 'destroy': 'commerce.delete_purchase',
+        'create': 'commerce.add_purchase', 'update': 'commerce.change_purchase',
+        'partial_update': 'commerce.change_purchase', 'destroy': 'commerce.delete_purchase',
     }
 
     @extend_schema(parameters=[IDEMPOTENCY_PARAMETER])
@@ -502,10 +644,15 @@ class PaymentViewSet(AuditMutationMixin, mixins.CreateModelMixin, mixins.ListMod
         return Response(self.get_serializer(payment).data)
 
 
-class ReceivableViewSet(viewsets.ReadOnlyModelViewSet):
+class ReceivableViewSet(AuditMutationMixin, viewsets.ReadOnlyModelViewSet):
     queryset = Client.objects.none()
     serializer_class = ReceivableSerializer
-    required_permissions = {'*': 'commerce.view_receivables'}
+    required_permissions = {
+        '*': 'commerce.view_receivables',
+        'allocate_payment': 'commerce.add_customerpayment',
+        'cancel_opening_payment': 'commerce.cancel_customerpayment',
+    }
+    audit_name = 'receivable'
     search_fields = ('name', 'phone', 'email', 'tax_number')
     ordering_fields = ('name', 'created_at')
 
@@ -513,13 +660,17 @@ class ReceivableViewSet(viewsets.ReadOnlyModelViewSet):
         if getattr(self, 'swagger_fake_view', False):
             return self.queryset
         queryset = receivables_queryset(self.request.user)
+        if getattr(self, 'action', None) != 'list':
+            return queryset.order_by('name', 'pk')
         status_filter = self.request.query_params.get('status', 'debtors')
         queryset = queryset.annotate(
             receivable_balance=F('receivable_invoiced') - F('receivable_paid'),
         )
         if status_filter == 'settled':
             queryset = queryset.filter(
-                receivable_invoice_count__gt=0, receivable_balance__lte=0,
+                Q(receivable_invoice_count__gt=0)
+                | Q(receivable_opening_payment_count__gt=0),
+                receivable_balance__lte=0,
             )
         elif status_filter != 'all':
             queryset = queryset.filter(receivable_balance__gt=0)
@@ -556,12 +707,80 @@ class ReceivableViewSet(viewsets.ReadOnlyModelViewSet):
             'total_invoiced': str(account['total_invoiced']),
             'total_paid': str(account['total_paid']),
             'balance_due': str(account['balance_due']),
+            'opening_balance': str(account['opening_balance']),
             'unreconciled_invoice_count': account['unreconciled_count'],
             'invoices': invoices,
             'payments': PaymentSerializer(
                 account['payments'], many=True, context={'request': request},
             ).data,
+            'opening_balance_payments': OpeningBalancePaymentSerializer(
+                account['opening_balance_payments'], many=True,
+                context={'request': request},
+            ).data,
         })
+
+    @extend_schema(parameters=[IDEMPOTENCY_PARAMETER], request=ReceivablePaymentAllocationSerializer)
+    @action(detail=True, methods=('post',), url_path='allocate-payment')
+    def allocate_payment(self, request, pk=None):
+        client = self.get_object()
+
+        def operation():
+            serializer = ReceivablePaymentAllocationSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            try:
+                allocations, opening_payment = allocate_client_payment(
+                    client=client,
+                    user=request.user,
+                    **serializer.validated_data,
+                )
+            except DjangoValidationError as exc:
+                raise ValidationError(
+                    exc.message_dict if hasattr(exc, 'message_dict') else exc.messages,
+                ) from exc
+            self._audit('allocate_payment', status.HTTP_201_CREATED)
+            return Response(
+                {
+                    'allocated_amount': str(
+                        sum((item.amount for item in allocations), Decimal('0.00'))
+                        + (opening_payment.amount if opening_payment else Decimal('0.00'))
+                    ),
+                    'payments': PaymentSerializer(
+                        allocations, many=True, context={'request': request},
+                    ).data,
+                    'opening_balance_payment': (
+                        OpeningBalancePaymentSerializer(
+                            opening_payment, context={'request': request},
+                        ).data if opening_payment else None
+                    ),
+                },
+                status=status.HTTP_201_CREATED,
+            )
+
+        return idempotent(
+            request, f'receivable.{client.pk}.allocate_payment', operation, required=False,
+        )
+
+    @action(detail=True, methods=('post',), url_path='cancel-opening-payment')
+    def cancel_opening_payment(self, request, pk=None):
+        client = self.get_object()
+        payment_id = serializers.IntegerField(min_value=1).run_validation(
+            request.data.get('payment_id'),
+        )
+        reason = serializers.CharField().run_validation(request.data.get('reason'))
+        try:
+            payment = OpeningBalancePayment.objects.get(
+                pk=payment_id, client=client,
+            ).cancel(user=request.user, reason=reason)
+        except OpeningBalancePayment.DoesNotExist as exc:
+            raise ValidationError({'payment_id': _('Règlement introuvable.')}) from exc
+        except DjangoValidationError as exc:
+            raise ValidationError(
+                exc.message_dict if hasattr(exc, 'message_dict') else exc.messages,
+            ) from exc
+        self._audit('cancel_opening_payment')
+        return Response(OpeningBalancePaymentSerializer(
+            payment, context={'request': request},
+        ).data)
 
 
 class LoadingOrderViewSet(AuditMutationMixin, viewsets.ModelViewSet):
