@@ -8,6 +8,7 @@
 {% block content %}
 {% has_access 'inventory.change_product' as can_change_product %}
 {% has_access 'inventory.view_product_pricing' as can_view_product_pricing %}
+{% has_access 'inventory.regularize_product_conditioning' as can_regularize_conditioning %}
 <div class="card card-dashboard p-4 bg-white">
     <div class="row g-4 align-items-start">
         <div class="col-12 col-lg-8">
@@ -22,6 +23,12 @@
             {% endif %}
             <p><strong>{% trans "Prix Détail" %} :</strong> {{ product.retail_price }} {% trans "DZD" %}</p>
             <p><strong>{% trans "Quantité" %} :</strong> {{ product.quantity }}</p>
+            <p><strong>{% trans "Statut du conditionnement" %} :</strong> {{ product.get_conditioning_status_display }}</p>
+            {% if product.conditioning_status == 'provisional' %}
+            <div class="alert alert-warning">
+                {% blocktrans with factor=product.historical_stock_conversion.factor %}Conditionnement provisoire : {{ factor }} pièces/carton. Vérifiez cette valeur et corrigez-la si nécessaire.{% endblocktrans %}
+            </div>
+            {% endif %}
             <h4 class="h6 mt-4">{% trans "Conditionnements" %}</h4>
             <div class="table-responsive">
                 <table class="table table-sm align-middle">
@@ -68,6 +75,7 @@
 
     <div class="form-actions mt-4">
         {% if can_change_product %}<a href="{% url 'product_update' product.pk %}" class="btn btn-primary">{% trans "Modifier" %}</a>{% endif %}
+        {% if can_regularize_conditioning and product.historical_stock_conversion %}<a href="{% url 'product_conditioning_correct' product.pk %}" class="btn btn-outline-danger">{% trans "Corriger le conditionnement et régulariser le stock" %}</a>{% endif %}
         <a href="{% url 'product_list' %}" class="btn btn-secondary">{% trans "Retour" %}</a>
     </div>
 </div>

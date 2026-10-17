@@ -124,6 +124,12 @@ class Product(models.Model):
         CARTON_ONLY = 'carton_only', _('Carton uniquement')
         CARTON_AND_PIECE = 'carton_and_piece', _('Carton et pièce')
 
+    class ConditioningStatus(models.TextChoices):
+        UNCLASSIFIED = 'unclassified', _('À classifier')
+        PROVISIONAL = 'provisional', _('Conditionnement provisoire')
+        CONFIRMED = 'confirmed', _('Conditionnement confirmé')
+        CORRECTED = 'corrected', _('Conditionnement corrigé')
+
     reference = models.CharField(_('Référence'), max_length=100, unique=True, editable=False)
     barcode = models.CharField(_('Code-barres'), max_length=100, unique=True, blank=True)
     name = models.CharField(_('Nom produit'), max_length=255)
@@ -134,6 +140,11 @@ class Product(models.Model):
         _('Mode de vente'), max_length=24, choices=UnitMode.choices,
         default=UnitMode.LEGACY,
         help_text=_('Les produits historiques restent inchangés tant que leur unité réelle n’est pas confirmée.'),
+    )
+    conditioning_status = models.CharField(
+        _('Statut du conditionnement'), max_length=16,
+        choices=ConditioningStatus.choices, default=ConditioningStatus.UNCLASSIFIED,
+        editable=False,
     )
     purchase_price = models.DecimalField(_("Prix d'achat"), max_digits=12, decimal_places=2)
     sale_price = models.DecimalField(_('Prix de vente'), max_digits=12, decimal_places=2)
@@ -154,6 +165,7 @@ class Product(models.Model):
         ordering = ['name']
         permissions = [
             ('view_product_pricing', 'Peut voir les trois tarifs produit'),
+            ('regularize_product_conditioning', 'Peut corriger le conditionnement et régulariser le stock'),
         ]
         constraints = [
             models.CheckConstraint(
@@ -281,6 +293,9 @@ class Product(models.Model):
 
     def save(self, *args, **kwargs):
         self._generated_media_errors = []
+
+        if self._state.adding and self.unit_mode != self.UnitMode.LEGACY:
+            self.conditioning_status = self.ConditioningStatus.CONFIRMED
 
         self.sale_price = self.retail_price
         from .pricing import validate_product_prices
@@ -415,7 +430,8 @@ class ProductPackaging(models.Model):
     def clean(self):
         super().clean()
         errors = {}
-        if self.conversion_factor and self.default_sale_price not in (None, ''):
+        prices_must_be_sellable = self.is_active and self.sale_enabled
+        if prices_must_be_sellable and self.conversion_factor and self.default_sale_price not in (None, ''):
             if Decimal(str(self.default_sale_price)) < self.minimum_sale_price:
                 errors['default_sale_price'] = _(
                     "Le prix du conditionnement ne peut pas être inférieur à son coût d'achat."
@@ -423,7 +439,7 @@ class ProductPackaging(models.Model):
         price_fields = ('super_wholesale_price', 'wholesale_price', 'retail_price')
         prices = [getattr(self, field_name) for field_name in price_fields]
         for field_name, price in zip(price_fields, prices):
-            if price not in (None, '') and Decimal(str(price)) < self.minimum_sale_price:
+            if prices_must_be_sellable and price not in (None, '') and Decimal(str(price)) < self.minimum_sale_price:
                 errors[field_name] = _(
                     "Le prix du conditionnement ne peut pas être inférieur à son coût d'achat."
                 )
@@ -486,6 +502,8 @@ class StockMovement(models.Model):
     SOURCE_SALE = 'sale'
     SOURCE_LOADING = 'loading'
     SOURCE_REVERSAL = 'reversal'
+    SOURCE_CONVERSION = 'conversion'
+    SOURCE_CONDITIONING = 'conditioning'
     SOURCE_CHOICES = [
         (SOURCE_LEGACY, _('Historique antérieur')),
         (SOURCE_MANUAL, _('Saisie manuelle')),
@@ -495,6 +513,8 @@ class StockMovement(models.Model):
         (SOURCE_SALE, _('Vente')),
         (SOURCE_LOADING, _('Chargement opérateur')),
         (SOURCE_REVERSAL, _('Annulation')),
+        (SOURCE_CONVERSION, _('Conversion historique')),
+        (SOURCE_CONDITIONING, _('Correction conditionnement')),
     ]
 
     product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name='movements')
@@ -767,10 +787,17 @@ class OperatorStockMovement(models.Model):
     SALE = 'sale'
     RETURN = 'return'
     REVERSAL = 'reversal'
-    MOVEMENT_CHOICES = [(LOAD, _('Chargement')), (SALE, _('Vente')), (RETURN, _('Retour dépôt')), (REVERSAL, _('Contrepassation'))]
+    ADJUSTMENT = 'adjustment'
+    MOVEMENT_CHOICES = [
+        (LOAD, _('Chargement')), (SALE, _('Vente')), (RETURN, _('Retour dépôt')),
+        (REVERSAL, _('Contrepassation')), (ADJUSTMENT, _('Régularisation')),
+    ]
     operator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='operator_stock_movements')
     product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name='operator_stock_movements')
-    loading_order = models.ForeignKey(LoadingOrder, on_delete=models.PROTECT, related_name='stock_movements')
+    loading_order = models.ForeignKey(
+        LoadingOrder, on_delete=models.PROTECT, related_name='stock_movements',
+        null=True, blank=True,
+    )
     movement_type = models.CharField(max_length=16, choices=MOVEMENT_CHOICES)
     quantity = models.PositiveIntegerField()
     applied_delta = models.IntegerField(editable=False)
@@ -792,6 +819,109 @@ class OperatorStockMovement(models.Model):
 
     def delete(self, *args, **kwargs):
         raise ValidationError(_('Le journal de stock opérateur est immuable.'))
+
+
+class HistoricalStockConversion(models.Model):
+    """One-time marker and immutable source quantities for a legacy stock conversion."""
+
+    DEFAULT_FACTOR = 30
+
+    product = models.OneToOneField(
+        Product, on_delete=models.PROTECT, related_name='historical_stock_conversion',
+    )
+    original_depot_cartons = models.PositiveIntegerField(_('Stock dépôt historique en cartons'))
+    original_minimum_stock_cartons = models.PositiveIntegerField(
+        _('Stock minimum historique en cartons'), default=0,
+    )
+    factor = models.PositiveIntegerField(_('Facteur appliqué'))
+    used_default_factor = models.BooleanField(_('Facteur provisoire utilisé'), default=False)
+    converted_depot_quantity = models.PositiveIntegerField(_('Stock dépôt converti en pièces'))
+    converted_minimum_stock = models.PositiveIntegerField(
+        _('Stock minimum converti en pièces'), default=0,
+    )
+    physical_inventory_required = models.BooleanField(
+        _('Inventaire physique requis pour les corrections futures'), default=False,
+    )
+    backup_reference = models.CharField(_('Référence de sauvegarde'), max_length=255, blank=True)
+    simulation_checksum = models.CharField(_('Empreinte de simulation'), max_length=64, blank=True)
+    applied_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='historical_stock_conversions',
+    )
+    converted_at = models.DateTimeField(auto_now_add=True)
+    last_adjusted_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ('product_id',)
+        constraints = [
+            models.CheckConstraint(condition=Q(factor__gte=2), name='historical_conversion_factor_gte_2'),
+        ]
+
+    @property
+    def movement_cutoff(self):
+        return self.last_adjusted_at or self.converted_at
+
+
+class HistoricalStockConversionLocation(models.Model):
+    conversion = models.ForeignKey(
+        HistoricalStockConversion, on_delete=models.PROTECT, related_name='operator_locations',
+    )
+    operator = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        related_name='historical_stock_conversion_locations',
+    )
+    original_cartons = models.PositiveIntegerField(_('Stock opérateur historique en cartons'))
+    converted_quantity = models.PositiveIntegerField(_('Stock opérateur converti en pièces'))
+
+    class Meta:
+        ordering = ('operator_id',)
+        constraints = [
+            models.UniqueConstraint(
+                fields=('conversion', 'operator'), name='uniq_conversion_operator_location',
+            ),
+        ]
+
+
+class ConditioningCorrection(models.Model):
+    """Append-only audit trail for a controlled carton-factor correction."""
+
+    product = models.ForeignKey(
+        Product, on_delete=models.PROTECT, related_name='conditioning_corrections',
+    )
+    conversion = models.ForeignKey(
+        HistoricalStockConversion, on_delete=models.PROTECT, related_name='corrections',
+    )
+    old_factor = models.PositiveIntegerField(_('Ancien facteur'))
+    new_factor = models.PositiveIntegerField(_('Nouveau facteur'))
+    depot_stock_before = models.PositiveIntegerField(_('Stock dépôt avant'))
+    depot_stock_after = models.PositiveIntegerField(_('Stock dépôt après'))
+    depot_difference = models.IntegerField(_('Écart dépôt'))
+    minimum_stock_before = models.PositiveIntegerField(_('Stock minimum avant'), default=0)
+    minimum_stock_after = models.PositiveIntegerField(_('Stock minimum après'), default=0)
+    operator_stocks_before = models.JSONField(default=dict, editable=False)
+    operator_stocks_after = models.JSONField(default=dict, editable=False)
+    automatic_recalculation = models.BooleanField(default=False, editable=False)
+    reason = models.CharField(_('Motif'), max_length=500)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        related_name='conditioning_corrections',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ('-created_at', '-pk')
+        constraints = [
+            models.CheckConstraint(condition=Q(old_factor__gte=2), name='conditioning_old_factor_gte_2'),
+            models.CheckConstraint(condition=Q(new_factor__gte=2), name='conditioning_new_factor_gte_2'),
+        ]
+
+    def save(self, *args, **kwargs):
+        if self.pk or not self._state.adding:
+            raise ValidationError(_('L’historique des corrections de conditionnement est immuable.'))
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError(_('L’historique des corrections de conditionnement est immuable.'))
 
 
 class LoadingOrderSequence(models.Model):

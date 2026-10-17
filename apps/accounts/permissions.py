@@ -22,6 +22,7 @@ PERMISSION_MATRIX = OrderedDict(
                 ('inventory.change_product', _('Modifier')),
                 ('inventory.delete_product', _('Supprimer')),
                 ('inventory.view_product_pricing', _('Voir les trois tarifs')),
+                ('inventory.regularize_product_conditioning', _('Corriger le conditionnement et le stock')),
             ],
         ),
         (

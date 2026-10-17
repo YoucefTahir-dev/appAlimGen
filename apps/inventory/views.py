@@ -21,17 +21,22 @@ from .forms import (
     ProductForm,
     QuickProductForm,
     CartonConfigurationForm,
+    ConditioningCorrectionForm,
     OtherProductPackagingFormSet,
     LoadingOrderForm,
     LoadingOrderLineFormSet,
     StockMovementForm,
     SupplierForm,
 )
-from .models import Brand, Category, Client, LoadingOrder, OperatorStock, Product, ProductPackaging, StockMovement, Supplier, Unit
+from .models import (
+    Brand, Category, Client, HistoricalStockConversion, LoadingOrder, OperatorStock,
+    Product, ProductPackaging, StockMovement, Supplier, Unit,
+)
 from .services import (
     cancel_loading_order, close_loading_order, create_product_from_form, generate_loading_number,
     record_stock_movement, reverse_stock_movement, validate_loading_order,
 )
+from .historical_stock import correct_conditioning, correction_preview
 from .location import audit_location, location_snapshot
 from .geocoding import GeocodingService, GeocodingUnavailable
 from django import forms
@@ -775,11 +780,73 @@ def stock_movement_delete(request, pk):
 
 @seller_required
 def product_detail(request, pk):
-    product = get_object_or_404(Product.objects.prefetch_related('packagings'), pk=pk)
+    product = get_object_or_404(
+        Product.objects.prefetch_related(
+            'packagings', 'conditioning_corrections__created_by',
+        ),
+        pk=pk,
+    )
     if not product.barcode or not product.barcode_image or not product.qr_code:
         product.save()
         product.refresh_from_db()
     return render(request, 'inventory/product_detail.html', {'product': product})
+
+
+@permission_required('inventory.regularize_product_conditioning')
+def product_conditioning_correct(request, pk):
+    product = get_object_or_404(
+        Product.objects.select_related('historical_stock_conversion').prefetch_related(
+            'historical_stock_conversion__operator_locations__operator',
+            'conditioning_corrections__created_by',
+        ),
+        pk=pk,
+    )
+    try:
+        conversion = product.historical_stock_conversion
+    except HistoricalStockConversion.DoesNotExist:
+        messages.error(request, _('Ce produit ne possède pas de conversion historique à corriger.'))
+        return redirect('product_detail', pk=product.pk)
+
+    form = ConditioningCorrectionForm(request.POST or None, product=product)
+    factor_value = request.POST.get('new_factor') if request.method == 'POST' else conversion.factor
+    try:
+        factor_for_preview = max(2, int(factor_value))
+    except (TypeError, ValueError):
+        factor_for_preview = conversion.factor
+    preview = correction_preview(conversion=conversion, new_factor=factor_for_preview)
+
+    if request.method == 'POST' and form.is_valid():
+        try:
+            correction = correct_conditioning(
+                product=product,
+                new_factor=form.cleaned_data['new_factor'],
+                reason=form.cleaned_data['reason'],
+                user=request.user,
+                physical_depot_quantity=form.cleaned_data.get('physical_depot_quantity'),
+                physical_operator_quantities=form.physical_operator_quantities(),
+            )
+        except ValidationError as exc:
+            _add_product_validation_errors(form, exc, fallback=None)
+        else:
+            log_security_event(
+                request,
+                f'web.product.conditioning_correct product={product.pk} correction={correction.pk}',
+                status_code=200,
+            )
+            messages.success(request, _('Le conditionnement et le stock ont été régularisés.'))
+            return redirect('product_detail', pk=product.pk)
+
+    return render(request, 'inventory/product_conditioning_correct.html', {
+        'product': product,
+        'conversion': conversion,
+        'form': form,
+        'preview': preview,
+        'physical_operator_fields': [
+            form[field_name]
+            for field_name in form.fields
+            if field_name.startswith('operator_')
+        ],
+    })
 
 
 @seller_required

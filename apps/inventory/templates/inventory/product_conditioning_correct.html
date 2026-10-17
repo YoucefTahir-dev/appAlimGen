@@ -1,0 +1,94 @@
+{% extends 'base/base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "Corriger le conditionnement" %} - {{ product.name }}{% endblock %}
+{% block page_title %}{% trans "Corriger le conditionnement et régulariser le stock" %}{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+  <div class="col-lg-7">
+    <form method="post" class="card card-dashboard p-4 bg-white" id="conditioning-correction-form"
+          data-original-cartons="{{ conversion.original_depot_cartons }}"
+          data-current-stock="{{ product.quantity }}"
+          data-requires-inventory="{% if form.requires_physical_inventory %}true{% else %}false{% endif %}">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+      <h2 class="h4">{{ product.name }}</h2>
+      <dl class="row mb-4">
+        <dt class="col-sm-6">{% trans "Nombre actuel de pièces par carton" %}</dt><dd class="col-sm-6">{{ conversion.factor }}</dd>
+        <dt class="col-sm-6">{% trans "Stock actuel du dépôt" %}</dt><dd class="col-sm-6">{{ product.quantity }} {% trans "pièces" %}</dd>
+        <dt class="col-sm-6">{% trans "Stock minimum actuel" %}</dt><dd class="col-sm-6">{{ product.minimum_stock }} {% trans "pièces" %}</dd>
+        <dt class="col-sm-6">{% trans "Statut" %}</dt><dd class="col-sm-6">{{ product.get_conditioning_status_display }}</dd>
+      </dl>
+
+      {% if form.requires_physical_inventory %}
+      <div class="alert alert-warning">
+        <strong>{% trans "Inventaire physique obligatoire." %}</strong>
+        {% trans "Des mouvements ont eu lieu depuis la conversion. Aucun recalcul automatique ne sera appliqué : saisissez les stocks réellement comptés pour chaque emplacement." %}
+      </div>
+      {% else %}
+      <div class="alert alert-info">
+        {% trans "Aucun mouvement postérieur n’a été détecté. Le stock historique peut être recalculé à partir des cartons d’origine." %}
+      </div>
+      {% endif %}
+
+      <div class="mb-3">{{ form.new_factor.label_tag }}{{ form.new_factor }}{{ form.new_factor.errors }}</div>
+      {% if form.requires_physical_inventory %}
+      <div class="mb-3">{{ form.physical_depot_quantity.label_tag }}{{ form.physical_depot_quantity }}{{ form.physical_depot_quantity.errors }}</div>
+      {% for field in physical_operator_fields %}<div class="mb-3">{{ field.label_tag }}{{ field }}{{ field.errors }}</div>{% endfor %}
+      {% endif %}
+
+      <div class="border rounded p-3 mb-3 bg-light">
+        <div><strong>{% trans "Stock théorique corrigé" %} :</strong> <span id="corrected-stock-preview">{% if preview.depot_target != None %}{{ preview.depot_target }}{% else %}—{% endif %}</span></div>
+        <div><strong>{% trans "Écart estimé" %} :</strong> <span id="corrected-difference-preview">{% if preview.depot_difference != None %}{{ preview.depot_difference }}{% else %}—{% endif %}</span></div>
+        <div class="form-text">{% trans "L’écart exact est recalculé et verrouillé côté serveur au moment de la confirmation." %}</div>
+      </div>
+
+      <div class="mb-3">{{ form.reason.label_tag }}{{ form.reason }}{{ form.reason.errors }}</div>
+      <div class="form-check mb-4">{{ form.confirm }} {{ form.confirm.label_tag }}{{ form.confirm.errors }}</div>
+      <div class="form-actions">
+        <button class="btn btn-danger" type="submit">{% trans "Confirmer la correction" %}</button>
+        <a class="btn btn-outline-secondary" href="{% url 'product_detail' product.pk %}">{% trans "Annuler" %}</a>
+      </div>
+    </form>
+  </div>
+  <div class="col-lg-5">
+    <div class="card card-dashboard p-4 bg-white">
+      <h2 class="h5">{% trans "Historique des corrections" %}</h2>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead><tr><th>{% trans "Date" %}</th><th>{% trans "Facteur" %}</th><th>{% trans "Écart" %}</th><th>{% trans "Utilisateur" %}</th></tr></thead>
+          <tbody>
+          {% for correction in product.conditioning_corrections.all %}
+            <tr><td>{{ correction.created_at|date:"SHORT_DATETIME_FORMAT" }}</td><td>{{ correction.old_factor }} → {{ correction.new_factor }}</td><td>{{ correction.depot_difference }}</td><td>{{ correction.created_by }}</td></tr>
+            <tr><td colspan="4" class="text-muted small">{{ correction.reason }}</td></tr>
+          {% empty %}<tr><td colspan="4" class="text-muted">{% trans "Aucune correction." %}</td></tr>{% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(() => {
+  const form = document.getElementById('conditioning-correction-form');
+  const factor = document.getElementById('id_new_factor');
+  const target = document.getElementById('corrected-stock-preview');
+  const difference = document.getElementById('corrected-difference-preview');
+  if (!form || !factor || form.dataset.requiresInventory === 'true') return;
+  const refresh = () => {
+    const value = Number.parseInt(factor.value, 10);
+    if (!Number.isInteger(value) || value < 2) { target.textContent = '—'; difference.textContent = '—'; return; }
+    const corrected = Number.parseInt(form.dataset.originalCartons, 10) * value;
+    const current = Number.parseInt(form.dataset.currentStock, 10);
+    target.textContent = String(corrected);
+    difference.textContent = `${corrected - current >= 0 ? '+' : ''}${corrected - current}`;
+  };
+  factor.addEventListener('input', refresh);
+  refresh();
+})();
+</script>
+{% endblock %}

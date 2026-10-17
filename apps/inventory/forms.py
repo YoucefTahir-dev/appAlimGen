@@ -7,7 +7,10 @@ from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from apps.core.security import validate_excel_upload
 from apps.commerce.widgets import ProductAutocomplete
-from .models import Brand, Category, Client, LoadingOrder, LoadingOrderLine, Product, ProductPackaging, StockMovement, Supplier, Unit
+from .models import (
+    Brand, Category, Client, HistoricalStockConversion, LoadingOrder, LoadingOrderLine,
+    OperatorStock, Product, ProductPackaging, StockMovement, Supplier, Unit,
+)
 
 
 class CategoryForm(forms.ModelForm):
@@ -489,6 +492,16 @@ class CartonConfigurationForm(forms.ModelForm):
         factor = cleaned_data.get('conversion_factor')
         if factor is not None and factor <= 1:
             self.add_error('conversion_factor', _('Un carton doit contenir plus d’une pièce.'))
+        if (
+            self.instance.pk
+            and factor is not None
+            and int(factor) != int(self.instance.conversion_factor)
+            and HistoricalStockConversion.objects.filter(product_id=self.instance.product_id).exists()
+        ):
+            self.add_error(
+                'conversion_factor',
+                _('Utilisez l’outil de correction du conditionnement pour modifier ce facteur et tracer le stock.'),
+            )
         prices = [
             cleaned_data.get('super_wholesale_price'),
             cleaned_data.get('wholesale_price'),
@@ -534,6 +547,64 @@ class CartonConfigurationForm(forms.ModelForm):
         ProductPackaging.objects.filter(
             product=product, kind=ProductPackaging.CARTON,
         ).update(purchase_enabled=False, sale_enabled=False, is_active=False)
+
+
+class ConditioningCorrectionForm(forms.Form):
+    new_factor = forms.IntegerField(
+        label=_('Nouveau nombre de pièces par carton'), min_value=2,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'min': 2}),
+    )
+    physical_depot_quantity = forms.IntegerField(
+        label=_('Stock physique du dépôt en pièces'), min_value=0, required=False,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
+    )
+    reason = forms.CharField(
+        label=_('Motif'), max_length=500,
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+    )
+    confirm = forms.BooleanField(
+        label=_('Je confirme le nouveau facteur et la régularisation de stock affichée.'),
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+    )
+
+    def __init__(self, *args, product, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.product = product
+        self.conversion = product.historical_stock_conversion
+        from .historical_stock import has_post_conversion_movements
+
+        self.requires_physical_inventory = has_post_conversion_movements(self.conversion)
+        self.operator_stocks = list(
+            OperatorStock.objects.filter(product=product).select_related('operator').order_by('operator_id')
+        )
+        known_operator_ids = {stock.operator_id for stock in self.operator_stocks}
+        for location in self.conversion.operator_locations.select_related('operator').order_by('operator_id'):
+            if location.operator_id not in known_operator_ids:
+                self.operator_stocks.append(OperatorStock(
+                    operator=location.operator, product=product, quantity=0,
+                ))
+        self.fields['new_factor'].initial = self.conversion.factor
+        if not self.requires_physical_inventory:
+            self.fields.pop('physical_depot_quantity')
+            return
+        self.fields['physical_depot_quantity'].required = True
+        self.fields['physical_depot_quantity'].initial = product.quantity
+        for stock in self.operator_stocks:
+            self.fields[f'operator_{stock.operator_id}'] = forms.IntegerField(
+                label=_('Stock physique opérateur — %(operator)s') % {
+                    'operator': stock.operator.get_full_name() or stock.operator.get_username(),
+                },
+                min_value=0,
+                initial=stock.quantity,
+                widget=forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
+            )
+
+    def physical_operator_quantities(self):
+        return {
+            stock.operator_id: self.cleaned_data[f'operator_{stock.operator_id}']
+            for stock in self.operator_stocks
+            if f'operator_{stock.operator_id}' in self.cleaned_data
+        }
 
 class ClientForm(forms.ModelForm):
     class Meta:
