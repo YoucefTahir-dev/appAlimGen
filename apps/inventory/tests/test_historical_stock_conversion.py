@@ -17,7 +17,7 @@ from apps.inventory.historical_stock import (
     correct_conditioning,
     has_post_conversion_movements,
 )
-from apps.inventory.forms import CartonConfigurationForm
+from apps.inventory.forms import CartonConfigurationForm, HistoricalStockConversionForm
 from apps.inventory.models import (
     ConditioningCorrection,
     HistoricalStockConversion,
@@ -72,6 +72,20 @@ class HistoricalStockConversionTests(TestCase):
         product.refresh_from_db()
         self.assertEqual(product.quantity, 100)
         self.assertFalse(HistoricalStockConversion.objects.exists())
+
+    def test_conversion_form_does_not_prefill_unverified_factor(self):
+        form = HistoricalStockConversionForm(product=self.legacy_product())
+        self.assertIsNone(form.fields['factor'].initial)
+
+    def test_conversion_preview_does_not_display_provisional_default_factor(self):
+        product = self.legacy_product()
+        self.client.force_login(self.manager)
+        response = self.client.get(reverse('product_conditioning_convert', args=[product.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['factor'], None)
+        self.assertEqual(response.context['depot_after'], '—')
+        self.assertEqual(response.context['minimum_after'], '—')
 
     def test_existing_carton_factor_is_confirmed(self):
         product = self.legacy_product()

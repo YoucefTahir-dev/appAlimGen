@@ -624,10 +624,13 @@ class HistoricalStockConversionForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.product = product
         carton = product.carton_packaging
+        # Do not silently force the provisional factor into the editable
+        # field.  When no carton packaging is registered, the operator must
+        # enter the verified physical factor explicitly before conversion.
         self.fields['factor'].initial = (
             carton.conversion_factor
             if carton and carton.conversion_factor >= 2
-            else HistoricalStockConversion.DEFAULT_FACTOR
+            else None
         )
 
     def clean(self):

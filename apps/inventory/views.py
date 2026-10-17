@@ -877,10 +877,15 @@ def product_conditioning_convert(request, pk):
 
     form = HistoricalStockConversionForm(request.POST or None, product=product)
     raw_factor = request.POST.get('factor') if request.method == 'POST' else form.fields['factor'].initial
+    preview_factor = None
     try:
-        factor = max(2, int(raw_factor))
+        if raw_factor not in (None, ''):
+            preview_factor = max(2, int(raw_factor))
     except (TypeError, ValueError):
-        factor = HistoricalStockConversion.DEFAULT_FACTOR
+        preview_factor = None
+    # The historical service still needs a deterministic fallback to build
+    # blockers, but it must never be shown as a confirmed physical factor.
+    factor = preview_factor or HistoricalStockConversion.DEFAULT_FACTOR
     plan = build_conversion_plans(
         default_factor=factor,
         queryset=Product.objects.filter(pk=product.pk),
@@ -923,17 +928,17 @@ def product_conditioning_convert(request, pk):
         {
             'name': stock.operator.get_full_name() or stock.operator.get_username(),
             'before': stock.quantity,
-            'after': stock.quantity * factor,
+            'after': stock.quantity * preview_factor if preview_factor else '—',
         }
         for stock in product.operator_stocks.all().order_by('operator_id')
     ]
     return render(request, 'inventory/product_conditioning_convert.html', {
         'product': product,
         'form': form,
-        'factor': factor,
+        'factor': preview_factor,
         'plan': plan,
-        'depot_after': product.quantity * factor,
-        'minimum_after': product.minimum_stock * factor,
+        'depot_after': product.quantity * preview_factor if preview_factor else '—',
+        'minimum_after': product.minimum_stock * preview_factor if preview_factor else '—',
         'operator_preview': operator_preview,
     })
 
