@@ -180,7 +180,7 @@ Ces fonctions sont incluses dans le tableau afin d'éviter un pourcentage artifi
 | `flutter build apk --debug` | **PASS** | APK généré dans `build/app/outputs/flutter-apk/app-debug.apk` |
 | Émulateur Android | **NON EXÉCUTÉ** | Aucun émulateur/appareil disponible ou piloté pendant cet audit |
 | Imprimante Bluetooth physique | **NON EXÉCUTÉ** | Les tests utilisent des transports simulés ; sortie papier non vérifiée |
-| Intégration contre Render/production | **NON EXÉCUTÉE** | Audit volontairement local et non mutatif ; aucune donnée de production touchée |
+| Déploiement Render | **PASS** | `/healthz/` et `/readyz/` répondent HTTP 200 ; la nouvelle route de conversion est active et protégée par authentification |
 | PostgreSQL 15 via Docker | **PASS — 11 tests ciblés** | PATCH vente avec/sans bon nullable, idempotence concurrente, chargements, conversion historique, paiements et ventes multi-unités |
 
 Remarque : une suite verte prouve l'absence de régression couverte par les tests existants. Elle ne prouve pas les parcours sans tests ciblés ni le comportement matériel Bluetooth.
@@ -249,4 +249,4 @@ Avant chaque nouvelle version Android :
 
 Les lots P0 automatisables de stock, achat et créances sont implémentés et couverts par la non-régression locale, y compris les tests ciblés sur PostgreSQL 15. La parité ne peut pas être déclarée à 100 % tant que les écarts P1/P2/P3 du tableau ne sont pas développés et que les contrôles sur appareil Android et imprimante physique ne sont pas exécutés dans leurs environnements réels.
 
-Ce rapport ne transforme pas une fonctionnalité non testée en fonctionnalité validée. Aucun déploiement Render ni aucune modification de données de production n'a été effectué pendant cette phase locale.
+Ce rapport ne transforme pas une fonctionnalité non testée en fonctionnalité validée. Le déploiement automatique Render a été vérifié en lecture seule ; aucune donnée de production n'a été modifiée pour les tests.
