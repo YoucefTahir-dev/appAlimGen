@@ -5,7 +5,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% trans "Ticket" %} {{ sale.ticket_number }}</title>
+    <title>{% if sale.show_legal_information %}{% trans "Ticket" %} {{ sale.ticket_number }}{% else %}{% trans "Ticket produits" %}{% endif %}</title>
     <style>
         @page {
             size: {{ ticket_width }}mm auto;
@@ -160,6 +160,7 @@
 </div>
 
 <main class="ticket">
+    {% if sale.show_legal_information %}
     {% if snapshot_warning %}<div class="small">{{ snapshot_warning }}</div><div class="separator"></div>{% endif %}
     <header class="center">
         {% if company and company.logo %}
@@ -171,8 +172,8 @@
         <div class="company-ar">الأمين للمواد الغذائية و غير الغذائية</div>
         <div class="muted">{{ company.address|default:"" }}</div>
         <div>Tél : {{ company.phone|default:"" }}</div>
-        {% if ticket_width == '80' or sale.show_legal_information %}<div>NIF : {{ company.tax_number|default:"-" }} | NIS : {{ company.nis|default:"-" }}</div>
-        <div>{% trans "RC" %} : {{ company.rc_number|default:"-" }} | AI : {{ company.article_number|default:"-" }}</div>{% endif %}
+        <div>NIF : {{ company.tax_number|default:"-" }} | NIS : {{ company.nis|default:"-" }}</div>
+        <div>{% trans "RC" %} : {{ company.rc_number|default:"-" }} | AI : {{ company.article_number|default:"-" }}</div>
     </header>
 
     <div class="separator"></div>
@@ -193,13 +194,14 @@
                 <div class="row"><span>NIS</span><span>{{ invoice_client.nis|default:"-" }}</span></div>
                 <div class="row"><span>{% trans "N° article" %}</span><span>{{ invoice_client.article_number|default:"-" }}</span></div>
                 <div class="row"><span>{% trans "RC" %}</span><span>{{ invoice_client.trade_register_number|default:"-" }}</span></div>
-            {% elif sale.show_legal_information %}{% for label, value in client_legal_identifiers %}
+            {% else %}{% for label, value in client_legal_identifiers %}
                 <div class="row"><span>{{ label }}</span><span>{{ value }}</span></div>
             {% endfor %}{% endif %}
         {% endif %}
     </section>
 
     <div class="separator"></div>
+    {% endif %}
 
     <table>
         <thead>
@@ -227,6 +229,7 @@
 
     <div class="separator"></div>
 
+    {% if sale.show_legal_information %}
     <section>
         <div class="row"><span>{% trans "Total" %} HT</span><span>{{ total_ht|floatformat:2 }} DZD</span></div>
         <div class="row"><span>{% trans "TVA" %} ({{ tax_rate|floatformat:2 }}%)</span><span>{{ tax_amount|floatformat:2 }} DZD</span></div>
@@ -242,6 +245,11 @@
         <div>{% trans "Merci pour votre visite" %}</div>
         <div>À bientôt.</div>
     </footer>
+    {% else %}
+    <section>
+        <div class="row total"><span>{% trans "TOTAL GÉNÉRAL" %}</span><span>{{ total_ttc|floatformat:2 }} DZD</span></div>
+    </section>
+    {% endif %}
 </main>
 
 {% if auto_print %}

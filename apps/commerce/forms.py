@@ -84,6 +84,11 @@ class SaleForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields['show_legal_information'].label = _('Afficher les informations du ticket')
+        self.fields['show_legal_information'].help_text = _(
+            'Désactivé : le ticket thermique contient uniquement les produits et le total général. '
+            'Les factures officielles conservent toujours leurs mentions obligatoires.'
+        )
         if self.instance and self.instance.pk:
             self.fields['settlement_action'].initial = self.NO_PAYMENT
 

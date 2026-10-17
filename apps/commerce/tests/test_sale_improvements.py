@@ -20,11 +20,13 @@ class SalePaymentAndLegalInformationTests(TestCase):
         self.client.force_login(self.user)
         self.category = Category.objects.create(name='Ventes améliorées')
         self.customer = Client.objects.create(
-            name='Client légal', tax_number='NIF-CLIENT', nis='NIS-CLIENT',
+            name='Client légal', phone='0555-CLIENT', address='ADRESSE-CLIENT',
+            tax_number='NIF-CLIENT', nis='NIS-CLIENT',
             article_number='AI-CLIENT', trade_register_number='RC-CLIENT',
         )
         CompanySettings.objects.update_or_create(pk=1, defaults={
-            'company_name': 'El Amine', 'tax_number': 'NIF-SOCIETE', 'nis': 'NIS-SOCIETE',
+            'company_name': 'ENTREPRISE-EL-AMINE', 'address': 'ADRESSE-SOCIETE',
+            'phone': '0666-SOCIETE', 'tax_number': 'NIF-SOCIETE', 'nis': 'NIS-SOCIETE',
             'article_number': 'AI-SOCIETE', 'rc_number': 'RC-SOCIETE',
         })
         self.product = Product.objects.create(
@@ -77,23 +79,40 @@ class SalePaymentAndLegalInformationTests(TestCase):
         self.assertEqual(sale.amount_paid, Decimal('40.00'))
         self.assertEqual(sale.payments.count(), 1)
 
-    def test_80mm_ticket_is_complete_while_58mm_can_hide_legal_information(self):
+    def test_disabled_ticket_information_is_absent_from_58_and_80_renderings(self):
         sale = self._sale(show_legal_information=False)
-        ticket_80 = self.client.get(reverse('sale_ticket_preview', args=[sale.pk, 80]))
-        self.assertContains(ticket_80, 'NIF-SOCIETE')
-        self.assertContains(ticket_80, 'NIF-CLIENT')
-        ticket_58 = self.client.get(reverse('sale_ticket_preview', args=[sale.pk, 58]))
-        self.assertNotContains(ticket_58, 'NIF-SOCIETE')
-        self.assertNotContains(ticket_58, 'NIF-CLIENT')
+        for width in (58, 80):
+            ticket = self.client.get(reverse('sale_ticket_preview', args=[sale.pk, width]))
+            self.assertEqual(ticket.status_code, 200)
+            self.assertContains(ticket, 'Produit paiement')
+            self.assertContains(ticket, 'Conditionnement')
+            self.assertContains(ticket, 'TOTAL GÉNÉRAL')
+            for forbidden in (
+                'ENTREPRISE-EL-AMINE', 'ADRESSE-SOCIETE', '0666-SOCIETE',
+                'NIF-SOCIETE', 'NIS-SOCIETE', 'AI-SOCIETE', 'RC-SOCIETE',
+                sale.invoice_number, sale.ticket_number,
+                'Client légal', '0555-CLIENT', 'ADRESSE-CLIENT',
+                'NIF-CLIENT', 'NIS-CLIENT', 'AI-CLIENT', 'RC-CLIENT',
+                self.user.username, 'data:image/png;base64', 'Merci pour votre visite',
+                'Paiement', 'Total HT', 'TVA (', 'Remise',
+            ):
+                self.assertNotContains(ticket, forbidden)
+
         invoice = self.client.get(reverse('sale_invoice_preview', args=[sale.pk]))
         self.assertContains(invoice, 'NIF-SOCIETE')
         self.assertContains(invoice, 'NIF-CLIENT')
-        thermal_80 = invoice_print_data(sale, paper_width=80, language='fr')
-        self.assertTrue(thermal_80['show_legal_information'])
-        self.assertTrue(thermal_80['show_complete_customer_details'])
-        thermal_58 = invoice_print_data(sale, paper_width=58, language='fr')
-        self.assertFalse(thermal_58['show_legal_information'])
-        self.assertFalse(thermal_58['show_complete_customer_details'])
+
+        for width in (58, 80):
+            thermal = invoice_print_data(sale, paper_width=width, language='fr')
+            self.assertFalse(thermal['show_ticket_information'])
+            self.assertFalse(thermal['show_legal_information'])
+            self.assertFalse(thermal['show_complete_customer_details'])
+            self.assertEqual(set(thermal['totals']), {'total_ttc'})
+            for forbidden_key in (
+                'invoice_number', 'ticket_number', 'issued_at', 'cashier',
+                'company', 'customer', 'qr_code', 'messages',
+            ):
+                self.assertNotIn(forbidden_key, thermal)
 
     def test_historical_and_new_documents_default_to_visible_legal_information(self):
         sale = self._sale()

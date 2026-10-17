@@ -224,6 +224,36 @@ class PrintingApiTests(APITestCase):
             self.assertEqual(payload['customer']['article_number'], 'ARTICLE-PRINT-03')
             self.assertEqual(payload['customer']['trade_register_number'], 'RC-PRINT-04')
 
+    def test_android_print_data_omits_all_ticket_information_when_disabled(self):
+        sale = Sale.objects.create(
+            invoice_number='FAC-PRINT-SECRET', ticket_number='TCK-PRINT-SECRET',
+            client=self.client_record, total=Decimal('80'), discount=0, tax_rate=0,
+            show_legal_information=False, created_by=self.admin,
+        )
+        line = SaleLine(
+            sale=sale, product=self.product, packaging_quantity=1,
+            quantity=1, unit_price=Decimal('80'),
+        )
+        line._stock_user = self.admin
+        line.save()
+        self.authenticate()
+
+        for width in (58, 80):
+            response = self.client.get(
+                reverse('api-invoice-print-data', args=[sale.pk]),
+                {'language': 'fr', 'paper_width': width},
+            )
+            self.assertEqual(response.status_code, 200, response.data)
+            payload = response.data.get('data', response.data)
+            self.assertFalse(payload['show_ticket_information'])
+            self.assertEqual(payload['items'][0]['name'], self.product.name)
+            self.assertEqual(set(payload['totals']), {'total_ttc'})
+            for forbidden_key in (
+                'invoice_number', 'ticket_number', 'issued_at', 'cashier',
+                'company', 'customer', 'qr_code', 'messages',
+            ):
+                self.assertNotIn(forbidden_key, payload)
+
     def test_print_data_rejects_invalid_width_and_language(self):
         sale = Sale.objects.create(
             invoice_number='FAC-2026-999002', client=self.client_record, total=0, discount=0, tax_rate=0,
