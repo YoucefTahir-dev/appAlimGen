@@ -61,6 +61,16 @@ class ProductSearchTests(TestCase):
         self.assertEqual(self.lookup('choc', context='purchase').json()['results'][0]['purchase_price'], '10.00')
         self.assertEqual(self.lookup('choc', client_id='bad').status_code, 400)
 
+    def test_stock_movement_search_exposes_total_piece_stock(self):
+        result = self.lookup('ch', context='stock_movement').json()['results'][0]
+
+        self.assertEqual(result, {
+            'id': self.product.pk,
+            'name': self.product.name,
+            'reference': self.product.reference,
+            'stock': 100,
+        })
+
     def test_authentication_and_context_permissions(self):
         self.client.logout()
         self.assertEqual(self.lookup('choc').status_code, 302)
@@ -68,6 +78,7 @@ class ProductSearchTests(TestCase):
         self.client.force_login(seller)
         self.assertEqual(self.lookup('choc').status_code, 200)
         self.assertEqual(self.lookup('choc', context='purchase').status_code, 403)
+        self.assertEqual(self.lookup('choc', context='stock_movement').status_code, 403)
         self.assertEqual(self.lookup('choc', context='invalid').status_code, 403)
         group = Group.objects.create(name='No commercial access')
         seller.groups.add(group)

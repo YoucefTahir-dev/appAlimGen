@@ -697,13 +697,16 @@ class StockMovementForm(forms.ModelForm):
     class Meta:
         model = StockMovement
         fields = ['product', 'movement_type', 'quantity', 'reason']
+        labels = {
+            'quantity': _('Quantité (pièces)'),
+        }
         help_texts = {
             'quantity': _(
-                'Entrée/sortie : nombre d’unités. Ajustement : stock physique final compté.'
+                'Entrée/sortie : nombre de pièces. Ajustement : stock physique final compté en pièces.'
             ),
         }
         widgets = {
-            'product': forms.Select(attrs={'class': 'form-select'}),
+            'product': ProductAutocomplete(attrs={'search_context': 'stock_movement'}),
             'movement_type': forms.Select(attrs={'class': 'form-select'}),
             'quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
             'reason': forms.TextInput(attrs={'class': 'form-control'}),

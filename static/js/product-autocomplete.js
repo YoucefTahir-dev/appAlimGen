@@ -17,6 +17,16 @@
         input.removeAttribute('aria-busy');
         s.index = -1;
     }
+    function updateStockMovementStatus(picker) {
+        if (picker.dataset.context !== 'stock_movement') return;
+        const hidden = picker.querySelector('.product-id');
+        const status = document.getElementById('stock-quantity-status');
+        if (!status) return;
+        const stock = hidden.dataset.stock;
+        status.textContent = hidden.value && stock !== undefined && stock !== ''
+            ? `${status.dataset.prefix} : ${stock} ${status.dataset.pieces}. ${status.dataset.note}`
+            : status.dataset.prompt;
+    }
     function select(picker, product) {
         close(picker);
         const input = picker.querySelector('.product-search');
@@ -24,6 +34,8 @@
         input.value = product.name;
         input.setCustomValidity('');
         hidden.value = String(product.id);
+        hidden.dataset.stock = String(product.stock ?? '');
+        updateStockMovementStatus(picker);
         picker.querySelector('.product-search-status').textContent = '';
         if (picker.dataset.context === 'purchase') {
             const row = picker.closest('tr');
@@ -103,6 +115,8 @@
                     option.textContent = `${product.name} · ${product.reference} · ${picker.dataset.stock}: ${product.stock} · ${picker.dataset.price}: ${price}`;
                 } else if (picker.dataset.context === 'loading_order') {
                     option.textContent = `${product.name} · ${product.reference} · ${picker.dataset.stockAvailable}: ${product.stock}`;
+                } else if (picker.dataset.context === 'stock_movement') {
+                    option.textContent = `${product.name} · ${product.reference} · ${picker.dataset.stockTotal}: ${product.stock} ${picker.dataset.pieces}`;
                 } else {
                     option.textContent = `${product.name} · ${product.reference} · ${picker.dataset.price}: ${price}`;
                 }
@@ -124,6 +138,8 @@
         close(picker);
         const hidden = picker.querySelector('.product-id');
         hidden.value = '';
+        delete hidden.dataset.stock;
+        updateStockMovementStatus(picker);
         hidden.dispatchEvent(new Event('change', {bubbles: true}));
         event.target.setCustomValidity(event.target.value.trim() ? picker.dataset.invalid : '');
         const query = event.target.value.trim();
@@ -171,6 +187,9 @@
             const row = event.target.closest('tr'), input = row.querySelector('.product-search');
             if (input) input.setCustomValidity(event.target.checked ? '' : (input.value && !row.querySelector('.product-id').value ? row.querySelector('.product-picker').dataset.invalid : ''));
         }
+    });
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('.product-picker[data-context="stock_movement"]').forEach(updateStockMovementStatus);
     });
     window.ProductAutocomplete = {select, close};
 })();

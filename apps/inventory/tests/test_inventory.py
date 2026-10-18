@@ -256,6 +256,44 @@ class InventoryViewTests(TestCase):
         self.product.refresh_from_db()
         self.assertEqual(self.product.quantity, 10)
 
+    def test_stock_movement_form_uses_product_search_and_piece_stock_message(self):
+        response = self.client.get(reverse('stock_movement_create'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="form-control product-search"')
+        self.assertContains(response, 'data-context="stock_movement"')
+        self.assertContains(response, 'static/js/product-autocomplete')
+        self.assertContains(response, 'Quantité (pièces)')
+        self.assertContains(response, 'stock physique final compté en pièces')
+        self.assertContains(
+            response,
+            'Sélectionnez un produit pour afficher son stock total en pièces.',
+        )
+
+        search = self.client.get(
+            reverse('commercial_product_search'),
+            {'q': 'Te', 'context': 'stock_movement'},
+        )
+        self.assertEqual(search.status_code, 200)
+        self.assertEqual(search.json()['results'][0], {
+            'id': self.product.pk,
+            'name': self.product.name,
+            'reference': self.product.reference,
+            'stock': 10,
+        })
+
+    def test_stock_movement_form_restores_selected_product_piece_stock(self):
+        response = self.client.post(reverse('stock_movement_create'), {
+            'product': self.product.pk,
+            'movement_type': '',
+            'quantity': 1,
+            'reason': 'Contrôle',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'value="Test Product"')
+        self.assertContains(response, 'data-stock="10"')
+
     def test_stock_movement_exit_rejects_insufficient_stock(self):
         response = self.client.post(reverse('stock_movement_create'), {
             'product': self.product.pk,

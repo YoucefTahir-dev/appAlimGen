@@ -14,6 +14,7 @@ def commercial_products(user, context):
         'sale': ('commerce.add_sale', 'commerce.change_sale'),
         'purchase': ('commerce.add_purchase', 'commerce.change_purchase'),
         'loading_order': ('inventory.add_loadingorder', 'inventory.change_loadingorder'),
+        'stock_movement': ('accounts.manage_stock',),
     }
     if context not in permissions or not any(has_permission(user, permission) for permission in permissions[context]):
         raise PermissionDenied

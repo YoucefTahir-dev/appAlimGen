@@ -1,5 +1,5 @@
 {% extends 'base/base.html' %}
-{% load i18n %}
+{% load i18n static %}
 
 {% block title %}{{ title }} - El Amine ERP{% endblock %}
 
@@ -16,6 +16,13 @@
             <div class="col-md-6">
                 {{ form.quantity.label_tag }}{{ form.quantity }}{{ form.quantity.errors }}
                 {% if form.quantity.help_text %}<div class="form-text">{{ form.quantity.help_text }}</div>{% endif %}
+                <div id="stock-quantity-status" class="alert alert-info py-2 px-3 mt-2 mb-0" role="status" aria-live="polite"
+                     data-prompt="{% trans 'Sélectionnez un produit pour afficher son stock total en pièces.' %}"
+                     data-prefix="{% trans 'Stock actuel total' %}"
+                     data-pieces="{% trans 'pièce(s)' %}"
+                     data-note="{% trans 'La quantité est toujours exprimée en pièces (unité de base), jamais en cartons.' %}">
+                    {% trans "Sélectionnez un produit pour afficher son stock total en pièces." %}
+                </div>
             </div>
             <div class="col-md-6">{{ form.reason.label_tag }}{{ form.reason }}{{ form.reason.errors }}</div>
         </div>
@@ -24,4 +31,8 @@
         </div>
     </form>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/product-autocomplete.js' %}" defer></script>
 {% endblock %}

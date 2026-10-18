@@ -17,11 +17,13 @@ class ProductAutocomplete(forms.TextInput):
     def get_context(self, name, value, attrs):
         context = super().get_context(name, value, attrs)
         context['widget']['label'] = ''
+        context['widget']['stock'] = ''
         if value:
             try:
-                product = self.choices.queryset.filter(pk=value).only('name').first()
+                product = self.choices.queryset.filter(pk=value).only('name', 'quantity').first()
                 if product:
                     context['widget']['label'] = product.name
+                    context['widget']['stock'] = product.quantity
             except (ValueError, TypeError, ValidationError):
                 pass
         return context
