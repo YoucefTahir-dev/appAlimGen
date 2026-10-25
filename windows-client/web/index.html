@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>El Amine</title>
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <main class="card" aria-live="polite">
+    <img class="logo" src="logo.png" alt="Logo El Amine" width="136" height="136">
+    <h1>El Amine</h1>
+    <p id="status" class="status">Connexion sécurisée à l’ERP…</p>
+    <div id="spinner" class="spinner" aria-hidden="true"></div>
+    <section id="offline" class="offline" hidden>
+      <h2>Connexion indisponible</h2>
+      <p>Vérifiez votre accès à Internet, puis réessayez. Aucune donnée n’est stockée dans cette page.</p>
+      <button id="retry" type="button">Réessayer</button>
+    </section>
+    <p class="origin">Connexion autorisée uniquement vers gestio-stock-web.onrender.com</p>
+  </main>
+</body>
+</html>

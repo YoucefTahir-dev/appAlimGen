@@ -1,0 +1,45 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "El Amine",
+  "version": "0.1.0",
+  "identifier": "dz.elamine.erp.windows",
+  "build": {
+    "frontendDist": "../web"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [],
+    "security": {
+      "capabilities": [],
+      "csp": "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: https://gestio-stock-web.onrender.com; connect-src https://gestio-stock-web.onrender.com; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "publisher": "El Amine",
+    "category": "Business",
+    "shortDescription": "ERP El Amine pour Windows",
+    "longDescription": "Client Windows sécurisé donnant accès à l'ERP Web El Amine.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      },
+      "nsis": {
+        "installerIcon": "icons/icon.ico",
+        "uninstallerIcon": "icons/icon.ico",
+        "installMode": "currentUser",
+        "languages": ["French"],
+        "displayLanguageSelector": false,
+        "startMenuFolder": "El Amine"
+      }
+    }
+  }
+}

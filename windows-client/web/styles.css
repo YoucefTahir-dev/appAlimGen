@@ -1,0 +1,69 @@
+:root {
+  font-family: "Segoe UI", system-ui, sans-serif;
+  color: #142237;
+  background: #f2f5f7;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: radial-gradient(circle at top, #ffffff 0, #f2f5f7 52%, #e6ecef 100%);
+}
+
+.card {
+  width: min(520px, 100%);
+  padding: 36px;
+  text-align: center;
+  background: #fff;
+  border: 1px solid #dce3e7;
+  border-radius: 20px;
+  box-shadow: 0 18px 45px rgba(20, 34, 55, .12);
+}
+
+.logo {
+  border-radius: 50%;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 12px rgba(151, 104, 20, .15));
+}
+
+h1 { margin: 18px 0 8px; font-size: 2rem; }
+h2 { margin: 26px 0 8px; font-size: 1.25rem; }
+.status { color: #4c5d6d; }
+.offline p { color: #4c5d6d; line-height: 1.55; }
+
+.spinner {
+  width: 34px;
+  height: 34px;
+  margin: 22px auto;
+  border: 4px solid #d9e7e0;
+  border-top-color: #168c59;
+  border-radius: 50%;
+  animation: spin .9s linear infinite;
+}
+
+button {
+  border: 0;
+  border-radius: 9px;
+  padding: 12px 24px;
+  color: #fff;
+  background: #168c59;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button:hover { background: #0f7548; }
+button:focus-visible { outline: 3px solid #8bc6aa; outline-offset: 3px; }
+.origin { margin: 30px 0 0; color: #71808e; font-size: .78rem; }
+[hidden] { display: none !important; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation: none; }
+}
