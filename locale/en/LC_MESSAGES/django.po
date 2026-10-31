@@ -774,3 +774,21 @@ msgid "Cette catégorie contient %(count)s produit. Choisissez sa nouvelle caté
 msgid_plural "Cette catégorie contient %(count)s produits. Choisissez leur nouvelle catégorie."
 msgstr[0] "This category contains %(count)s product. Choose its new category."
 msgstr[1] "This category contains %(count)s products. Choose their new category."
+
+msgid "Formulaire à recharger"
+msgstr "Reload this form"
+
+msgid "Ce formulaire a expiré ou votre session a changé. Pour votre sécurité, la demande n'a pas été exécutée."
+msgstr "This form has expired or your session has changed. For your security, the request was not processed."
+
+msgid "Vous êtes déjà connecté. Accédez à votre espace pour continuer."
+msgstr "You are already signed in. Open your account to continue."
+
+msgid "Accéder à mon espace"
+msgstr "Open my account"
+
+msgid "Rechargez la page de connexion, puis saisissez à nouveau vos identifiants."
+msgstr "Reload the sign-in page, then enter your credentials again."
+
+msgid "Recharger la connexion"
+msgstr "Reload sign-in"

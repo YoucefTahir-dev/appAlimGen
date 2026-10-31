@@ -1,0 +1,22 @@
+{% extends 'base/base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "Formulaire à recharger" %} - {% trans "ERP El Amine" %}{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="card shadow-sm auth-card mx-auto">
+        <div class="card-body p-4">
+            <h1 class="h4">{% trans "Formulaire à recharger" %}</h1>
+            <p>{% trans "Ce formulaire a expiré ou votre session a changé. Pour votre sécurité, la demande n'a pas été exécutée." %}</p>
+            {% if user.is_authenticated %}
+                <p>{% trans "Vous êtes déjà connecté. Accédez à votre espace pour continuer." %}</p>
+                <a class="btn btn-success" href="{% url 'login' %}">{% trans "Accéder à mon espace" %}</a>
+            {% else %}
+                <p>{% trans "Rechargez la page de connexion, puis saisissez à nouveau vos identifiants." %}</p>
+                <a class="btn btn-success" href="{% url 'login' %}">{% trans "Recharger la connexion" %}</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

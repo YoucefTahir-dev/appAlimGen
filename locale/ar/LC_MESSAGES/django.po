@@ -1696,3 +1696,21 @@ msgid "Cette catégorie contient %(count)s produit. Choisissez sa nouvelle caté
 msgid_plural "Cette catégorie contient %(count)s produits. Choisissez leur nouvelle catégorie."
 msgstr[0] "تحتوي هذه الفئة على %(count)s منتج. اختر فئته الجديدة."
 msgstr[1] "تحتوي هذه الفئة على %(count)s منتجات. اختر فئتها الجديدة."
+
+msgid "Formulaire à recharger"
+msgstr "يرجى إعادة تحميل النموذج"
+
+msgid "Ce formulaire a expiré ou votre session a changé. Pour votre sécurité, la demande n'a pas été exécutée."
+msgstr "انتهت صلاحية هذا النموذج أو تغيّرت جلستك. حفاظًا على أمانك، لم يتم تنفيذ الطلب."
+
+msgid "Vous êtes déjà connecté. Accédez à votre espace pour continuer."
+msgstr "أنت مسجّل الدخول بالفعل. انتقل إلى حسابك للمتابعة."
+
+msgid "Accéder à mon espace"
+msgstr "الانتقال إلى حسابي"
+
+msgid "Rechargez la page de connexion, puis saisissez à nouveau vos identifiants."
+msgstr "أعد تحميل صفحة تسجيل الدخول، ثم أدخل بيانات الدخول من جديد."
+
+msgid "Recharger la connexion"
+msgstr "إعادة تحميل صفحة الدخول"

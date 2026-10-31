@@ -1,3 +1,5 @@
+from urllib.parse import urlsplit
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login, logout, update_session_auth_hash
@@ -18,6 +20,8 @@ from django.db.models import Count, Q
 from django.urls import reverse, reverse_lazy
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views import View
+from django.views.decorators.cache import never_cache
+from django.views.decorators.csrf import requires_csrf_token
 from django.views.decorators.http import require_POST
 from django.utils.translation import gettext as _
 from .forms import (
@@ -54,10 +58,12 @@ from .services import PasswordResetDeliveryError
 class UserLoginView(LoginView):
     template_name = 'accounts/login.html'
     authentication_form = LoginForm
+    redirect_authenticated_user = True
 
     def get_success_url(self):
         redirect_url = self.get_redirect_url()
-        if redirect_url:
+        # An old login tab must not redirect back to the login URL forever.
+        if redirect_url and urlsplit(redirect_url).path != self.request.path:
             return redirect_url
         destinations = (
             ('accounts.view_dashboard', 'dashboard'),
@@ -105,6 +111,15 @@ class UserLoginView(LoginView):
             status_code=401,
         )
         return super().form_invalid(form)
+
+
+@never_cache
+@requires_csrf_token
+def csrf_failure(request, reason=''):
+    # Keep the rejected POST rejected. Recovery is an explicit safe GET, never
+    # a retry of credentials or business mutations with a refreshed token.
+    return render(request, 'accounts/csrf_failure.html', status=403)
+
 
 @login_required
 @require_POST

@@ -15,8 +15,9 @@
                 <h2 class="h4">{% trans "Connexion" %}</h2>
                 <p class="text-muted">{% trans "Entrez vos identifiants pour accéder au système" %}</p>
             </div>
-            <form method="post">
+            <form method="post" id="login-form">
                 {% csrf_token %}
+                <input type="hidden" name="next" value="{{ next }}">
                 {{ form.non_field_errors }}
                 <div class="mb-3">{{ form.username.label_tag }}{{ form.username }}</div>
                 <div class="mb-3">{{ form.password.label_tag }}{{ form.password }}</div>
@@ -28,4 +29,8 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/login.js' %}" defer></script>
 {% endblock %}
