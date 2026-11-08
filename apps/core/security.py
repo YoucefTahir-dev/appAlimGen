@@ -13,6 +13,7 @@ from django.db.models import Q
 from django.http import HttpResponse
 from django.shortcuts import redirect
 from django.utils import timezone
+from django.utils.cache import add_never_cache_headers
 from django.utils.deprecation import MiddlewareMixin
 from django.utils.translation import gettext as _
 from openpyxl import load_workbook
@@ -314,6 +315,12 @@ class SecurityHeadersMiddleware:
         headers = getattr(settings, 'SECURITY_RESPONSE_HEADERS', {})
         for name, value in headers.items():
             response.setdefault(name, value)
+        # OAuth codes can arrive in this query string. Apply privacy even when
+        # a later middleware returns before the callback view (e.g. mandatory
+        # password change). This never exempts authentication or permissions.
+        if request.path == '/core/backups/drive/callback/':
+            response['Referrer-Policy'] = 'no-referrer'
+            add_never_cache_headers(response)
         return response
 
 

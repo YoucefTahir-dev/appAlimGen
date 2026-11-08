@@ -71,6 +71,14 @@ services:
         value: "2"
       - key: WEB_TIMEOUT
         value: "120"
+      # Opt-in preparation only. Keep export/OAuth disabled until runtime,
+      # callback, secret custody and restore qualifications are complete.
+      - key: DRIVE_BACKUP_BUILD_DEPENDENCIES
+        value: "false"
+      - key: DRIVE_BACKUP_ENABLED
+        value: "false"
+      - key: DRIVE_BACKUP_OAUTH_ENABLED
+        value: "false"
       - key: MEDIA_STORAGE_BACKEND
         value: s3
       - key: AWS_ACCESS_KEY_ID

@@ -1,0 +1,3 @@
+# Optional server-side OAuth token protection for the Drive-backup assistant.
+# Install alongside, not instead of, the ERP's existing requirements.lock.
+cryptography==50.0.2

@@ -1,0 +1,101 @@
+{% extends 'base/base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "Sauvegardes Google Drive" %}{% endblock %}
+{% block page_title %}{% trans "Sauvegardes Google Drive" %}{% endblock %}
+
+{% block content %}
+<section class="card card-dashboard bg-white p-4 mb-4" aria-labelledby="drive-account-title">
+    <h2 class="h5" id="drive-account-title">{% trans "1. Choisir mon compte Google Drive" %}</h2>
+    <p>{% trans "La connexion s’effectue sur le site officiel Google dans un navigateur Web normal. Ne saisissez jamais votre mot de passe Google dans l’ERP." %}</p>
+    {% if connection_notice == 'failed' %}
+        <div class="alert alert-warning" role="alert">{% trans "La connexion Google n’a pas été confirmée. Aucun export n’a été lancé. Réessayez la connexion ou contactez l’administrateur." %}</div>
+    {% elif connection_notice == 'connected' %}
+        <div class="alert alert-success" role="status">{% trans "Connexion Google confirmée. Vérifiez le compte destinataire ci-dessous avant de lancer une sauvegarde." %}</div>
+    {% endif %}
+    {% if drive_connection.connected %}
+        <p><strong>{% trans "Compte destinataire" %} :</strong> {{ drive_connection.account.email }}{% if drive_connection.account.display_name %} — {{ drive_connection.account.display_name }}{% endif %}</p>
+        <p>{% trans "Destination : dossier privé « El Amine - sauvegardes chiffrees » dans ce compte. La sélection d’un autre dossier ou d’un Drive partagé n’est pas proposée dans cette première version." %}</p>
+    {% else %}
+        <div class="alert alert-secondary" role="status">{% trans "Aucun compte Drive connecté pour cette session. Le bouton de sauvegarde reste bloqué." %}</div>
+    {% endif %}
+    <p class="text-muted">{% trans "La connexion est limitée à votre session ERP dans ce navigateur. Après déconnexion ou expiration de session, reconnectez Google Drive. Aucun envoi automatique ne sera lancé." %}</p>
+    {% if can_create_backups %}
+    <form method="post" action="{% url 'backup_drive_connect' %}">
+        {% csrf_token %}
+        {{ connection_form.non_field_errors }}
+        <div class="mb-3">
+            {{ connection_form.current_password.label_tag }}
+            {{ connection_form.current_password }}
+            {{ connection_form.current_password.errors }}
+            <div class="form-text">{% trans "Mot de passe ERP, uniquement pour autoriser la connexion ou la déconnexion de Drive. Cette étape n’exporte aucune donnée." %}</div>
+        </div>
+        <button type="submit" class="btn btn-outline-primary"{% if not drive_connection.available %} disabled{% endif %}>
+            {% if drive_connection.connected %}{% trans "Changer de compte Google Drive" %}{% else %}{% trans "Connecter Google Drive" %}{% endif %}
+        </button>
+        {% if drive_connection.connected %}<button type="submit" class="btn btn-outline-secondary" formaction="{% url 'backup_drive_disconnect' %}">{% trans "Déconnecter Drive de cette session" %}</button>{% endif %}
+    </form>
+    {% endif %}
+    <p class="text-muted mt-2 mb-0">{% trans "Déconnecter ici n’efface aucune archive, n’annule pas un export déjà autorisé et ne révoque pas l’autorisation Google du compte. Cette autorisation peut être retirée dans les paramètres de sécurité Google." %}</p>
+</section>
+<div class="card card-dashboard bg-white p-4 mb-4">
+    <h2 class="h5">2. {% trans "Archive chiffrée de la base de données" %}</h2>
+    <p>{% trans "L’archive est chiffrée avant son envoi dans le dossier Drive privé réservé à l’application." %}</p>
+    <div class="alert alert-warning" role="note">
+        <strong>{% trans "Base de données uniquement — médias exclus." %}</strong>
+        {% trans "Les photos, logos et pièces jointes ne sont pas inclus. Cette option ne constitue pas une sauvegarde complète de l’ERP et n’accède pas au bucket GCP exclu." %}
+    </div>
+    <p class="text-muted">{% trans "L’opération s’exécute pendant cette requête, pour un petit volume uniquement : aucun traitement en arrière-plan ni envoi automatique n’est configuré. Attendez la confirmation sans cliquer plusieurs fois. Un envoi vérifié ne prouve pas qu’une restauration a été testée." %}</p>
+    <p class="text-muted">{% trans "La disponibilité du bouton indique uniquement que la configuration est renseignée. Les outils et l’autorisation Drive sont vérifiés au déclenchement. L’espace Drive n’est pas estimé à l’avance : Google peut refuser l’envoi si l’espace ou le quota est épuisé." %}</p>
+
+    {% if backup_error %}<div class="alert alert-danger" role="alert">{{ backup_error }}</div>{% endif %}
+
+    {% if not backup_availability.ready %}
+        <div class="alert alert-secondary" role="status">
+            <strong>{% trans "Sauvegarde indisponible : aucun export ne peut être lancé." %}</strong>
+            {% if not backup_availability.enabled %}<p class="mb-0">{% trans "Cette fonctionnalité est désactivée par défaut. Son activation et la connexion à Drive nécessitent une configuration et une autorisation séparées." %}</p>{% endif %}
+            {% if backup_availability.issues %}
+            <ul class="mb-0 mt-2">{% for issue in backup_availability.issues %}<li>{{ issue }}</li>{% endfor %}</ul>
+            {% endif %}
+        </div>
+    {% endif %}
+
+    {% if can_create_backups %}
+    <form method="post" action="{% url 'backup_create' %}">
+        {% csrf_token %}
+        {{ form.drive_destination }}
+        {{ form.drive_destination.errors }}
+        {{ form.non_field_errors }}
+        <div class="mb-3">
+            {{ form.current_password.label_tag }}
+            {{ form.current_password }}
+            {{ form.current_password.errors }}
+            <div class="form-text">{{ form.current_password.help_text }}</div>
+        </div>
+        <div class="form-check mb-3">
+            {{ form.confirm_database_only }}
+            {{ form.confirm_database_only.label_tag }}
+            {{ form.confirm_database_only.errors }}
+        </div>
+        <button type="submit" class="btn btn-primary"{% if not backup_availability.ready %} disabled{% endif %}>
+            <i class="bi bi-cloud-arrow-up me-1"></i>{% trans "Créer l’archive chiffrée et l’envoyer sur Drive" %}
+        </button>
+    </form>
+    {% else %}
+    <p class="text-muted mb-0">{% trans "Vous pouvez consulter cette page mais vous n’avez pas l’autorisation de créer une sauvegarde." %}</p>
+    {% endif %}
+</div>
+
+{% if last_backup %}
+<section class="card card-dashboard bg-white p-4" aria-labelledby="backup-result-title">
+    <h2 class="h5" id="backup-result-title">{% trans "Dernier envoi vérifié" %}</h2>
+    <p class="text-success">{% trans "L’envoi chiffré et son intégrité ont été vérifiés." %}</p>
+    <dl class="row">
+        <dt class="col-sm-3">{% trans "Fichier" %}</dt><dd class="col-sm-9 text-break">{{ last_backup.name }}</dd>
+        <dt class="col-sm-3">{% trans "Taille" %}</dt><dd class="col-sm-9">{{ last_backup.size }} {% trans "octets" %}</dd>
+        <dt class="col-sm-3">SHA-256</dt><dd class="col-sm-9 text-break">{{ last_backup.sha256 }}</dd>
+    </dl>
+    <p class="text-warning mb-0">{% trans "Restauration non testée pour cette archive. Médias non inclus. P0-A n’est pas clôturé par cet envoi." %}</p>
+</section>
+{% endif %}
+{% endblock %}
