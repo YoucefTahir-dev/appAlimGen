@@ -309,6 +309,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'accounts.User'
 
 REST_FRAMEWORK = {
+    # Keep the API v1 nested-item error contract when upgrading DRF 3.18.
+    # Revisit with a versioned client migration before DRF 3.20 removes this.
+    'LIST_SERIALIZER_ERRORS_AS_DICT': False,
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'apps.api.jwt_auth.VersionedJWTAuthentication',
     ),

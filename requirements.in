@@ -6,14 +6,18 @@ reportlab==5.0.0
 openpyxl==3.1.5
 django-widget-tweaks==1.5.1
 python-dotenv==1.2.2
-Pillow==12.3.0
+Pillow==13.0.0
 qrcode[pil]==8.2
 arabic-reshaper==3.0.1
 python-bidi==0.6.11
 whitenoise==6.12.0
 django-storages[s3]==1.14.6
-djangorestframework==3.17.2
+djangorestframework==3.18.3
 djangorestframework-simplejwt==5.5.1
 django-filter==25.1
 drf-spectacular==0.28.0
 typing-extensions==4.16.0
+
+# Security pins for transitive authentication and HTTP dependencies.
+PyJWT==2.15.1
+urllib3==2.8.0
