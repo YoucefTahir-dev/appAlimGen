@@ -42,7 +42,7 @@ if not DEBUG and not ALLOWED_HOSTS:
     raise ImproperlyConfigured('ALLOWED_HOSTS doit être défini en production.')
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
+    'apps.accounts.admin_apps.SecureAdminConfig',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',

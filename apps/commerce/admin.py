@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.core.exceptions import PermissionDenied
 from .models import (
     InvoiceSequence,
     OpeningBalancePayment,
@@ -10,35 +11,76 @@ from .models import (
     TicketSequence,
 )
 
-@admin.register(Purchase)
-class PurchaseAdmin(admin.ModelAdmin):
+
+class FinancialAuditAdmin(admin.ModelAdmin):
+    """Audit only: financial changes must use the transactional business flows.
+
+    Keep Django's per-model view/change permission check for read access. Even a
+    superuser must not bypass document totals, payment or stock services here.
+    """
+
     actions = None
+    inlines = ()
+    list_editable = ()
+    autocomplete_fields = ()
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def get_actions(self, request):
+        return {}
+
+    def get_inline_instances(self, request, obj=None):
+        return []
+
+    def get_readonly_fields(self, request, obj=None):
+        # Include new concrete/M2M fields automatically, not reverse relations.
+        return tuple(dict.fromkeys((
+            *super().get_readonly_fields(request, obj),
+            *(field.name for field in self.model._meta.concrete_fields),
+            *(field.name for field in self.model._meta.many_to_many),
+        )))
+
+    def changelist_view(self, request, extra_context=None):
+        if request.method not in ('GET', 'HEAD', 'OPTIONS'):
+            raise PermissionDenied
+        return super().changelist_view(request, extra_context=extra_context)
+
+    def save_model(self, request, obj, form, change):
+        raise PermissionDenied
+
+    def save_related(self, request, form, formsets, change):
+        raise PermissionDenied
+
+    def delete_model(self, request, obj):
+        raise PermissionDenied
+
+    def delete_queryset(self, request, queryset):
+        raise PermissionDenied
+
+
+@admin.register(Purchase)
+class PurchaseAdmin(FinancialAuditAdmin):
     list_display = ('reference', 'supplier', 'created_at', 'total')
     search_fields = ('reference',)
 
-    def delete_model(self, request, obj):
-        obj._stock_user = request.user
-        super().delete_model(request, obj)
 
 @admin.register(PurchaseLine)
-class PurchaseLineAdmin(admin.ModelAdmin):
-    actions = None
+class PurchaseLineAdmin(FinancialAuditAdmin):
     list_display = (
         'purchase', 'product', 'packaging_name', 'packaging_quantity',
         'quantity', 'purchase_price',
     )
 
-    def save_model(self, request, obj, form, change):
-        obj._stock_user = request.user
-        super().save_model(request, obj, form, change)
-
-    def delete_model(self, request, obj):
-        obj._stock_user = request.user
-        super().delete_model(request, obj)
 
 @admin.register(Sale)
-class SaleAdmin(admin.ModelAdmin):
-    actions = None
+class SaleAdmin(FinancialAuditAdmin):
     list_display = (
         'invoice_number', 'ticket_number', 'client', 'payment_type',
         'snapshot_integrity_status', 'created_at', 'total',
@@ -51,35 +93,21 @@ class SaleAdmin(admin.ModelAdmin):
         'subtotal_ht_snapshot', 'tax_amount_snapshot',
     )
 
-    def delete_model(self, request, obj):
-        obj._stock_user = request.user
-        super().delete_model(request, obj)
 
 @admin.register(InvoiceSequence)
-class InvoiceSequenceAdmin(admin.ModelAdmin):
+class InvoiceSequenceAdmin(FinancialAuditAdmin):
     list_display = ('year', 'last_number', 'updated_at')
     readonly_fields = ('year', 'last_number', 'updated_at')
 
-    def has_add_permission(self, request):
-        return False
-
-    def has_delete_permission(self, request, obj=None):
-        return False
 
 @admin.register(TicketSequence)
-class TicketSequenceAdmin(admin.ModelAdmin):
+class TicketSequenceAdmin(FinancialAuditAdmin):
     list_display = ('year', 'last_number', 'updated_at')
     readonly_fields = ('year', 'last_number', 'updated_at')
 
-    def has_add_permission(self, request):
-        return False
-
-    def has_delete_permission(self, request, obj=None):
-        return False
 
 @admin.register(SaleLine)
-class SaleLineAdmin(admin.ModelAdmin):
-    actions = None
+class SaleLineAdmin(FinancialAuditAdmin):
     list_display = ('sale', 'product', 'packaging_name', 'packaging_quantity', 'quantity', 'unit_price', 'unit_cost')
     readonly_fields = (
         'unit_cost', 'packaging_name', 'packaging_factor',
@@ -87,32 +115,18 @@ class SaleLineAdmin(admin.ModelAdmin):
         'unit_name_snapshot', 'line_total_ht_snapshot',
     )
 
-    def save_model(self, request, obj, form, change):
-        obj._stock_user = request.user
-        super().save_model(request, obj, form, change)
-
-    def delete_model(self, request, obj):
-        obj._stock_user = request.user
-        super().delete_model(request, obj)
 
 @admin.register(Payment)
-class PaymentAdmin(admin.ModelAdmin):
-    actions = None
+class PaymentAdmin(FinancialAuditAdmin):
     list_display = ('reference', 'payment_type', 'amount', 'sale', 'purchase', 'created_at')
     list_filter = ('payment_type',)
     readonly_fields = ('reference', 'created_by')
 
-    def save_model(self, request, obj, form, change):
-        if obj.created_by_id is None:
-            obj.created_by = request.user
-        super().save_model(request, obj, form, change)
-
 
 @admin.register(OpeningBalancePayment)
-class OpeningBalancePaymentAdmin(admin.ModelAdmin):
+class OpeningBalancePaymentAdmin(FinancialAuditAdmin):
     """Read-only audit trail; creation and cancellation go through the service API."""
 
-    actions = None
     list_display = (
         'reference', 'client', 'payment_type', 'amount', 'created_at', 'cancelled_at',
     )
@@ -123,12 +137,3 @@ class OpeningBalancePaymentAdmin(admin.ModelAdmin):
         'notes', 'created_by', 'created_at', 'cancelled_at', 'cancelled_by',
         'cancellation_reason',
     )
-
-    def has_add_permission(self, request):
-        return False
-
-    def has_change_permission(self, request, obj=None):
-        return request.user.is_active and request.user.is_staff
-
-    def has_delete_permission(self, request, obj=None):
-        return False
