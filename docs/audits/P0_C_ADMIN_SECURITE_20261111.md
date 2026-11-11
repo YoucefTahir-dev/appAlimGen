@@ -52,6 +52,9 @@ transaction. La commande du projet `reset_admin` l’effectue déjà.
 - `apps/commerce/tests/test_admin_security.py`
 - `gestio_stock/settings.py` : remplacement de la seule entrée de configuration
   admin par `apps.accounts.admin_apps.SecureAdminConfig`.
+- `.github/workflows/django-ci.yml` : correction de publication limitée au runner
+  `ubuntu-24.04`, après l'échec de préparation Python décrit ci-dessous. Les
+  modifications locales préexistantes de ce workflow ne sont pas publiées.
 - Le présent compte rendu.
 
 `SecureAdminConfig` conserve le nom et le label `django.contrib.admin` / `admin`,
@@ -143,11 +146,20 @@ Historique conservé dans `tmp/p0c-admin-tests-20261111/` :
 
 ## Contrôles de publication
 
-La publication autorisée doit se limiter aux huit fichiers de ce lot. Envoyer
+La publication autorisée se limite aux neuf fichiers décrits ci-dessus. Envoyer
 d'abord le candidat sur une branche `security/**`, couverte par la CI existante,
 puis exiger une CI verte sur son commit exact avant promotion sur `main`, suivie
 du contrôle du déploiement Render de ce même commit. Le présent compte rendu de
 prépublication ne constitue pas une preuve que ce déploiement a déjà réussi.
+
+Le premier candidat `65234eca48a83d19ef0db1d1d1e2aab48b903ea3` a déclenché
+la [CI 43032303057](https://github.com/YoucefTahir-dev/appAlimGen/actions/runs/43032303057),
+arrêtée avant installation des dépendances et tests : Python 3.12.8 n'est pas
+disponible pour Ubuntu 26.04, désormais sélectionné par `ubuntu-latest`.
+La correction épingle uniquement le runner de cette CI à `ubuntu-24.04`, en
+conservant Python 3.12.8, les contrôles et les dépendances. C'est l'option de
+transition [documentée par GitHub](https://github.blog/changelog/2026-09-17-ubuntu-26-generally-available-and-latest-migration/).
+Les empreintes des sept fichiers Python restent celles du candidat testé.
 
 Avant la promotion, vérifier avec l’exploitant qu’un compte propriétaire
 superuser est disponible, sans communiquer ses identifiants. Prévenir
