@@ -25,7 +25,7 @@ from apps.commerce.receivables import (
     receivable_account,
     receivables_queryset,
 )
-from apps.commerce.product_search import search_products
+from apps.commerce.product_search import commercial_products, search_products
 from apps.commerce.services import ensure_ticket_number
 from apps.commerce.utils import build_invoice_context, generate_invoice_pdf, qr_code_data_uri
 from apps.core.dashboard import DashboardPeriodError, dashboard_context
@@ -85,6 +85,7 @@ IDEMPOTENCY_PARAMETER = OpenApiParameter(
 
 class CompanySettingsView(APIView):
     required_permissions = {
+        'options': (),
         'get': 'core.view_companysettings',
         'patch': 'core.change_companysettings',
         'put': 'core.change_companysettings',
@@ -172,7 +173,10 @@ class ProductViewSet(AuditMutationMixin, viewsets.ModelViewSet):
     filterset_fields = ('category', 'brand', 'unit')
     audit_name = 'product'
     required_permissions = {
+        'metadata': (),
         'list': 'inventory.view_product', 'retrieve': 'inventory.view_product',
+        # search_products enforces add/change rights for the requested context.
+        'search': (),
         'barcode': 'inventory.view_product', 'qr': 'inventory.view_product',
         'price': 'inventory.view_product',
         'historical_conversion_preview': 'inventory.regularize_product_conditioning',
@@ -211,6 +215,9 @@ class ProductViewSet(AuditMutationMixin, viewsets.ModelViewSet):
         context = request.query_params.get('context', 'loading_order')
         if context not in {'sale', 'purchase', 'loading_order'}:
             raise ValidationError({'context': _('Contexte de recherche invalide.')})
+        # Check the context before resolving a client supplied by the caller.
+        # The shared search helper repeats this guard before querying products.
+        commercial_products(request.user, context)
         query = request.query_params.get('q', '').strip()
         if len(query) > 100:
             raise ValidationError({'q': _('Recherche trop longue.')})
@@ -401,6 +408,7 @@ class ProductPackagingViewSet(AuditMutationMixin, viewsets.ModelViewSet):
     filterset_fields = ('product', 'is_active')
     audit_name = 'product_packaging'
     required_permissions = {
+        'metadata': (),
         'list': 'inventory.view_product', 'retrieve': 'inventory.view_product',
         'create': 'inventory.change_product', 'update': 'inventory.change_product',
         'partial_update': 'inventory.change_product', 'destroy': 'inventory.change_product',
@@ -411,7 +419,10 @@ class ReferenceReadOnlyViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class = None
     search_fields = ('name',)
     ordering = ('name',)
-    required_permissions = {'*': 'inventory.view_product'}
+    required_permissions = {
+        'metadata': (),
+        'list': 'inventory.view_product', 'retrieve': 'inventory.view_product',
+    }
 
 
 class CategoryViewSet(AuditMutationMixin, viewsets.ModelViewSet):
@@ -422,6 +433,7 @@ class CategoryViewSet(AuditMutationMixin, viewsets.ModelViewSet):
     ordering = ('name',)
     audit_name = 'category'
     required_permissions = {
+        'metadata': (),
         'list': 'inventory.view_product', 'retrieve': 'inventory.view_product',
         'create': 'inventory.add_product', 'update': 'inventory.change_product',
         'partial_update': 'inventory.change_product', 'destroy': 'inventory.delete_product',
@@ -480,6 +492,7 @@ class ClientViewSet(AuditMutationMixin, viewsets.ModelViewSet):
     ordering_fields = ('name', 'created_at', 'balance')
     audit_name = 'client'
     required_permissions = {
+        'metadata': (),
         'list': 'inventory.view_client', 'retrieve': 'inventory.view_client',
         'history': ('inventory.view_client', 'commerce.view_sale'), 'create': 'inventory.add_client',
         'update': 'inventory.change_client', 'partial_update': 'inventory.change_client',
@@ -505,6 +518,7 @@ class SupplierViewSet(AuditMutationMixin, viewsets.ModelViewSet):
     ordering_fields = ('name', 'created_at')
     audit_name = 'supplier'
     required_permissions = {
+        'metadata': (),
         'list': 'inventory.view_supplier', 'retrieve': 'inventory.view_supplier',
         'history': ('inventory.view_supplier', 'commerce.view_purchase'), 'create': 'inventory.add_supplier',
         'update': 'inventory.change_supplier', 'partial_update': 'inventory.change_supplier',
@@ -531,6 +545,7 @@ class SaleViewSet(AuditMutationMixin, mixins.CreateModelMixin, mixins.ListModelM
     filterset_fields = ('client', 'payment_type')
     audit_name = 'sale'
     required_permissions = {
+        'metadata': (),
         'list': 'commerce.view_sale', 'retrieve': 'commerce.view_sale',
         'create': 'commerce.add_sale', 'update': 'commerce.change_sale',
         'partial_update': 'commerce.change_sale', 'destroy': 'commerce.delete_sale',
@@ -573,6 +588,7 @@ class PurchaseViewSet(AuditMutationMixin, mixins.CreateModelMixin, mixins.ListMo
     filterset_fields = ('supplier',)
     audit_name = 'purchase'
     required_permissions = {
+        'metadata': (),
         'list': 'commerce.view_purchase', 'retrieve': 'commerce.view_purchase',
         'create': 'commerce.add_purchase', 'update': 'commerce.change_purchase',
         'partial_update': 'commerce.change_purchase', 'destroy': 'commerce.delete_purchase',
@@ -605,7 +621,12 @@ class PaymentViewSet(AuditMutationMixin, mixins.CreateModelMixin, mixins.ListMod
     filterset_fields = ('sale', 'purchase', 'payment_type')
     ordering_fields = ('created_at', 'amount')
     audit_name = 'payment'
-    required_permissions = {}
+    # Reading is filtered by view_sale/view_purchase in get_queryset; creation
+    # and cancellation check the exact sale/purchase permission and object scope
+    # in the serializer/handler. Do not replace those checks with a broad OR.
+    required_permissions = {
+        'metadata': (), 'list': (), 'retrieve': (), 'create': (), 'cancel': (),
+    }
 
     def get_queryset(self):
         can_sales = has_permission(self.request.user, 'commerce.view_sale')
@@ -648,7 +669,8 @@ class ReceivableViewSet(AuditMutationMixin, viewsets.ReadOnlyModelViewSet):
     queryset = Client.objects.none()
     serializer_class = ReceivableSerializer
     required_permissions = {
-        '*': 'commerce.view_receivables',
+        'metadata': (),
+        'list': 'commerce.view_receivables', 'retrieve': 'commerce.view_receivables',
         'allocate_payment': 'commerce.add_customerpayment',
         'cancel_opening_payment': 'commerce.cancel_customerpayment',
     }
@@ -792,7 +814,12 @@ class LoadingOrderViewSet(AuditMutationMixin, viewsets.ModelViewSet):
     search_fields = ('number', 'operator__username')
     ordering_fields = ('created_at', 'number', 'status')
     audit_name = 'loading_order'
+    any_permission_actions = ('list', 'retrieve', 'current')
     required_permissions = {
+        'metadata': (),
+        'list': ('inventory.view_loadingorder', 'inventory.view_all_loadingorders'),
+        'retrieve': ('inventory.view_loadingorder', 'inventory.view_all_loadingorders'),
+        'current': ('inventory.view_loadingorder', 'inventory.view_all_loadingorders'),
         'create': 'inventory.add_loadingorder',
         'update': 'inventory.change_loadingorder',
         'partial_update': 'inventory.change_loadingorder',
@@ -855,6 +882,13 @@ class OperatorStockViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = OperatorStock.objects.select_related('operator', 'product')
     serializer_class = OperatorStockSerializer
     filterset_fields = ('product',)
+    any_permission_actions = ('list', 'retrieve', 'movements')
+    required_permissions = {
+        'metadata': (),
+        'list': ('inventory.view_loadingorder', 'inventory.view_all_loadingorders'),
+        'retrieve': ('inventory.view_loadingorder', 'inventory.view_all_loadingorders'),
+        'movements': ('inventory.view_loadingorder', 'inventory.view_all_loadingorders'),
+    }
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -866,7 +900,7 @@ class OperatorStockViewSet(viewsets.ReadOnlyModelViewSet):
             return queryset
         return queryset.filter(operator=self.request.user)
 
-    @action(detail=False, methods=('get'))
+    @action(detail=False, methods=('get',))
     def movements(self, request):
         queryset = OperatorStockMovement.objects.select_related('product', 'loading_order', 'operator')
         if has_permission(request.user, 'inventory.view_all_loadingorders'):
@@ -888,6 +922,7 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = SaleSerializer
     search_fields = ('invoice_number', 'ticket_number', 'client__name')
     required_permissions = {
+        'metadata': (),
         'list': 'accounts.view_invoices', 'retrieve': 'accounts.view_invoices',
         'pdf': 'accounts.download_invoice_pdf', 'ticket': 'accounts.print_invoice',
         'print_data': 'accounts.print_invoice',
@@ -955,6 +990,7 @@ class PrinterProfileViewSet(AuditMutationMixin, viewsets.ModelViewSet):
     filterset_fields = ('connection_mode', 'protocol', 'paper_width', 'is_default', 'is_active')
     audit_name = 'printer'
     required_permissions = {
+        'metadata': (),
         'list': 'printing.view_printerprofile', 'retrieve': 'printing.view_printerprofile',
         'default': 'printing.view_printerprofile', 'create': 'printing.add_printerprofile',
         'update': 'printing.change_printerprofile', 'partial_update': 'printing.change_printerprofile',
@@ -1002,6 +1038,7 @@ class PrintProfileViewSet(AuditMutationMixin, viewsets.ModelViewSet):
     filterset_fields = ('document_type', 'printer', 'language', 'is_active')
     audit_name = 'print_profile'
     required_permissions = {
+        'metadata': (),
         'list': 'printing.view_printprofile', 'retrieve': 'printing.view_printprofile',
         'create': 'printing.add_printprofile', 'update': 'printing.change_printprofile',
         'partial_update': 'printing.change_printprofile', 'destroy': 'printing.delete_printprofile',
@@ -1009,7 +1046,7 @@ class PrintProfileViewSet(AuditMutationMixin, viewsets.ModelViewSet):
 
 
 class PrintingCapabilitiesView(APIView):
-    required_permissions = {'get': 'accounts.print_invoice'}
+    required_permissions = {'get': 'accounts.print_invoice', 'options': ()}
 
     @extend_schema(responses=dict)
     def get(self, request):
@@ -1028,7 +1065,11 @@ class StockViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ProductSerializer
     search_fields = ('name', 'reference', 'barcode')
     ordering_fields = ('name', 'quantity', 'minimum_stock')
-    required_permissions = {'*': 'accounts.view_stock'}
+    required_permissions = {
+        'metadata': (),
+        'list': 'accounts.view_stock', 'retrieve': 'accounts.view_stock',
+        'movements': 'accounts.view_stock', 'alerts': 'accounts.view_stock',
+    }
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -1066,6 +1107,7 @@ class ExpenseViewSet(AuditMutationMixin, viewsets.ModelViewSet):
     filterset_fields = ('category', 'supplier', 'payment_method')
     audit_name = 'expense'
     required_permissions = {
+        'metadata': (),
         'list': 'expenses.view_expense', 'retrieve': 'expenses.view_expense',
         'create': 'expenses.add_expense', 'update': 'expenses.change_expense',
         'partial_update': 'expenses.change_expense', 'destroy': 'expenses.delete_expense',
@@ -1086,6 +1128,7 @@ class ExpenseCategoryViewSet(AuditMutationMixin, viewsets.ModelViewSet):
     serializer_class = ExpenseCategorySerializer
     audit_name = 'expense_category'
     required_permissions = {
+        'metadata': (),
         'list': 'expenses.view_expense', 'retrieve': 'expenses.view_expense',
         'create': 'expenses.add_expensecategory', 'update': 'expenses.add_expensecategory',
         'partial_update': 'expenses.add_expensecategory', 'destroy': 'expenses.add_expensecategory',
@@ -1093,7 +1136,7 @@ class ExpenseCategoryViewSet(AuditMutationMixin, viewsets.ModelViewSet):
 
 
 class DashboardView(APIView):
-    required_permissions = {'get': 'accounts.view_dashboard'}
+    required_permissions = {'get': 'accounts.view_dashboard', 'options': ()}
 
     @extend_schema(responses=dict)
     def get(self, request):
@@ -1123,7 +1166,7 @@ class DashboardView(APIView):
 
 
 class AlertsView(APIView):
-    required_permissions = {'get': 'accounts.view_dashboard'}
+    required_permissions = {'get': 'accounts.view_dashboard', 'options': ()}
 
     @extend_schema(responses=dict)
     def get(self, request):
