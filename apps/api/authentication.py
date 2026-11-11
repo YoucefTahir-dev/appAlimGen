@@ -91,6 +91,8 @@ class MobileTokenRefreshView(TokenRefreshView):
 
 
 class LogoutView(APIView):
+    required_permissions = {'post': (), 'options': ()}
+
     @extend_schema(
         request=inline_serializer('LogoutRequest', {'refresh': serializers.CharField()}),
         responses=inline_serializer('LogoutResponse', {'message': serializers.CharField()}),
@@ -111,6 +113,8 @@ class LogoutView(APIView):
 
 
 class CurrentUserView(APIView):
+    required_permissions = {'get': (), 'options': ()}
+
     @extend_schema(responses=dict)
     def get(self, request):
         from apps.accounts.permissions import ALL_MANAGED_PERMISSION_NAMES, has_permission
@@ -147,6 +151,8 @@ class PasswordChangeSerializer(serializers.Serializer):
 
 
 class PasswordChangeView(APIView):
+    required_permissions = {'post': (), 'options': ()}
+
     @extend_schema(
         request=PasswordChangeSerializer,
         responses=inline_serializer('PasswordChangeResponse', {'message': serializers.CharField()}),

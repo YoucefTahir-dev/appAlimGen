@@ -1,7 +1,7 @@
 from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from rest_framework.permissions import IsAdminUser
-from rest_framework.routers import DefaultRouter
+from rest_framework.routers import APIRootView, DefaultRouter
 
 from .authentication import (
     CurrentUserView,
@@ -39,7 +39,12 @@ from .views import (
 )
 
 
+class AuthenticatedAPIRootView(APIRootView):
+    required_permissions = {'get': (), 'options': ()}
+
+
 router = DefaultRouter()
+router.APIRootView = AuthenticatedAPIRootView
 router.register('products', ProductViewSet, basename='api-product')
 router.register('packagings', ProductPackagingViewSet, basename='api-product-packaging')
 router.register('printers', PrinterProfileViewSet, basename='api-printer')

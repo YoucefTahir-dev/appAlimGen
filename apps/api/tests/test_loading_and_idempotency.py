@@ -225,7 +225,10 @@ class LoadingOrderFlowTests(APITestCase):
             2,
         )
 
-    def test_api_current_only_exposes_authenticated_operator(self):
+    def test_api_current_only_exposes_authorized_operator(self):
+        self.operator.user_permissions.add(Permission.objects.get(
+            content_type__app_label='inventory', codename='view_loadingorder',
+        ))
         validate_loading_order(self.order, user=self.admin)
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {MobileTokenSerializer.get_token(self.operator).access_token}')
         response = self.client.get(reverse('api-loading-order-current'))
