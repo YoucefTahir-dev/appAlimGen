@@ -124,8 +124,10 @@ Preuves locales non secrètes dans `tmp/p0c-admin-tests-20261111/` :
 
 Les cinq fichiers déjà modifiés avant ce lot (`.env.example`, les deux workflows
 database-backup/django-ci, `apps/core/backup.py` et son test) ont conservé leurs
-empreintes initiales. Les autres travaux non suivis n’ont pas été incorporés au
-snapshot ni modifiés.
+empreintes initiales pendant la validation isolée. Lors de la publication, seule
+la ligne du runner de django-ci est corrigée ; son autre modification locale
+préexistante reste non publiée. Les autres travaux non suivis n’ont pas été
+incorporés au snapshot ni modifiés.
 
 Historique conservé dans `tmp/p0c-admin-tests-20261111/` :
 
