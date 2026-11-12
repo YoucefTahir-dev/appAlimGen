@@ -3,14 +3,13 @@ from django.utils.translation import gettext as _
 from drf_spectacular.utils import extend_schema, inline_serializer
 from rest_framework import permissions, serializers, status
 from rest_framework.response import Response
-from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenRefreshSerializer
 from rest_framework_simplejwt.settings import api_settings
 from rest_framework.exceptions import APIException, AuthenticationFailed, Throttled
 from django.contrib.auth import get_user_model
 from django.contrib.auth import password_validation
-from django.db import transaction
+from django.db import DatabaseError, transaction
 from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
@@ -21,6 +20,7 @@ from apps.core.security import (
     password_reset_rate_limit_action,
 )
 from .jwt_auth import TOKEN_VERSION_CLAIM, TokenRevoked
+from .throttling import AuthenticationRateLimitUnavailable, SharedAuthRateThrottle
 
 
 class MobileTokenSerializer(TokenObtainPairSerializer):
@@ -50,8 +50,9 @@ class MobileTokenSerializer(TokenObtainPairSerializer):
 class MobileTokenView(TokenObtainPairView):
     permission_classes = (permissions.AllowAny,)
     serializer_class = MobileTokenSerializer
-    throttle_classes = (ScopedRateThrottle,)
+    throttle_classes = (SharedAuthRateThrottle,)
     throttle_scope = 'auth'
+    auth_rate_limit_operation = 'login'
 
     def post(self, request, *args, **kwargs):
         response = super().post(request, *args, **kwargs)
@@ -59,7 +60,14 @@ class MobileTokenView(TokenObtainPairView):
         return response
 
     def handle_exception(self, exc):
-        log_security_event(self.request, 'api.auth.login.failed', level='warning', status_code=401)
+        status_code = getattr(exc, 'status_code', 500)
+        if isinstance(exc, Throttled):
+            action = 'api.auth.login.blocked'
+        elif isinstance(exc, AuthenticationRateLimitUnavailable) or status_code >= 500:
+            action = 'api.auth.login.unavailable'
+        else:
+            action = 'api.auth.login.failed'
+        log_security_event(self.request, action, level='warning', status_code=status_code)
         return super().handle_exception(exc)
 
     @staticmethod
@@ -86,8 +94,9 @@ class MobileTokenRefreshSerializer(TokenRefreshSerializer):
 class MobileTokenRefreshView(TokenRefreshView):
     serializer_class = MobileTokenRefreshSerializer
     permission_classes = (permissions.AllowAny,)
-    throttle_classes = (ScopedRateThrottle,)
+    throttle_classes = (SharedAuthRateThrottle,)
     throttle_scope = 'auth'
+    auth_rate_limit_operation = 'refresh'
 
 
 class LogoutView(APIView):
@@ -183,8 +192,10 @@ class PasswordResetRequestSerializer(serializers.Serializer):
 
 class PasswordResetRequestView(APIView):
     permission_classes = (permissions.AllowAny,)
-    throttle_classes = (ScopedRateThrottle,)
+    authentication_classes = ()
+    throttle_classes = (SharedAuthRateThrottle,)
     throttle_scope = 'password_reset'
+    auth_rate_limit_operation = 'password_reset_request'
 
     @extend_schema(
         request=PasswordResetRequestSerializer,
@@ -196,7 +207,11 @@ class PasswordResetRequestView(APIView):
         serializer = PasswordResetRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         email = serializer.validated_data['email']
-        if is_password_reset_rate_limited(request, email):
+        try:
+            audit_limit_reached = is_password_reset_rate_limited(request, email)
+        except DatabaseError as exc:
+            raise AuthenticationRateLimitUnavailable() from exc
+        if audit_limit_reached:
             log_security_event(
                 request, 'api.auth.password_reset.blocked',
                 level='warning', status_code=429,
@@ -232,8 +247,10 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
 
 class PasswordResetConfirmView(APIView):
     permission_classes = (permissions.AllowAny,)
-    throttle_classes = (ScopedRateThrottle,)
+    authentication_classes = ()
+    throttle_classes = (SharedAuthRateThrottle,)
     throttle_scope = 'password_reset'
+    auth_rate_limit_operation = 'password_reset_confirm'
 
     @extend_schema(
         request=PasswordResetConfirmSerializer,
