@@ -18,6 +18,7 @@
           data-base-unit-label="{% trans 'Unité de base' %}"
           data-existing-paid="{% if form.instance.pk %}{{ form.instance.amount_paid|unlocalize }}{% else %}0.00{% endif %}">
         {% csrf_token %}
+        {{ form.request_token }}{{ form.request_token.errors }}
         {{ form.non_field_errors }}
         <div class="row g-3">
             {% if form.instance.pk %}

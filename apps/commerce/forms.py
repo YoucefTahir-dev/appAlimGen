@@ -14,6 +14,7 @@ from apps.inventory.pricing import sale_base_unit_allowed, sale_packaging_allowe
 from .models import Payment, Purchase, PurchaseLine, Sale, SaleLine
 from .widgets import ClientAutocomplete, ProductAutocomplete
 from .services import validate_tax_rate
+from .web_idempotency import new_web_token
 
 
 class PackagingSelect(forms.Select):
@@ -31,7 +32,22 @@ class PackagingSelect(forms.Select):
         return option
 
 
-class PurchaseForm(forms.ModelForm):
+class WebMutationForm(forms.ModelForm):
+    request_token = forms.CharField(widget=forms.HiddenInput, required=False, max_length=128)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        token_name = self.add_prefix('request_token')
+        if not self.is_bound:
+            self.initial['request_token'] = new_web_token()
+        elif not str(self.data.get(token_name, '')).strip():
+            # Do not mutate request.POST: the wrapper must still recognize this
+            # submission as a legacy one. An error page upgrades the next POST.
+            self.data = self.data.copy()
+            self.data[token_name] = new_web_token()
+
+
+class PurchaseForm(WebMutationForm):
     class Meta:
         model = Purchase
         fields = ['reference', 'supplier', 'tax_rate']
@@ -50,7 +66,7 @@ class PurchaseForm(forms.ModelForm):
         return validate_tax_rate(self.cleaned_data['tax_rate'])
 
 
-class SaleForm(forms.ModelForm):
+class SaleForm(WebMutationForm):
     PAY_FULL = 'pay_full'
     PAY_PARTIAL = 'pay_partial'
     NO_PAYMENT = 'no_payment'

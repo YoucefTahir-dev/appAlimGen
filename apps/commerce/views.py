@@ -10,7 +10,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import DecimalField, ExpressionWrapper, F, Q, Sum, Value
 from django.db.models.deletion import ProtectedError
 from django.db.models.functions import Coalesce
-from django.http import HttpResponse, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_GET, require_POST
 from django.utils.translation import gettext as _
@@ -30,6 +30,7 @@ from .services import create_sale, create_purchase, ensure_ticket_number, refres
 from .utils import build_invoice_context, generate_invoice_pdf, qr_code_data_uri
 from .product_search import commercial_products, search_products
 from .receivables import attach_receivable_counts, receivable_account, receivables_queryset
+from .web_idempotency import web_idempotent
 
 
 MONEY_QUANTUM = Decimal('0.01')
@@ -56,6 +57,28 @@ def visible_sales(user, queryset=None):
     ):
         queryset = queryset.filter(created_by=user)
     return queryset
+
+
+def _check_sale_form_replay(request, record, pk=None):
+    if record.resource_type != 'sale' or not record.resource_id.isdecimal():
+        raise Http404
+    sale = get_object_or_404(visible_sales(request.user), pk=record.resource_id)
+    if pk is not None and sale.pk != pk:
+        raise Http404
+
+
+def _check_purchase_form_replay(request, record, pk=None):
+    if record.resource_type != 'purchase' or not record.resource_id.isdecimal():
+        raise Http404
+    purchase = get_object_or_404(Purchase, pk=record.resource_id)
+    if pk is not None and purchase.pk != pk:
+        raise Http404
+
+
+def _document_form_redirect(route, document):
+    response = redirect(route)
+    response._web_idempotency_resource_id = str(document.pk)
+    return response
 
 
 @login_required
@@ -210,12 +233,16 @@ def purchase_list(request):
 
 
 @seller_required
+@web_idempotent(
+    operation='web.sale.create', resource_type='sale',
+    replay_check=_check_sale_form_replay,
+)
 def sale_create(request):
     form = SaleForm(request.POST or None)
     formset = SaleLineFormSet(request.POST or None, prefix='lines')
     if form.is_valid() and formset.is_valid():
         try:
-            create_sale(
+            sale = create_sale(
                 client=form.cleaned_data['client'],
                 lines=[line.cleaned_data for line in formset
                        if line.cleaned_data and not line.cleaned_data.get('DELETE')],
@@ -231,7 +258,7 @@ def sale_create(request):
             _add_stock_error(form, exc)
         else:
             messages.success(request, 'Facture enregistrée avec succès.')
-            return redirect('sale_list')
+            return _document_form_redirect('sale_list', sale)
     return render(request, 'commerce/sale_form.html', {'form': form, 'formset': formset, 'title': _('Nouvelle facture')})
 
 
@@ -267,12 +294,16 @@ def sale_price_lookup(request):
 
 
 @manager_required
+@web_idempotent(
+    operation='web.purchase.create', resource_type='purchase',
+    replay_check=_check_purchase_form_replay,
+)
 def purchase_create(request):
     form = PurchaseForm(request.POST or None)
     formset = PurchaseLineFormSet(request.POST or None, prefix='lines')
     if form.is_valid() and formset.is_valid():
         try:
-            create_purchase(
+            purchase = create_purchase(
                 reference=form.cleaned_data['reference'],
                 supplier=form.cleaned_data['supplier'],
                 tax_rate=form.cleaned_data['tax_rate'],
@@ -284,11 +315,15 @@ def purchase_create(request):
             _add_stock_error(form, exc)
         else:
             messages.success(request, "Bon d'achat enregistré avec succès.")
-            return redirect('purchase_list')
+            return _document_form_redirect('purchase_list', purchase)
     return render(request, 'commerce/purchase_form.html', {'form': form, 'formset': formset, 'title': _('Nouvel achat'), 'quick_product_form': QuickProductForm(prefix='quick')})
 
 
 @manager_required
+@web_idempotent(
+    operation=lambda request, pk: f'web.sale.{pk}.update', resource_type='sale',
+    replay_check=_check_sale_form_replay,
+)
 def sale_update(request, pk):
     sale = get_object_or_404(visible_sales(request.user), pk=pk)
     form = SaleForm(request.POST or None, instance=sale)
@@ -332,7 +367,7 @@ def sale_update(request, pk):
                 _add_stock_error(form, exc)
             else:
                 messages.success(request, 'Facture mise à jour avec succès.')
-                return redirect('sale_list')
+                return _document_form_redirect('sale_list', sale)
     return render(request, 'commerce/sale_form.html', {'form': form, 'formset': formset, 'title': _('Modifier la facture')})
 
 
@@ -355,6 +390,10 @@ def sale_delete(request, pk):
 
 
 @manager_required
+@web_idempotent(
+    operation=lambda request, pk: f'web.purchase.{pk}.update', resource_type='purchase',
+    replay_check=_check_purchase_form_replay,
+)
 def purchase_update(request, pk):
     purchase = get_object_or_404(Purchase, pk=pk)
     form = PurchaseForm(request.POST or None, instance=purchase)
@@ -371,7 +410,7 @@ def purchase_update(request, pk):
             _add_stock_error(form, exc)
         else:
             messages.success(request, "Bon d'achat mis à jour avec succès.")
-            return redirect('purchase_list')
+            return _document_form_redirect('purchase_list', purchase)
     return render(request, 'commerce/purchase_form.html', {'form': form, 'formset': formset, 'title': _("Modifier l'achat"), 'quick_product_form': QuickProductForm(prefix='quick')})
 
 
