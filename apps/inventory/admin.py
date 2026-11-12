@@ -1,6 +1,9 @@
 from django.contrib import admin
+from django import forms
+from django.core.exceptions import ValidationError
+from django.utils.translation import gettext_lazy as _
 from .models import (
-    Brand, Category, Client, LoadingOrder, LoadingOrderLine, OperatorStock,
+    Brand, Category, Client, ClientBalanceAdjustment, LoadingOrder, LoadingOrderLine, OperatorStock,
     OperatorStockMovement, Product, ProductPackaging, StockMovement, Supplier, Unit,
 )
 
@@ -82,14 +85,62 @@ class StockMovementAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         return False
 
+class ClientAdminForm(forms.ModelForm):
+    class Meta:
+        model = Client
+        fields = '__all__'
+
+    def clean(self):
+        data = super().clean()
+        if self.instance.pk and 'balance' in self.data:
+            submitted = forms.DecimalField(max_digits=12, decimal_places=2).clean(self.data.get('balance'))
+            if submitted != self.instance.balance:
+                raise ValidationError(_(
+                    'La dette antérieure est en lecture seule. Utilisez la correction dédiée dans la fiche client.'
+                ))
+        return data
+
+
 @admin.register(Client)
 class ClientAdmin(admin.ModelAdmin):
+    form = ClientAdminForm
     list_display = ('name', 'phone', 'wilaya', 'customer_type', 'balance')
     list_filter = ('customer_type', 'wilaya')
     search_fields = (
         'name', 'phone', 'tax_number', 'nis',
         'article_number', 'trade_register_number',
     )
+
+    def get_readonly_fields(self, request, obj=None):
+        return ('balance',) if obj else ()
+
+    def save_model(self, request, obj, form, change):
+        from .balance_adjustments import save_client_profile, save_new_client_with_balance_audit
+        if change:
+            save_client_profile(client=obj)
+        else:
+            save_new_client_with_balance_audit(client=obj, user=request.user)
+
+
+@admin.register(ClientBalanceAdjustment)
+class ClientBalanceAdjustmentAdmin(admin.ModelAdmin):
+    list_display = ('client', 'kind', 'balance_before', 'balance_after', 'delta', 'actor_name_snapshot', 'created_at')
+    list_filter = ('kind', 'created_at')
+    search_fields = ('client__name', 'reason', 'actor_name_snapshot')
+    readonly_fields = (
+        'client', 'kind', 'balance_before', 'balance_after', 'delta', 'reason',
+        'created_by', 'actor_id_snapshot', 'actor_name_snapshot', 'created_at',
+    )
+    actions = None
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 @admin.register(Supplier)
 class SupplierAdmin(admin.ModelAdmin):

@@ -324,7 +324,7 @@ class PasswordResetService:
             raise ValidationError({'token': _('Le lien est invalide ou a expiré.')})
         password_validation.validate_password(new_password, user=user)
         locked_user = get_user_model().objects.select_for_update().get(pk=user.pk)
-        if not self.token_generator.check_token(locked_user, token):
+        if not locked_user.is_active or not self.token_generator.check_token(locked_user, token):
             from django.core.exceptions import ValidationError
 
             raise ValidationError({'token': _('Le lien est invalide ou a expiré.')})

@@ -85,40 +85,6 @@ def password_reset_rate_limit_action(email):
     return rate_limit_action(PASSWORD_RESET_EVENT, digest)
 
 
-def is_password_reset_rate_limited(request, email):
-    window = getattr(settings, 'PASSWORD_RESET_WINDOW_SECONDS', 3600)
-    return is_rate_limited(
-        request,
-        password_reset_rate_limit_action(email),
-        getattr(settings, 'PASSWORD_RESET_LIMIT', 5),
-        window,
-    ) or is_event_rate_limited(
-        request,
-        PASSWORD_RESET_EVENT,
-        getattr(settings, 'PASSWORD_RESET_IP_LIMIT', 10),
-        window,
-    )
-
-
-def is_rate_limited(request, action, limit, window_seconds):
-    if limit <= 0 or window_seconds <= 0:
-        return False
-
-    from apps.core.models import AuditLog
-
-    client_ip = get_client_ip(request)
-    if client_ip is None:
-        return False
-
-    since = timezone.now() - timezone.timedelta(seconds=window_seconds)
-    queryset = AuditLog.objects.filter(
-        action=action,
-        ip_address=client_ip,
-        created_at__gte=since,
-    ).order_by()
-    return queryset.values('pk')[limit - 1:limit].exists()
-
-
 def is_event_rate_limited(request, event, limit, window_seconds):
     """Limit an event for an IP, independently of attacker-controlled identifiers."""
     if limit <= 0 or window_seconds <= 0:
@@ -137,22 +103,6 @@ def is_event_rate_limited(request, event, limit, window_seconds):
         created_at__gte=since,
     ).order_by()
     return queryset.values('pk')[limit - 1:limit].exists()
-
-
-def is_authentication_rate_limited(request, event, identifier=''):
-    """Apply both per-account and global per-IP authentication limits."""
-    window_seconds = getattr(settings, 'LOGIN_FAILURE_WINDOW_SECONDS', 900)
-    return is_rate_limited(
-        request,
-        rate_limit_action(event, identifier),
-        getattr(settings, 'LOGIN_FAILURE_LIMIT', 5),
-        window_seconds,
-    ) or is_event_rate_limited(
-        request,
-        event,
-        getattr(settings, 'LOGIN_FAILURE_IP_LIMIT', 20),
-        window_seconds,
-    )
 
 
 def log_security_event(request, action, user=None, level='info', status_code=None):
@@ -366,24 +316,39 @@ class SecurityAuditMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
 
+    def process_view(self, request, view_func, view_args, view_kwargs):
+        # This hook runs after CsrfViewMiddleware.process_view. A rejected CSRF
+        # POST must remain 403, not authenticate or consume an admission budget.
+        if request.method != 'POST' or request.resolver_match.view_name != 'admin:login':
+            return None
+        from .web_auth_rate_limit import WebAuthenticationUnavailable, admit_web_authentication
+
+        try:
+            admission = admit_web_authentication(request, 'admin_login')
+        except WebAuthenticationUnavailable:
+            admission = None
+        if admission is None or not admission.allowed:
+            status_code = 503 if admission is None else 429
+            event = 'auth.admin_login.unavailable' if admission is None else 'auth.admin_login.blocked'
+            log_security_event(request, event, level='warning', status_code=status_code)
+            response = HttpResponse(_(
+                'Le service d’authentification est temporairement indisponible.'
+            ) if admission is None else _('Trop de tentatives d’authentification.'), status=status_code)
+            if admission is not None:
+                response['Retry-After'] = str(admission.retry_after)
+            return response
+        request._admin_login_admitted = True
+        return None
+
     def __call__(self, request):
-        is_admin_login = request.method == 'POST' and request.path.rstrip('/') == '/admin/login'
-        admin_action = None
-        if is_admin_login:
-            admin_action = rate_limit_action(ADMIN_LOGIN_FAILURE_EVENT, request.POST.get('username', ''))
-            if is_authentication_rate_limited(
-                request,
-                ADMIN_LOGIN_FAILURE_EVENT,
-                request.POST.get('username', ''),
-            ):
-                log_security_event(request, 'auth.admin_login.blocked', level='warning', status_code=429)
-                response = HttpResponse(_('Trop de tentatives d’authentification.'), status=429)
-                response['Retry-After'] = str(getattr(settings, 'LOGIN_FAILURE_WINDOW_SECONDS', 900))
-                return response
 
         response = self.get_response(request)
-        if is_admin_login and response.status_code == 200:
-            log_security_event(request, admin_action, level='warning', status_code=401)
+        if getattr(request, '_admin_login_admitted', False) and response.status_code == 200:
+            log_security_event(
+                request,
+                rate_limit_action(ADMIN_LOGIN_FAILURE_EVENT, request.POST.get('username', '')),
+                level='warning', status_code=401,
+            )
         if response.status_code in {403, 404}:
             level = 'warning' if response.status_code == 403 else 'info'
             log_security_event(

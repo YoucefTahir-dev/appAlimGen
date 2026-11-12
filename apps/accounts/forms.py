@@ -318,6 +318,11 @@ class StyledPasswordResetForm(forms.Form):
 
 
 class StyledSetPasswordForm(SetPasswordForm):
+    def __init__(self, *args, reset_uid=None, reset_token=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.reset_uid = reset_uid
+        self.reset_token = reset_token
+
     new_password1 = forms.CharField(
         label=_('Nouveau mot de passe'),
         strip=False,
@@ -347,6 +352,13 @@ class StyledSetPasswordForm(SetPasswordForm):
             user = super().save(commit=False)
             user.force_password_change = False
             return user
+        if self.reset_uid is not None:
+            self.user = PasswordResetService().confirm(
+                uid=self.reset_uid, token=self.reset_token,
+                new_password=self.cleaned_data['new_password1'],
+                new_password_confirm=self.cleaned_data['new_password2'],
+            )
+            return self.user
         return PasswordResetService.complete_for_user(
             self.user,
             self.cleaned_data['new_password1'],

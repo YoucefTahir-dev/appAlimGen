@@ -419,15 +419,15 @@ class SharedAuthenticationThrottleTests(APITestCase):
         verify.assert_not_called()
         validate.assert_not_called()
 
-    def test_secondary_reset_audit_check_database_failure_cannot_dispatch_email(self):
-        with patch(
-            'apps.api.authentication.is_password_reset_rate_limited',
-            side_effect=DatabaseError('synthetic database failure'),
-        ):
-            with patch('apps.api.authentication.PasswordResetService.request') as deliver:
-                response = self.reset_request(self.user.email)
-        self.assert_unavailable(response)
-        deliver.assert_not_called()
+    def test_reset_audit_rows_do_not_act_as_a_second_non_atomic_quota(self):
+        # Authentication reservations are the source of truth. Historical Web
+        # log rows must not create an extra IP-coupled API account limit.
+        for _ in range(5):
+            AuditLog.objects.create(
+                action='auth.password_reset.request identifier=historical',
+                ip_address='192.0.2.10',
+            )
+        self.assertEqual(self.reset_request(self.user.email).status_code, 200)
 
     def test_login_security_log_records_real_throttled_and_unavailable_statuses(self):
         self.assertEqual(self.login().status_code, 401)

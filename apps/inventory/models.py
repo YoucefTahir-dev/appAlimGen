@@ -964,6 +964,9 @@ class Client(models.Model):
     class Meta:
         verbose_name = _('Client')
         verbose_name_plural = _('Clients')
+        permissions = [
+            ('adjust_client_balance', 'Peut corriger la dette antérieure client'),
+        ]
         constraints = [
             models.UniqueConstraint(
                 Lower(Trim('email')),
@@ -1000,6 +1003,77 @@ class Client(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class ImmutableClientBalanceAdjustmentQuerySet(models.QuerySet):
+    def _raise_immutable(self):
+        raise ValidationError(_('Le journal de dette antérieure est immuable. Enregistrez une nouvelle correction motivée.'))
+
+    def update(self, **kwargs):
+        self._raise_immutable()
+
+    def delete(self):
+        self._raise_immutable()
+
+    def bulk_create(self, objs, **kwargs):
+        self._raise_immutable()
+
+    def bulk_update(self, objs, fields, **kwargs):
+        self._raise_immutable()
+
+
+class ClientBalanceAdjustment(models.Model):
+    """Application-level append-only history; never added to receivable totals."""
+
+    INITIAL = 'initial'
+    CORRECTION = 'correction'
+    KIND_CHOICES = [(INITIAL, _('Saisie initiale')), (CORRECTION, _('Correction'))]
+
+    client = models.ForeignKey(Client, on_delete=models.PROTECT, related_name='balance_adjustments')
+    kind = models.CharField(max_length=16, choices=KIND_CHOICES, editable=False)
+    balance_before = models.DecimalField(max_digits=12, decimal_places=2, editable=False)
+    balance_after = models.DecimalField(max_digits=12, decimal_places=2, editable=False)
+    delta = models.DecimalField(max_digits=13, decimal_places=2, editable=False)
+    reason = models.CharField(_('Motif'), max_length=1000, editable=False)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='client_balance_adjustments', editable=False,
+    )
+    actor_id_snapshot = models.PositiveBigIntegerField(editable=False)
+    actor_name_snapshot = models.CharField(max_length=150, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = ImmutableClientBalanceAdjustmentQuerySet.as_manager()
+
+    class Meta:
+        ordering = ('-created_at', '-pk')
+        default_permissions = ('view',)
+        verbose_name = _('Correction de dette antérieure')
+        verbose_name_plural = _('Journal de dette antérieure')
+        indexes = [models.Index(fields=('client', '-created_at'), name='inv_client_debt_date_idx')]
+        constraints = [
+            models.CheckConstraint(condition=~Q(balance_before=models.F('balance_after')), name='inv_debt_adjustment_changed'),
+            models.CheckConstraint(condition=~Q(reason=''), name='inv_debt_adjustment_reason'),
+        ]
+
+    def clean(self):
+        super().clean()
+        if self.balance_before is not None and self.balance_after is not None and self.delta is not None:
+            if self.delta != self.balance_after - self.balance_before:
+                raise ValidationError({'delta': _('La variation doit correspondre aux montants avant/après.')})
+        if not str(self.reason or '').strip():
+            raise ValidationError({'reason': _('Le motif de la correction est obligatoire.')})
+
+    def save(self, *args, **kwargs):
+        if self.pk or not self._state.adding or not getattr(self, '_ledger_write_allowed', False):
+            raise ValidationError(_('Utilisez le service de correction de dette antérieure. Le journal est immuable.'))
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError(_('Le journal de dette antérieure ne peut pas être supprimé.'))
+
+    def __str__(self):
+        return f'{self.client_id}: {self.balance_before} → {self.balance_after}'
 
 
 class Supplier(models.Model):

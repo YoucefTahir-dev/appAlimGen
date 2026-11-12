@@ -109,6 +109,9 @@ X_FRAME_OPTIONS = os.getenv('X_FRAME_OPTIONS', 'DENY')
 SESSION_COOKIE_AGE = env_int('SESSION_COOKIE_AGE', 60 * 60 * 8)
 SESSION_SAVE_EVERY_REQUEST = env_bool('SESSION_SAVE_EVERY_REQUEST', True)
 SESSION_IDLE_TIMEOUT_SECONDS = env_int('SESSION_IDLE_TIMEOUT_SECONDS', 60 * 30)
+# Historical variable names/ceilings are preserved. Web/admin now reserve all
+# POST attempts (successful logins included), not merely logged failures; each
+# channel has independent persistent IP and global-account namespaces.
 LOGIN_FAILURE_LIMIT = env_int('LOGIN_FAILURE_LIMIT', 5)
 LOGIN_FAILURE_IP_LIMIT = env_int('LOGIN_FAILURE_IP_LIMIT', 20)
 LOGIN_FAILURE_WINDOW_SECONDS = env_int('LOGIN_FAILURE_WINDOW_SECONDS', 15 * 60)
@@ -367,6 +370,9 @@ SPECTACULAR_SETTINGS = {
 }
 
 API_IDEMPOTENCY_RETENTION_DAYS = int(os.getenv('API_IDEMPOTENCY_RETENTION_DAYS', '7'))
+# Compatible rollout: older installed clients remain accepted until the owner
+# has qualified their replacement. New clients may opt into required-v1 early.
+API_IDEMPOTENCY_REQUIRED = env_bool('API_IDEMPOTENCY_REQUIRED', False)
 
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'dashboard'

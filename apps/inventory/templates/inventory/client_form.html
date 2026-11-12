@@ -19,7 +19,7 @@
             </div>
             <div class="col-md-6">{{ form.wilaya.label_tag }}{{ form.wilaya }}{{ form.wilaya.errors }}</div>
             <div class="col-md-6">{{ form.customer_type.label_tag }}{{ form.customer_type }}{{ form.customer_type.errors }}</div>
-            <div class="col-md-6">{{ form.balance.label_tag }}{{ form.balance }}{{ form.balance.errors }}</div>
+            <div class="col-md-6">{{ form.balance.label_tag }}{{ form.balance }}{{ form.balance.errors }}{% if form.balance.help_text %}<div class="form-text">{{ form.balance.help_text }}</div>{% endif %}</div>
             <div class="col-12">{{ form.notes.label_tag }}{{ form.notes }}{{ form.notes.errors }}</div>
         </div>
         <fieldset class="border rounded-3 p-3 mt-4">

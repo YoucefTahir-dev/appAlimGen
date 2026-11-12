@@ -1,5 +1,4 @@
 from decimal import Decimal
-from uuid import uuid4
 
 from django import forms
 from django.core.exceptions import ValidationError
@@ -138,9 +137,7 @@ class SaleForm(WebMutationForm):
         return cleaned
 
 
-class PaymentForm(forms.ModelForm):
-    request_token = forms.CharField(widget=forms.HiddenInput, required=False)
-
+class PaymentForm(WebMutationForm):
     class Meta:
         model = Payment
         fields = [
@@ -160,7 +157,6 @@ class PaymentForm(forms.ModelForm):
     def __init__(self, *args, document=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.document = document
-        self.fields['request_token'].initial = uuid4().hex
         self.fields['created_at'].input_formats = ('%Y-%m-%dT%H:%M',)
         self.fields['created_at'].required = False
         if isinstance(document, Sale):

@@ -108,14 +108,14 @@ class PasswordResetFlowTests(TestCase):
                 self.assertEqual(response.status_code, 400)
 
     @patch('apps.accounts.services.password_reset.DjangoEmailDeliveryService.send')
-    def test_api_reports_provider_failure_without_exposing_details(self, send):
+    def test_api_provider_failure_keeps_neutral_public_response(self, send):
         send.side_effect = OSError('secret provider detail')
         response = APIClient().post(
             reverse('api-password-reset-request'),
             {'email': self.user.email},
             format='json',
         )
-        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.status_code, 200)
         self.assertNotIn('secret provider detail', str(response.data))
 
     @override_settings(
@@ -149,7 +149,7 @@ class PasswordResetFlowTests(TestCase):
         DEFAULT_FROM_EMAIL='verified-sender@example.com',
     )
     @patch('apps.accounts.services.password_reset.urlopen')
-    def test_brevo_timeout_returns_503_and_logs_safe_diagnostics(self, urlopen):
+    def test_brevo_timeout_keeps_neutral_response_and_logs_safe_diagnostics(self, urlopen):
         urlopen.side_effect = TimeoutError('contains-secret-and-recipient')
 
         with self.assertLogs('security', level='ERROR') as logs:
@@ -157,7 +157,7 @@ class PasswordResetFlowTests(TestCase):
                 reverse('password_reset'), {'email': self.user.email},
             )
 
-        self.assertEqual(response.status_code, 503)
+        self.assertRedirects(response, reverse('password_reset_done'))
         diagnostic = '\n'.join(logs.output)
         self.assertIn('provider=brevo', diagnostic)
         self.assertIn('transport=https_api', diagnostic)
@@ -187,7 +187,7 @@ class PasswordResetFlowTests(TestCase):
                 reverse('password_reset'), {'email': self.user.email},
             )
 
-        self.assertEqual(response.status_code, 503)
+        self.assertRedirects(response, reverse('password_reset_done'))
         diagnostic = '\n'.join(logs.output)
         self.assertIn('status=401', diagnostic)
         self.assertIn('code=unauthorized', diagnostic)
@@ -200,7 +200,7 @@ class PasswordResetFlowTests(TestCase):
         DEFAULT_FROM_EMAIL='unverified-sender@example.com',
     )
     @patch('apps.accounts.services.password_reset.urlopen')
-    def test_brevo_unverified_sender_returns_503(self, urlopen):
+    def test_brevo_unverified_sender_keeps_neutral_response(self, urlopen):
         urlopen.side_effect = HTTPError(
             'https://api.brevo.com/v3/smtp/email',
             400,
@@ -211,20 +211,20 @@ class PasswordResetFlowTests(TestCase):
         response = self.client.post(
             reverse('password_reset'), {'email': self.user.email},
         )
-        self.assertEqual(response.status_code, 503)
-        self.assertNotContains(response, 'sender rejected', status_code=503)
+        self.assertRedirects(response, reverse('password_reset_done'))
+        self.assertNotIn('sender rejected', response.content.decode())
 
     @override_settings(
         PASSWORD_RESET_EMAIL_PROVIDER='brevo_api',
         BREVO_API_KEY='',
         DEFAULT_FROM_EMAIL='verified-sender@example.com',
     )
-    def test_missing_brevo_api_key_returns_503_without_network_call(self):
+    def test_missing_brevo_api_key_keeps_neutral_response_without_network_call(self):
         with patch('apps.accounts.services.password_reset.urlopen') as urlopen:
             response = self.client.post(
                 reverse('password_reset'), {'email': self.user.email},
             )
-        self.assertEqual(response.status_code, 503)
+        self.assertRedirects(response, reverse('password_reset_done'))
         urlopen.assert_not_called()
 
     @override_settings(
@@ -232,12 +232,12 @@ class PasswordResetFlowTests(TestCase):
         BREVO_API_KEY='test-brevo-api-key',
         DEFAULT_FROM_EMAIL='',
     )
-    def test_missing_sender_returns_503_without_network_call(self):
+    def test_missing_sender_keeps_neutral_response_without_network_call(self):
         with patch('apps.accounts.services.password_reset.urlopen') as urlopen:
             response = self.client.post(
                 reverse('password_reset'), {'email': self.user.email},
             )
-        self.assertEqual(response.status_code, 503)
+        self.assertRedirects(response, reverse('password_reset_done'))
         urlopen.assert_not_called()
 
     @override_settings(PASSWORD_RESET_LIMIT=1)

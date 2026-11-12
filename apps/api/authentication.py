@@ -1,4 +1,3 @@
-from django.conf import settings
 from django.utils.translation import gettext as _
 from drf_spectacular.utils import extend_schema, inline_serializer
 from rest_framework import permissions, serializers, status
@@ -6,16 +5,15 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenRefreshSerializer
 from rest_framework_simplejwt.settings import api_settings
-from rest_framework.exceptions import APIException, AuthenticationFailed, Throttled
+from rest_framework.exceptions import AuthenticationFailed, Throttled
 from django.contrib.auth import get_user_model
 from django.contrib.auth import password_validation
-from django.db import DatabaseError, transaction
+from django.db import transaction
 from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from apps.accounts.services import PasswordResetDeliveryError, PasswordResetService
 from apps.core.security import (
-    is_password_reset_rate_limited,
     log_security_event,
     password_reset_rate_limit_action,
 )
@@ -179,13 +177,6 @@ class PasswordChangeView(APIView):
         return Response({'message': _('Mot de passe modifié. Reconnectez-vous.')})
 
 
-class PasswordResetDeliveryUnavailable(APIException):
-    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-    business_code = 'PASSWORD_RESET_DELIVERY_UNAVAILABLE'
-    business_message = _('Le service d’envoi est temporairement indisponible.')
-    default_detail = business_message
-
-
 class PasswordResetRequestSerializer(serializers.Serializer):
     email = serializers.EmailField(max_length=254)
 
@@ -207,28 +198,20 @@ class PasswordResetRequestView(APIView):
         serializer = PasswordResetRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         email = serializer.validated_data['email']
-        try:
-            audit_limit_reached = is_password_reset_rate_limited(request, email)
-        except DatabaseError as exc:
-            raise AuthenticationRateLimitUnavailable() from exc
-        if audit_limit_reached:
-            log_security_event(
-                request, 'api.auth.password_reset.blocked',
-                level='warning', status_code=429,
-            )
-            raise Throttled(
-                wait=getattr(settings, 'PASSWORD_RESET_WINDOW_SECONDS', 3600),
-                detail=_('Trop de demandes. Réessayez plus tard.'),
-            )
+        # SharedAuthRateThrottle already reserved persistent IP/account budgets
+        # before serializer validation. Audit rows are a journal, not a quota.
         log_security_event(request, password_reset_rate_limit_action(email))
         try:
             dispatched = PasswordResetService().request(email, request=request)
-        except PasswordResetDeliveryError as exc:
+        except PasswordResetDeliveryError:
             log_security_event(
                 request, 'api.auth.password_reset.delivery_failed',
                 level='error', status_code=503,
             )
-            raise PasswordResetDeliveryUnavailable() from exc
+            # An accepted public reset request must not reveal whether an
+            # account exists through a provider-specific 503. Transport errors
+            # remain internally observable; synchronous timing remains R-03.
+            dispatched = 0
         if dispatched:
             log_security_event(request, 'api.auth.password_reset.email_dispatched')
         return Response({

@@ -130,6 +130,9 @@ def create_sale(
 ):
     if not lines:
         raise ValidationError({'lines': _('Une vente ou un achat doit contenir au moins un produit.')})
+    # Loading lifecycle operations acquire the order before stock rows. Taking
+    # Product first here deadlocks with a simultaneous close returning stock.
+    active_loading = active_loading_for_operator(user, lock=True) if getattr(user, 'is_authenticated', False) else None
     product_ids = sorted({line['product'].pk if isinstance(line['product'], Product) else int(line['product']) for line in lines})
     products = {
         product.pk: product
@@ -149,7 +152,6 @@ def create_sale(
     if len(packagings) != len(packaging_ids):
         raise ValidationError({'packaging': _('Conditionnement invalide ou inactif.')})
 
-    active_loading = active_loading_for_operator(user, lock=True) if getattr(user, 'is_authenticated', False) else None
     requested = {}
     subtotal = Decimal('0')
     margin = Decimal('0')
@@ -316,10 +318,13 @@ def update_sale(
     else:
         if not lines:
             raise ValidationError({'lines': _('Une vente doit contenir au moins un produit.')})
+        # Replacement restores old lines as well as consuming the new lines.
+        # Lock the whole union in PK order before either mutation, not the new
+        # subset first followed by old products in incidental line order.
         product_ids = sorted({
             line['product'].pk if isinstance(line['product'], Product) else int(line['product'])
             for line in lines
-        })
+        } | set(sale.lines.values_list('product_id', flat=True)))
         products = {
             product.pk: product
             for product in Product.objects.select_for_update().filter(pk__in=product_ids).order_by('pk')

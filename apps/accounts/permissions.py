@@ -51,6 +51,7 @@ PERMISSION_MATRIX = OrderedDict(
                 ('inventory.add_client', _('Ajouter')),
                 ('inventory.change_client', _('Modifier')),
                 ('inventory.delete_client', _('Supprimer')),
+                ('inventory.adjust_client_balance', _('Corriger la dette antérieure')),
             ],
         ),
         (
@@ -170,6 +171,9 @@ ALL_MANAGED_PERMISSION_NAMES = frozenset(
     for permission_name, _label in permissions
 )
 
+# Sensitive new rights are opt-in, including for legacy administrators.
+LEGACY_ADMIN_PERMISSIONS = ALL_MANAGED_PERMISSION_NAMES - {'inventory.adjust_client_balance'}
+
 LEGACY_MANAGER_PERMISSIONS = frozenset(
     permission
     for permission in ALL_MANAGED_PERMISSION_NAMES
@@ -187,6 +191,7 @@ LEGACY_MANAGER_PERMISSIONS = frozenset(
         'accounts.create_backups',
         'accounts.restore_backups',
         'core.change_companysettings',
+        'inventory.adjust_client_balance',
     }
 )
 
@@ -268,7 +273,7 @@ def _legacy_permission(user, permission_name):
         return False
     role = getattr(user, 'role', None)
     if role == getattr(user, 'ADMIN', 'admin'):
-        return permission_name in ALL_MANAGED_PERMISSION_NAMES
+        return permission_name in LEGACY_ADMIN_PERMISSIONS
     if role == getattr(user, 'MANAGER', 'manager'):
         return permission_name in LEGACY_MANAGER_PERMISSIONS
     if role == getattr(user, 'SELLER', 'seller'):
@@ -344,6 +349,7 @@ ROUTE_PERMISSIONS = {
     'client_create': ('inventory.add_client',),
     'client_update': ('inventory.change_client',),
     'client_delete': ('inventory.delete_client',),
+    'client_balance_adjust': ('inventory.adjust_client_balance',),
     'supplier_list': ('inventory.view_supplier',),
     'supplier_create': ('inventory.add_supplier',),
     'supplier_update': ('inventory.change_supplier',),

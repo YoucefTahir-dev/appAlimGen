@@ -6,12 +6,14 @@
 
 {% block content %}
 {% has_access 'inventory.change_client' as can_change_client %}
+{% has_access 'inventory.adjust_client_balance' as can_adjust_client_balance %}
 <div class="card card-dashboard p-4 bg-white mb-4">
     <div class="page-toolbar mb-3">
         <h2 class="h4 mb-0">{{ client_obj.name }}</h2>
         {% if can_change_client %}
             <a class="btn btn-outline-primary" href="{% url 'client_update' client_obj.pk %}">{% trans "Modifier" %}</a>
         {% endif %}
+        {% if can_adjust_client_balance %}<a class="btn btn-outline-warning" href="{% url 'client_balance_adjust' client_obj.pk %}">{% trans "Corriger la dette antérieure" %}</a>{% endif %}
     </div>
     <div class="row g-3">
         <div class="col-12 col-md-6"><strong>{% trans "Type de client" %} :</strong> {{ client_obj.get_customer_type_display }}</div>
@@ -30,6 +32,10 @@
         {% if client_obj.notes %}<div class="col-12"><strong>{% trans "Notes" %} :</strong> {{ client_obj.notes|linebreaksbr }}</div>{% endif %}
     </div>
 </div>
+
+{% if can_adjust_client_balance %}
+    {% include 'inventory/_client_balance_history.html' %}
+{% endif %}
 
 <div class="card card-dashboard p-4 bg-white mb-4">
     <h3 class="h5 mb-3">{% trans "Informations légales" %}</h3>
