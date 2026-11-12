@@ -427,6 +427,7 @@ class RoutePermissionMiddleware:
             and request.method == 'POST'
             and response.status_code in {302, 303}
             and getattr(request.user, 'is_authenticated', False)
+            and not getattr(request, '_web_idempotency_replayed', False)
         ):
             from apps.core.security import log_security_event
 

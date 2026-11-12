@@ -11,6 +11,7 @@
 <div class="card card-dashboard p-4 bg-white">
     <form method="post" id="purchase-form">
         {% csrf_token %}
+        {{ form.request_token }}{{ form.request_token.errors }}
         {{ form.non_field_errors }}
         <div class="row g-3">
             <div class="col-md-6">{{ form.reference.label_tag }}{{ form.reference }}{{ form.reference.errors }}</div>
