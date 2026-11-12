@@ -20,7 +20,12 @@ def _request_hash(request):
     return hashlib.sha256(raw.encode('utf-8')).hexdigest()
 
 
-def idempotent(request, operation, callback, *, required=True):
+def idempotent(request, operation, callback, *, required=True, replay_check=None):
+    """Run a mutation once and optionally recheck access before its replay.
+
+    ``replay_check(record)`` must raise when the current request is no longer
+    authorized. It does not run the mutation or revalidate its financial state.
+    """
     key = (request.headers.get(IDEMPOTENCY_HEADER) or '').strip()
     if not key:
         if required:
@@ -62,6 +67,8 @@ def idempotent(request, operation, callback, *, required=True):
             raise BusinessAPIException('IDEMPOTENCY_KEY_REUSED', 'Cette clé a déjà été utilisée avec une requête différente.')
         if not record.completed:
             raise BusinessAPIException('IDEMPOTENCY_REQUEST_IN_PROGRESS', 'Une requête portant cette clé est déjà en cours.')
+        if replay_check is not None:
+            replay_check(record)
         response = Response(record.response_body, status=record.response_status)
         response['Idempotency-Replayed'] = 'true'
         return response

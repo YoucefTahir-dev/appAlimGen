@@ -735,18 +735,28 @@ class PaymentSerializer(serializers.ModelSerializer):
         )
 
     def validate(self, attrs):
-        if bool(attrs.get('sale')) == bool(attrs.get('purchase')):
+        self.check_target_permissions(
+            sale=attrs.get('sale'), purchase=attrs.get('purchase'),
+        )
+        return attrs
+
+    def check_target_permissions(self, *, sale=None, purchase=None):
+        """Check the current payment target without reapplying the payment.
+
+        Replays use this same authorization policy after the original payment
+        has changed the balance, so no amount or financial-state validation
+        belongs here.
+        """
+        if bool(sale) == bool(purchase):
             raise serializers.ValidationError(_('Indiquez exactement une vente ou un achat.'))
         request = self.context['request']
-        permission = 'commerce.add_customerpayment' if attrs.get('sale') else 'commerce.change_purchase'
+        permission = 'commerce.add_customerpayment' if sale else 'commerce.change_purchase'
         if not has_permission(request.user, permission):
             raise PermissionDenied(_('Vous ne disposez pas de la permission requise.'))
-        sale = attrs.get('sale')
         if sale and LoadingOrder.objects.filter(operator=request.user).exists() and not has_permission(
             request.user, 'inventory.view_all_loadingorders'
         ) and sale.created_by_id != request.user.pk:
             raise PermissionDenied(_('Cette vente appartient à un autre opérateur.'))
-        return attrs
 
     def create(self, validated_data):
         try:
