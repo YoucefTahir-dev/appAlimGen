@@ -52,3 +52,17 @@ class AuditLog(models.Model):
 
     def __str__(self):
         return f"{self.user} - {self.action}"
+
+
+class AuthRateLimitBucket(models.Model):
+    """Short-lived technical counters, without raw account/IP/token values."""
+
+    key = models.CharField(max_length=64, primary_key=True, editable=False)
+    hits = models.PositiveIntegerField(default=0)
+    expires_at = models.DateTimeField()
+
+    class Meta:
+        default_permissions = ()
+        indexes = [
+            models.Index(fields=['expires_at'], name='auth_bucket_expiry_idx'),
+        ]
