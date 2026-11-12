@@ -13,6 +13,7 @@ from drf_spectacular.types import OpenApiTypes
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import serializers
@@ -124,6 +125,12 @@ class CompanySettingsView(APIView):
 
 class AuditMutationMixin:
     audit_name = 'resource'
+
+    def _check_replay_object_access(self, pk):
+        # Recheck the current authorization scope, but not transient list
+        # filters (for example ?status=draft after validating a loading order).
+        instance = get_object_or_404(self.get_queryset(), pk=pk)
+        self.check_object_permissions(self.request, instance)
 
     def _audit(self, operation, status_code=200):
         log_security_event(
@@ -558,7 +565,12 @@ class SaleViewSet(AuditMutationMixin, mixins.CreateModelMixin, mixins.ListModelM
     @extend_schema(parameters=[IDEMPOTENCY_PARAMETER])
     def update(self, request, *args, **kwargs):
         pk = kwargs.get('pk')
-        return idempotent(request, f'sale.{pk}.update', lambda: super(SaleViewSet, self).update(request, *args, **kwargs), required=False)
+        return idempotent(
+            request, f'sale.{pk}.update',
+            lambda: super(SaleViewSet, self).update(request, *args, **kwargs),
+            required=False,
+            replay_check=lambda record: self._check_replay_object_access(pk),
+        )
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -597,6 +609,16 @@ class PurchaseViewSet(AuditMutationMixin, mixins.CreateModelMixin, mixins.ListMo
     @extend_schema(parameters=[IDEMPOTENCY_PARAMETER])
     def create(self, request, *args, **kwargs):
         return idempotent(request, 'purchase.create', lambda: super(PurchaseViewSet, self).create(request, *args, **kwargs), required=False)
+
+    @extend_schema(parameters=[IDEMPOTENCY_PARAMETER])
+    def update(self, request, *args, **kwargs):
+        pk = kwargs.get('pk')
+        return idempotent(
+            request, f'purchase.{pk}.update',
+            lambda: super(PurchaseViewSet, self).update(request, *args, **kwargs),
+            required=False,
+            replay_check=lambda record: self._check_replay_object_access(pk),
+        )
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -646,7 +668,25 @@ class PaymentViewSet(AuditMutationMixin, mixins.CreateModelMixin, mixins.ListMod
 
     @extend_schema(parameters=[IDEMPOTENCY_PARAMETER])
     def create(self, request, *args, **kwargs):
-        return idempotent(request, 'payment.create', lambda: super(PaymentViewSet, self).create(request, *args, **kwargs), required=False)
+        return idempotent(
+            request, 'payment.create',
+            lambda: super(PaymentViewSet, self).create(request, *args, **kwargs),
+            required=False, replay_check=self._check_payment_replay_access,
+        )
+
+    def _check_payment_replay_access(self, record):
+        resource_id = record.resource_id
+        if not resource_id and isinstance(record.response_body, dict):
+            resource_id = record.response_body.get('id')
+        # Creation may be allowed without the separate read permission used by
+        # get_queryset(). Reuse only the current contextual creation policy.
+        payment = get_object_or_404(
+            Payment.objects.select_related('sale', 'purchase'), pk=resource_id,
+        )
+        self.check_object_permissions(self.request, payment)
+        self.get_serializer().check_target_permissions(
+            sale=payment.sale, purchase=payment.purchase,
+        )
 
     @action(detail=True, methods=('post',))
     def cancel(self, request, pk=None):
@@ -859,7 +899,10 @@ class LoadingOrderViewSet(AuditMutationMixin, viewsets.ModelViewSet):
             order = validate_loading_order(self.get_object(), user=request.user)
             self._audit('validate')
             return Response(self.get_serializer(order).data)
-        return idempotent(request, f'loading.{pk}.validate', operation, required=False)
+        return idempotent(
+            request, f'loading.{pk}.validate', operation, required=False,
+            replay_check=lambda record: self._check_replay_object_access(pk),
+        )
 
     @extend_schema(request=None, responses=LoadingOrderSerializer, parameters=[IDEMPOTENCY_PARAMETER])
     @action(detail=True, methods=('post',))
@@ -868,7 +911,10 @@ class LoadingOrderViewSet(AuditMutationMixin, viewsets.ModelViewSet):
             order = close_loading_order(self.get_object(), user=request.user)
             self._audit('close')
             return Response(self.get_serializer(order).data)
-        return idempotent(request, f'loading.{pk}.close', operation, required=False)
+        return idempotent(
+            request, f'loading.{pk}.close', operation, required=False,
+            replay_check=lambda record: self._check_replay_object_access(pk),
+        )
 
     @extend_schema(request=None, responses=LoadingOrderSerializer)
     @action(detail=True, methods=('post',))
