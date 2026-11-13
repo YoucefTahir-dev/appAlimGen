@@ -68,7 +68,7 @@ class MigrationEnvironmentReportTests(unittest.TestCase):
                 self.assertNotIn('private-sentinel', json.dumps(result))
 
     def test_connection_routing_options_are_never_treated_as_direct_attestation(self):
-        for key in ('host', 'hostaddr', 'service', 'servicefile', 'passfile', 'port', 'dbname', 'user', 'password', 'dsn'):
+        for key in ('host', 'hostaddr', 'service', 'servicefile', 'passfile', 'port', 'dbname', 'user', 'password', 'dsn', 'options'):
             with self.subTest(option=key):
                 result = self.report(f'postgresql://u:p@host/db?{key}=private-sentinel')
                 self.assertTrue(result['routing_options_detected'])
@@ -120,7 +120,52 @@ class MigrationEnvironmentReportTests(unittest.TestCase):
         output = StringIO()
         self.assertEqual(main(['private-sentinel'], environment={}, stdout=output), 2)
         self.assertNotIn('private-sentinel', output.getvalue())
-        self.assertEqual(json.loads(output.getvalue())['issues'], ['command_accepts_no_arguments'])
+        self.assertEqual(json.loads(output.getvalue())['issues'], ['command_arguments_invalid'])
+
+    def test_migration_guard_requires_explicit_operator_attestation_not_just_non_pooler(self):
+        for value in ('', 'false', '0', 'yes', 'private-sentinel'):
+            output = StringIO()
+            environment = {'DATABASE_URL': 'postgresql://u:p@host/db', 'MIGRATION_DIRECT_CONNECTION_CONFIRMED': value}
+            self.assertEqual(main(['--migration-guard'], environment=environment, stdout=output), 2)
+            report = json.loads(output.getvalue())
+            self.assertFalse(report['operator_direct_connection_attested'])
+            self.assertNotIn('private-sentinel', output.getvalue())
+
+    def test_attested_config_gate_is_not_a_deployment_or_network_verification(self):
+        for value in ('true', '1', 'TRUE'):
+            output = StringIO()
+            environment = {'DATABASE_URL': 'postgresql://u:p@host/db', 'MIGRATION_DIRECT_CONNECTION_CONFIRMED': value}
+            self.assertEqual(main(['--migration-guard'], environment=environment, stdout=output), 0)
+            report = json.loads(output.getvalue())
+            self.assertEqual(report['status'], 'CONFIG_GATE_PASSED')
+            self.assertTrue(report['operator_direct_connection_attested'])
+            for name in ('deployment_ready', 'direct_connection_verified', 'network_access', 'database_access'):
+                self.assertFalse(report[name])
+
+    def test_operator_attestation_never_bypasses_pooler_malformed_url_or_routing_option(self):
+        for url in ('postgresql://u:p@fixture-pooler.region.neon.tech/db',
+                    'postgresql://u:p@host:notaport/db',
+                    'postgresql://u:p@host/db?hostaddr=private-sentinel',
+                    'postgresql://u:p@host/db?options=private-sentinel'):
+            output = StringIO()
+            self.assertEqual(main(['--migration-guard'], environment={
+                'DATABASE_URL': url, 'MIGRATION_DIRECT_CONNECTION_CONFIRMED': 'true',
+            }, stdout=output), 2)
+            self.assertNotIn('private-sentinel', output.getvalue())
+
+    def test_routing_environment_is_reported_and_cannot_be_overridden_by_attestation(self):
+        for name in ('PGHOST', 'PGHOSTADDR', 'PGPORT', 'PGDATABASE', 'PGSERVICE', 'PGSERVICEFILE', 'PGOPTIONS'):
+            environment = {'DATABASE_URL': 'postgresql://u:p@host/db', name: 'private-sentinel',
+                           'MIGRATION_DIRECT_CONNECTION_CONFIRMED': 'true'}
+            output = StringIO()
+            self.assertEqual(main(['--migration-guard'], environment=environment, stdout=output), 2)
+            self.assertTrue(json.loads(output.getvalue())['routing_environment_detected'])
+            self.assertNotIn('private-sentinel', output.getvalue())
+
+    def test_migration_guard_accepts_no_extra_arguments_or_secret_values(self):
+        output = StringIO()
+        self.assertEqual(main(['--migration-guard', 'private-sentinel'], environment={}, stdout=output), 2)
+        self.assertNotIn('private-sentinel', output.getvalue())
 
 
 if __name__ == '__main__':

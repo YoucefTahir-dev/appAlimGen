@@ -1,4 +1,4 @@
-from django.core.management import BaseCommand, call_command
+from django.core.management import BaseCommand, CommandError, call_command
 from django.db import connections
 
 from apps.core.deployment_migrations import forward_plan, migration_lock
@@ -8,7 +8,9 @@ class Command(BaseCommand):
     help = 'Apply only reviewed forward expansions under a bounded PostgreSQL deployment lock.'
 
     def add_arguments(self, parser):
-        parser.add_argument('--plan-only', action='store_true')
+        mode = parser.add_mutually_exclusive_group()
+        mode.add_argument('--plan-only', action='store_true')
+        mode.add_argument('--check-applied', action='store_true', help='Read-only startup gate: refuse any pending migration; do not acquire a lock or apply SQL.')
         parser.add_argument('--direct-connection-confirmed', action='store_true', help='Confirm an operator-verified direct PostgreSQL connection, not a transaction pooler.')
         parser.add_argument('--wait-seconds', type=int, default=30)
         parser.add_argument('--lock-timeout-ms', type=int, default=5000)
@@ -16,6 +18,12 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         connection = connections['default']
+        if options.get('check_applied'):
+            plan = forward_plan(connection)
+            if plan:
+                raise CommandError('Pending reviewed migrations: run the qualified pre-deploy phase before starting this code. No migration applied.')
+            self.stdout.write('Schema gate completed: no pending migrations. No migration applied.')
+            return
         if options['plan_only']:
             plan = forward_plan(connection)
             for migration, _ in plan:

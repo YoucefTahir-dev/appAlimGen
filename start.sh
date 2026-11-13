@@ -5,6 +5,10 @@ set -o errexit
 # same offline guard; disabled installations do not need optional native tools.
 python scripts/check_drive_backup_runtime.py --expected-postgres-major 18 --build-guard
 
+# Read-only schema gate. Never fall back to running migrations at startup if
+# the pre-deploy command was omitted, failed or applied an incomplete plan.
+python manage.py deploy_migrate --check-applied
+
 echo "Starting Gunicorn on 0.0.0.0:${PORT:-8000}"
 # %(U)s excludes query strings: OAuth codes/state must not enter access logs.
 # Access logging remains disabled unless separately configured by the operator.

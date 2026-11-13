@@ -13,7 +13,11 @@ from urllib.parse import parse_qsl, urlsplit
 
 ROUTING_OPTIONS = frozenset({
     'host', 'hostaddr', 'port', 'service', 'servicefile', 'passfile',
-    'dbname', 'database', 'user', 'password', 'dsn',
+    'dbname', 'database', 'user', 'password', 'dsn', 'options',
+})
+ROUTING_ENVIRONMENT = frozenset({
+    'PGHOST', 'PGHOSTADDR', 'PGPORT', 'PGDATABASE', 'PGSERVICE',
+    'PGSERVICEFILE', 'PGOPTIONS',
 })
 
 
@@ -33,6 +37,7 @@ def migration_environment_report(environment):
         'connection_options_verified': False,
         'known_pooler_detected': False,
         'routing_options_detected': False,
+        'routing_environment_detected': False,
         'direct_connection_verified': False,
         'render_compute_plan_verified': False,
         'rollback_floor_attested': False,
@@ -85,6 +90,11 @@ def migration_environment_report(environment):
         result['issues'].append('known_pooler_not_suitable_for_session_lock')
     if result['routing_options_detected']:
         result['issues'].append('connection_routing_options_require_review')
+    result['routing_environment_detected'] = any(
+        _text(environment, name) for name in ROUTING_ENVIRONMENT
+    )
+    if result['routing_environment_detected']:
+        result['issues'].append('connection_routing_environment_requires_review')
     if result['issues']:
         result['status'] = 'BLOCKED'
     result['issues'].extend([
@@ -97,15 +107,27 @@ def migration_environment_report(environment):
 
 def main(argv=None, *, environment=None, stdout=None):
     arguments = sys.argv[1:] if argv is None else argv
-    if arguments:
+    environment = os.environ if environment is None else environment
+    if arguments == ['--migration-guard']:
+        report = migration_environment_report(environment)
+        report['scope'] = 'offline_migration_guard_configuration_only'
+        attested = _text(environment, 'MIGRATION_DIRECT_CONNECTION_CONFIRMED').lower() in {'true', '1'}
+        report['operator_direct_connection_attested'] = attested
+        # An attestation cannot bypass syntax, pooler or routing refusals. It
+        # remains an operator assertion, never a network/TLS/rollout proof.
+        permitted = report['status'] != 'BLOCKED' and attested
+        if not attested:
+            report['issues'].append('operator_direct_connection_attestation_required')
+        report['status'] = 'CONFIG_GATE_PASSED' if permitted else 'BLOCKED'
+    elif arguments:
         # Never echo an accidentally supplied URL, secret or unsupported option.
         report = {
             'scope': 'offline_migration_environment_only',
             'status': 'BLOCKED', 'deployment_ready': False,
-            'issues': ['command_accepts_no_arguments'],
+            'issues': ['command_arguments_invalid'],
         }
     else:
-        report = migration_environment_report(os.environ if environment is None else environment)
+        report = migration_environment_report(environment)
     print(json.dumps(report, sort_keys=True), file=sys.stdout if stdout is None else stdout)
     return 2 if report['status'] == 'BLOCKED' else 0
 

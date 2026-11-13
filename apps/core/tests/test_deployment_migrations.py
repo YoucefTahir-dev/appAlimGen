@@ -15,6 +15,7 @@ from django.db.migrations.executor import MigrationExecutor
 from django.db.migrations.migration import Migration
 from django.db.migrations.state import ProjectState
 from django.test import SimpleTestCase, TransactionTestCase
+from django.test.utils import CaptureQueriesContext
 
 from apps.core.deployment_migrations import MIGRATION_LOCK_ID, forward_plan, migration_lock
 
@@ -118,6 +119,43 @@ class DeploymentPlanTests(SimpleTestCase):
                 command.handle(plan_only=False, direct_connection_confirmed=True, wait_seconds=30, lock_timeout_ms=5000, statement_timeout_ms=120000, verbosity=0)
         migrate.assert_called_once_with('migrate', database='default', interactive=False, verbosity=0)
 
+    def test_startup_check_with_empty_plan_never_locks_or_calls_migrate(self):
+        from apps.core.management.commands.deploy_migrate import Command
+        output = StringIO()
+        with patch('apps.core.management.commands.deploy_migrate.forward_plan', return_value=[]) as plan, patch(
+            'apps.core.management.commands.deploy_migrate.migration_lock',
+        ) as lock, patch('apps.core.management.commands.deploy_migrate.call_command') as mutate:
+            Command(stdout=output).handle(check_applied=True, plan_only=False)
+        plan.assert_called_once()
+        lock.assert_not_called()
+        mutate.assert_not_called()
+        self.assertIn('No migration applied.', output.getvalue())
+
+    def test_startup_check_refuses_pending_plan_without_fallback_mutation(self):
+        from apps.core.management.commands.deploy_migrate import Command
+        with patch('apps.core.management.commands.deploy_migrate.forward_plan', return_value=[(object(), False)]), patch(
+            'apps.core.management.commands.deploy_migrate.migration_lock',
+        ) as lock, patch('apps.core.management.commands.deploy_migrate.call_command') as mutate:
+            with self.assertRaisesMessage(CommandError, 'Pending reviewed migrations'):
+                Command(stdout=StringIO()).handle(check_applied=True, plan_only=False)
+        lock.assert_not_called()
+        mutate.assert_not_called()
+
+    def test_startup_check_preserves_unknown_plan_refusal_without_fallback(self):
+        from apps.core.management.commands.deploy_migrate import Command
+        with patch('apps.core.management.commands.deploy_migrate.forward_plan', side_effect=CommandError('Unapproved fixture')), patch(
+            'apps.core.management.commands.deploy_migrate.call_command',
+        ) as mutate:
+            with self.assertRaisesMessage(CommandError, 'Unapproved fixture'):
+                Command(stdout=StringIO()).handle(check_applied=True, plan_only=False)
+        mutate.assert_not_called()
+
+    def test_read_only_modes_are_mutually_exclusive(self):
+        from apps.core.management.commands.deploy_migrate import Command
+        parser = Command().create_parser('manage.py', 'deploy_migrate')
+        with self.assertRaises(CommandError):
+            parser.parse_args(['--plan-only', '--check-applied'])
+
 
 class PostgreSQLDeploymentLockTests(TransactionTestCase):
     def setUp(self):
@@ -203,6 +241,20 @@ class PostgreSQLDeploymentLockTests(TransactionTestCase):
     def test_guarded_noop_command_is_forward_only_and_releases_lock(self):
         call_command('deploy_migrate', direct_connection_confirmed=True, verbosity=0, stdout=StringIO())
         self.assertEqual(forward_plan(connection), [])
+
+    def test_read_only_startup_gate_uses_real_schema_without_mutations_or_lock(self):
+        with CaptureQueriesContext(connection) as captured, patch(
+            'apps.core.management.commands.deploy_migrate.migration_lock',
+        ) as lock, patch('apps.core.management.commands.deploy_migrate.call_command') as mutate:
+            call_command('deploy_migrate', check_applied=True, verbosity=0, stdout=StringIO())
+        self.assertTrue(captured.captured_queries)
+        for query in captured.captured_queries:
+            sql = query['sql'].lstrip().upper()
+            self.assertFalse(sql.startswith(('INSERT', 'UPDATE', 'DELETE', 'CREATE', 'ALTER', 'DROP', 'TRUNCATE')))
+            self.assertNotIn('PG_ADVISORY', sql)
+            self.assertNotIn('PG_TRY_ADVISORY', sql)
+        lock.assert_not_called()
+        mutate.assert_not_called()
 
     def test_second_atomic_migration_failure_keeps_first_commit_without_automatic_downgrade(self):
         # Demonstrate the exact partial-failure boundary on synthetic DDL, not
