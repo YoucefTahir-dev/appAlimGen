@@ -45,7 +45,10 @@ from .historical_stock import (
     correction_preview,
 )
 from .location import audit_location, location_snapshot
-from .balance_adjustments import adjust_client_balance, save_new_client_with_balance_audit
+from .balance_adjustments import (
+    adjust_client_balance, client_balance_corrections_enabled,
+    client_balance_corrections_required, save_new_client_with_balance_audit,
+)
 from apps.commerce.web_idempotency import new_web_token, web_idempotent
 from .geocoding import GeocodingService, GeocodingUnavailable
 from django import forms
@@ -637,6 +640,7 @@ def client_detail(request, pk):
         'inventory/client_detail.html',
         {
             'client_obj': client_obj, 'sales': sales,
+            'client_balance_corrections_enabled': client_balance_corrections_enabled(),
             'balance_adjustments': client_obj.balance_adjustments.select_related('created_by').all()[:100]
             if has_permission(request.user, 'inventory.adjust_client_balance') else [],
         },
@@ -665,6 +669,7 @@ def _check_client_balance_replay(request, record, pk):
 
 
 @permission_required('inventory.adjust_client_balance')
+@client_balance_corrections_required
 @web_idempotent(lambda request, pk: f'web.client.{pk}.adjust_balance', 'client', _check_client_balance_replay)
 def client_balance_adjust(request, pk):
     client_obj = get_object_or_404(Client, pk=pk)

@@ -1,14 +1,40 @@
 """Journalled corrections of remaining opening debt, without historical repricing."""
 
 from decimal import Decimal
+from functools import wraps
 
+from django.conf import settings
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
+from django.http import HttpResponseForbidden
 from django.utils.translation import gettext as _
 
 from apps.accounts.permissions import has_permission
 
 from .models import Client, ClientBalanceAdjustment
+
+
+def client_balance_corrections_enabled():
+    """A reversible correction switch, never a switch for initial debt traces."""
+    return getattr(settings, 'CLIENT_BALANCE_CORRECTIONS_ENABLED', False) is True
+
+
+def require_client_balance_corrections_enabled():
+    if not client_balance_corrections_enabled():
+        raise PermissionDenied(_('La correction de dette antérieure est désactivée.'))
+
+
+def client_balance_corrections_required(view_func):
+    """Gate the Web entry before its idempotency registry, including replays."""
+    @wraps(view_func)
+    def wrapped(request, *args, **kwargs):
+        try:
+            require_client_balance_corrections_enabled()
+        except PermissionDenied as exc:
+            return HttpResponseForbidden(str(exc), content_type='text/plain; charset=utf-8')
+        return view_func(request, *args, **kwargs)
+
+    return wrapped
 
 
 def _balance(value):
@@ -35,6 +61,7 @@ def adjust_client_balance(*, client_id, expected_balance, new_balance, reason, u
     """Compare and set one remaining debt under the same client lock as receipts."""
     if not has_permission(user, 'inventory.adjust_client_balance'):
         raise PermissionDenied
+    require_client_balance_corrections_enabled()
     expected = _balance(expected_balance)
     target = _balance(new_balance)
     reason = str(reason or '').strip()
@@ -59,7 +86,7 @@ def adjust_client_balance(*, client_id, expected_balance, new_balance, reason, u
 
 @transaction.atomic
 def save_new_client_with_balance_audit(*, client, user):
-    """Keep the existing add-client policy and journal new non-zero opening debt."""
+    """Always journal new non-zero opening debt, including bridge/rollback mode."""
     if not has_permission(user, 'inventory.add_client'):
         raise PermissionDenied
     if client.pk or not client._state.adding:

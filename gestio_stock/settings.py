@@ -373,6 +373,9 @@ API_IDEMPOTENCY_RETENTION_DAYS = int(os.getenv('API_IDEMPOTENCY_RETENTION_DAYS',
 # Compatible rollout: older installed clients remain accepted until the owner
 # has qualified their replacement. New clients may opt into required-v1 early.
 API_IDEMPOTENCY_REQUIRED = env_bool('API_IDEMPOTENCY_REQUIRED', False)
+# The qualified bridge keeps initial debt journalling and safe profile saves
+# active, even when corrections are unavailable or a later release is rolled back.
+CLIENT_BALANCE_CORRECTIONS_ENABLED = env_bool('CLIENT_BALANCE_CORRECTIONS_ENABLED', False)
 
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'dashboard'

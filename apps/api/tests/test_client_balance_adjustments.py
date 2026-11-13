@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.contrib.auth.models import Group, Permission
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from rest_framework.test import APITestCase
 
@@ -17,6 +17,7 @@ from apps.core.models import AuditLog
 from apps.inventory.models import Client, ClientBalanceAdjustment
 
 
+@override_settings(CLIENT_BALANCE_CORRECTIONS_ENABLED=True)
 class ClientBalanceApiTests(APITestCase):
     @classmethod
     def setUpTestData(cls):

@@ -47,7 +47,9 @@ from apps.inventory.historical_stock import (
 from apps.inventory.services import cancel_loading_order, close_loading_order, validate_loading_order
 from apps.inventory.pricing import get_sale_price_context, sale_packaging_allowed
 from apps.inventory.location import audit_location, location_snapshot
-from apps.inventory.balance_adjustments import adjust_client_balance
+from apps.inventory.balance_adjustments import (
+    adjust_client_balance, require_client_balance_corrections_enabled,
+)
 from apps.inventory.models import ClientBalanceAdjustment
 from apps.printing.models import PrinterProfile, PrintProfile
 from apps.printing.services import encode_payload, invoice_print_data, printer_test_payload, select_printer_for_user
@@ -526,6 +528,9 @@ class ClientViewSet(AuditMutationMixin, viewsets.ModelViewSet):
     )
     @action(detail=True, methods=('post',), url_path='adjust-balance')
     def adjust_balance(self, request, pk=None):
+        # Must precede the registry: disabling a mutation also denies cached
+        # successful responses, without deleting the immutable history.
+        require_client_balance_corrections_enabled()
         client = self.get_object()
 
         def operation():

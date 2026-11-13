@@ -11,7 +11,7 @@ from django.contrib.auth.models import Permission
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import close_old_connections, connection, connections
 from django.db.models.deletion import ProtectedError
-from django.test import RequestFactory, TestCase, TransactionTestCase
+from django.test import RequestFactory, TestCase, TransactionTestCase, override_settings
 from django.urls import reverse
 
 from apps.accounts.permissions import has_permission
@@ -32,6 +32,7 @@ User = get_user_model()
 CORRECT = 'inventory.adjust_client_balance'
 
 
+@override_settings(CLIENT_BALANCE_CORRECTIONS_ENABLED=True)
 class ClientBalanceAdjustmentTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -342,6 +343,7 @@ class ClientBalanceAdjustmentTests(TestCase):
         self.assertEqual(self.customer.notes, 'Admin profile only')
 
 
+@override_settings(CLIENT_BALANCE_CORRECTIONS_ENABLED=True)
 class PostgreSQLClientBalanceConcurrencyTests(TransactionTestCase):
     reset_sequences = True
 
