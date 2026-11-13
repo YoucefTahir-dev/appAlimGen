@@ -2,13 +2,14 @@ import io
 import json
 from datetime import timedelta
 from unittest import skipUnless
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.admin.sites import AdminSite
 from django.contrib.auth.models import Permission
 from django.core.management import call_command, CommandError
 from django.db import connection
-from django.test import TestCase, TransactionTestCase, RequestFactory
+from django.test import SimpleTestCase, TestCase, TransactionTestCase, RequestFactory
 from django.utils import timezone
 
 from apps.core.models import AuditLog
@@ -81,6 +82,24 @@ class LocationRetentionTests(TestCase):
         self.assertEqual(self.run_command()['eligible'], 2)
 
 
+class DatabasePostureTLSReportingTests(SimpleTestCase):
+    def test_unencrypted_session_requires_review_even_without_elevated_privileges(self):
+        for tls in (False, True):
+            with self.subTest(tls=tls), \
+                    patch('apps.core.management.commands.check_database_posture.connection') as database, \
+                    patch('apps.core.management.commands.check_database_posture.transaction.atomic'):
+                database.vendor = 'postgresql'
+                cursor = database.cursor.return_value.__enter__.return_value
+                cursor.fetchone.return_value = (False, False, False, False, tls, False, 16, True, False)
+                output = io.StringIO()
+                call_command('check_database_posture', stdout=output)
+                report = json.loads(output.getvalue())
+                self.assertIs(report['session_tls'], tls)
+                self.assertIs(report['review_required'], not tls)
+                self.assertFalse(report['privileges_modified'])
+                cursor.execute.assert_any_call('SET TRANSACTION READ ONLY')
+
+
 @skipUnless(connection.vendor == 'postgresql', 'Real PostgreSQL metadata required.')
 class DatabasePostureTests(TransactionTestCase):
     def test_readonly_tls_role_report_has_no_names_and_no_business_reads(self):
@@ -92,8 +111,17 @@ class DatabasePostureTests(TransactionTestCase):
         with connection.execute_wrapper(record):
             call_command('check_database_posture', stdout=output)
         report = json.loads(output.getvalue())
-        self.assertTrue(report['session_tls'])
-        self.assertTrue(report['review_required'])  # disposable cluster owner
+        # The local CI service may have TLS disabled; report the real session,
+        # never pretend it is encrypted or assume the test role is privileged.
+        with connection.cursor() as cursor:
+            cursor.execute('SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_stat_ssl '
+                           'WHERE pid = pg_catalog.pg_backend_pid() AND ssl)')
+            expected_tls = cursor.fetchone()[0]
+        self.assertIs(report['session_tls'], expected_tls)
+        self.assertEqual(report['review_required'], bool(not expected_tls or any(
+            report[key] for key in ('superuser', 'can_create_roles', 'can_create_databases',
+                                    'bypasses_rls', 'public_schema_create')
+        )))
         self.assertFalse(report['business_data_read'])
         self.assertFalse(report['privileges_modified'])
         for sql in queries:
