@@ -17,7 +17,7 @@ from apps.core.export_security import excel_safe_text
 from apps.core.pagination import paginate_queryset
 from .forms import (
     CategoryDeleteForm, CategoryForm,
-    ClientForm,
+    ClientForm, ClientBalanceAdjustmentForm,
     ImportExcelForm,
     ProductForm,
     QuickProductForm,
@@ -45,6 +45,11 @@ from .historical_stock import (
     correction_preview,
 )
 from .location import audit_location, location_snapshot
+from .balance_adjustments import (
+    adjust_client_balance, client_balance_corrections_enabled,
+    client_balance_corrections_required, save_new_client_with_balance_audit,
+)
+from apps.commerce.web_idempotency import new_web_token, web_idempotent
 from .geocoding import GeocodingService, GeocodingUnavailable
 from django import forms
 from django.core.cache import cache
@@ -619,7 +624,7 @@ def client_export(request):
 def client_create(request):
     form = ClientForm(request.POST or None)
     if form.is_valid():
-        client_obj = form.save()
+        client_obj = save_new_client_with_balance_audit(client=form.save(commit=False), user=request.user)
         audit_location(request, client_obj, None)
         messages.success(request, _('Client ajouté avec succès.'))
         return redirect('client_list')
@@ -633,7 +638,12 @@ def client_detail(request, pk):
     return render(
         request,
         'inventory/client_detail.html',
-        {'client_obj': client_obj, 'sales': sales},
+        {
+            'client_obj': client_obj, 'sales': sales,
+            'client_balance_corrections_enabled': client_balance_corrections_enabled(),
+            'balance_adjustments': client_obj.balance_adjustments.select_related('created_by').all()[:100]
+            if has_permission(request.user, 'inventory.adjust_client_balance') else [],
+        },
     )
 
 
@@ -649,12 +659,63 @@ def client_update(request, pk):
         return redirect('client_list')
     return render(request, 'inventory/client_form.html', {'form': form, 'title': _('Modifier le client')})
 
+
+def _check_client_balance_replay(request, record, pk):
+    # Outer permission checks are rerun before the replay registry is consulted.
+    client = get_object_or_404(Client, pk=pk)
+    if str(client.pk) != record.resource_id:
+        from django.http import Http404
+        raise Http404
+
+
+@permission_required('inventory.adjust_client_balance')
+@client_balance_corrections_required
+@web_idempotent(lambda request, pk: f'web.client.{pk}.adjust_balance', 'client', _check_client_balance_replay)
+def client_balance_adjust(request, pk):
+    client_obj = get_object_or_404(Client, pk=pk)
+    form = ClientBalanceAdjustmentForm(
+        request.POST if request.method == 'POST' else None,
+        initial={
+            'expected_balance': client_obj.balance, 'new_balance': client_obj.balance,
+            'request_token': new_web_token(),
+        },
+    )
+    if form.is_valid():
+        try:
+            adjust_client_balance(
+                client_id=client_obj.pk,
+                expected_balance=form.cleaned_data['expected_balance'],
+                new_balance=form.cleaned_data['new_balance'],
+                reason=form.cleaned_data['reason'], user=request.user,
+            )
+        except ValidationError as exc:
+            if hasattr(exc, 'message_dict'):
+                for field, errors in exc.message_dict.items():
+                    form.add_error(field if field in form.fields else None, errors)
+            else:
+                form.add_error(None, exc)
+        else:
+            messages.success(request, _('Correction de dette antérieure enregistrée.'))
+            # The operator need not also hold the unrelated view-client right.
+            response = redirect('client_balance_adjust', pk=client_obj.pk)
+            response._web_idempotency_resource_id = client_obj.pk
+            return response
+    return render(request, 'inventory/client_balance_adjustment_form.html', {
+        'form': form, 'client_obj': client_obj,
+        'balance_adjustments': client_obj.balance_adjustments.select_related('created_by').all()[:100],
+    })
+
+
 @manager_required
 def client_delete(request, pk):
     client_obj = get_object_or_404(Client, pk=pk)
     if request.method == 'POST':
-        client_obj.delete()
-        messages.success(request, _('Client supprimé.'))
+        try:
+            client_obj.delete()
+        except ProtectedError:
+            messages.error(request, _('Ce client possède un historique financier et ne peut pas être supprimé.'))
+        else:
+            messages.success(request, _('Client supprimé.'))
         return redirect('client_list')
     return render(request, 'inventory/client_confirm_delete.html', {'client': client_obj})
 

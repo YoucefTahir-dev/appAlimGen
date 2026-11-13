@@ -27,6 +27,23 @@ def _apply_line_stock_changes(*changes):
     record_stock_movements([change for change in changes if change is not None])
 
 
+def _lock_sales_for_stock(sale_ids):
+    """Acquire parents before lines/products, including direct model writes."""
+    sales = {
+        sale.pk: sale
+        for sale in Sale.objects.select_for_update(of=('self',)).filter(pk__in=sale_ids).order_by('pk')
+    }
+    loading_ids = {sale.loading_order_id for sale in sales.values() if sale.loading_order_id}
+    loadings = {
+        order.pk: order
+        for order in LoadingOrder.objects.select_for_update(of=('self',)).filter(pk__in=loading_ids).order_by('pk')
+    }
+    for sale in sales.values():
+        if sale.loading_order_id:
+            sale.loading_order = loadings[sale.loading_order_id]
+    return sales
+
+
 def _apply_sale_stock_delta(*, sale, product_id, delta, user, reference, reason):
     if not delta:
         return
@@ -50,7 +67,17 @@ class StockAwareDeleteQuerySet(models.QuerySet):
     def delete(self):
         deleted_total = 0
         deleted_by_model = {}
-        for obj in list(self.select_for_update()):
+        locked_objects = list(self.select_for_update(of=('self',)).order_by('pk'))
+        if self.model is Sale:
+            # Multi-document deletes must acquire every parent/resource in the
+            # same order as multi-line deletes, not one loading at a time in
+            # the Sale model's reverse-date default ordering.
+            sale_ids = {obj.pk for obj in locked_objects}
+            _lock_sales_for_stock(sale_ids)
+            list(Product.objects.select_for_update().filter(
+                pk__in=SaleLine.objects.filter(sale_id__in=sale_ids).values_list('product_id', flat=True),
+            ).order_by('pk'))
+        for obj in locked_objects:
             count, details = obj.delete()
             deleted_total += count
             for label, value in details.items():
@@ -473,7 +500,10 @@ class Sale(models.Model):
 
     @transaction.atomic
     def delete(self, *args, **kwargs):
-        Sale.objects.select_for_update().get(pk=self.pk)
+        _lock_sales_for_stock({self.pk})
+        list(Product.objects.select_for_update().filter(
+            pk__in=self.lines.values_list('product_id', flat=True),
+        ).order_by('pk'))
         user = getattr(self, '_stock_user', None)
         for line in list(self.lines.all()):
             line._stock_user = user
@@ -507,6 +537,30 @@ class TicketSequence(models.Model):
         return f'{self.year} - {self.last_number}'
 
 
+class SaleLineQuerySet(StockTrackedLineQuerySet):
+    @transaction.atomic
+    def delete(self):
+        # The generic stock-aware queryset locks lines first. That would invert
+        # the parent-first order used by save/delete and the sale services.
+        identities = self.order_by('pk').values_list('pk', 'sale_id')
+        # A caller may already have chained select_for_update(). Identity
+        # discovery must not inherit that line-first lock before its parents.
+        # Clear it only on this cloned query; do not alter the caller queryset.
+        identities.query.select_for_update = False
+        rows = list(identities)
+        if not rows:
+            return 0, {}
+        sales = _lock_sales_for_stock({sale_id for _pk, sale_id in rows})
+        selected = self.filter(pk__in=[pk for pk, _sale_id in rows]).order_by('pk')
+        locked_rows = list(selected.select_for_update(of=('self',)).values_list('sale_id', 'product_id'))
+        if any(sale_id not in sales for sale_id, _product_id in locked_rows):
+            raise ValidationError(_('La ligne a été modifiée simultanément. Veuillez recommencer.'))
+        list(Product.objects.select_for_update().filter(
+            pk__in={product_id for _sale_id, product_id in locked_rows},
+        ).order_by('pk'))
+        return StockAwareDeleteQuerySet.delete(selected)
+
+
 class SaleLine(models.Model):
     sale = models.ForeignKey(Sale, on_delete=models.CASCADE, related_name='lines')
     product = models.ForeignKey(Product, on_delete=models.PROTECT)
@@ -532,7 +586,7 @@ class SaleLine(models.Model):
         max_digits=14, decimal_places=2, null=True, blank=True, editable=False,
     )
 
-    objects = StockTrackedLineQuerySet.as_manager()
+    objects = SaleLineQuerySet.as_manager()
 
     @property
     def stock_quantity(self):
@@ -571,6 +625,11 @@ class SaleLine(models.Model):
         self.packaging_quantity = int(self.packaging_quantity)
         self.unit_price = Decimal(str(self.unit_price))
         user = getattr(self, '_stock_user', None)
+        sale_ids = {self.sale_id}
+        if self.pk:
+            sale_ids.add(SaleLine.objects.values_list('sale_id', flat=True).get(pk=self.pk))
+        locked_sales = _lock_sales_for_stock(sale_ids)
+        self.sale = locked_sales[self.sale_id]
         if self._state.adding:
             # Lock only the product row. ``Product.unit`` is nullable, so joining it
             # in a ``SELECT ... FOR UPDATE`` makes PostgreSQL reject the query with
@@ -612,6 +671,8 @@ class SaleLine(models.Model):
             return
 
         old = SaleLine.objects.select_for_update().get(pk=self.pk)
+        if old.sale_id not in locked_sales:
+            raise ValidationError(_('La ligne a été modifiée simultanément. Veuillez recommencer.'))
         update_fields = kwargs.get('update_fields')
         persisted_product_id = self.product_id
         persisted_quantity = self.quantity
@@ -701,7 +762,12 @@ class SaleLine(models.Model):
 
     @transaction.atomic
     def delete(self, *args, **kwargs):
-        locked = SaleLine.objects.select_for_update().select_related('sale').get(pk=self.pk)
+        sale_id = SaleLine.objects.values_list('sale_id', flat=True).get(pk=self.pk)
+        sale = _lock_sales_for_stock({sale_id})[sale_id]
+        locked = SaleLine.objects.select_for_update().get(pk=self.pk)
+        if locked.sale_id != sale_id:
+            raise ValidationError(_('La ligne a été modifiée simultanément. Veuillez recommencer.'))
+        locked.sale = sale
         _apply_sale_stock_delta(
             sale=locked.sale, product_id=locked.product_id, delta=locked.quantity,
             reason=f'Suppression ligne vente {locked.sale.invoice_number}',

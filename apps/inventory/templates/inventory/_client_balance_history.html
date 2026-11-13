@@ -1,0 +1,18 @@
+{% load i18n %}
+<div class="card card-dashboard p-4 bg-white mb-4">
+    <h3 class="h5">{% trans "Journal de dette antérieure" %}</h3>
+    <p class="text-muted">{% trans "Les règlements et leurs annulations figurent dans le compte de créances. Les corrections ci-dessous ne sont pas des paiements." %}</p>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead><tr><th>{% trans "Date" %}</th><th>{% trans "Type" %}</th><th>{% trans "Avant" %}</th><th>{% trans "Après" %}</th><th>{% trans "Variation" %}</th><th>{% trans "Auteur" %}</th><th>{% trans "Motif" %}</th></tr></thead>
+            <tbody>
+            {% for adjustment in balance_adjustments %}
+                <tr><td>{{ adjustment.created_at|date:"d/m/Y H:i" }}</td><td>{{ adjustment.get_kind_display }}</td><td>{{ adjustment.balance_before|floatformat:2 }}</td><td>{{ adjustment.balance_after|floatformat:2 }}</td><td>{{ adjustment.delta|floatformat:2 }}</td><td>{{ adjustment.actor_name_snapshot }}</td><td>{{ adjustment.reason }}</td></tr>
+            {% empty %}
+                <tr><td colspan="7">{% trans "Aucune correction journalisée. Les soldes historiques n’ont pas été recalculés." %}</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <p class="small text-muted">{% trans "Les 100 écritures les plus récentes sont affichées." %}</p>
+</div>

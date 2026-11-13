@@ -677,6 +677,45 @@ class ClientForm(forms.ModelForm):
             else:
                 kwargs['data'] = mutable_data
         super().__init__(*args, **kwargs)
+        if self.instance.pk:
+            self.fields['balance'].disabled = True
+            self.fields['balance'].help_text = _(
+                'La dette antérieure se corrige uniquement depuis la fiche client, avec un motif.'
+            )
+
+    def clean_balance(self):
+        value = self.cleaned_data['balance']
+        if self.instance.pk and 'balance' in self.data:
+            submitted = forms.DecimalField(max_digits=12, decimal_places=2).clean(self.data.get('balance'))
+            if submitted != self.instance.balance:
+                raise ValidationError(_(
+                    'La dette antérieure ne peut pas être modifiée dans la fiche. Utilisez la correction dédiée.'
+                ))
+        return value
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        if commit:
+            if instance.pk:
+                from .balance_adjustments import save_client_profile
+                save_client_profile(client=instance)
+            else:
+                instance.save()
+            self.save_m2m()
+        return instance
+
+
+class ClientBalanceAdjustmentForm(forms.Form):
+    expected_balance = forms.DecimalField(max_digits=12, decimal_places=2, widget=forms.HiddenInput())
+    new_balance = forms.DecimalField(
+        label=_('Nouvelle dette antérieure restante (DZD)'), max_digits=12, decimal_places=2,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+    )
+    reason = forms.CharField(
+        label=_('Motif de la correction'), max_length=1000, strip=True,
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+    )
+    request_token = forms.CharField(widget=forms.HiddenInput())
 
 class SupplierForm(forms.ModelForm):
     class Meta:

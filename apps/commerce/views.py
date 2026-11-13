@@ -30,7 +30,7 @@ from .services import create_sale, create_purchase, ensure_ticket_number, refres
 from .utils import build_invoice_context, generate_invoice_pdf, qr_code_data_uri
 from .product_search import commercial_products, search_products
 from .receivables import attach_receivable_counts, receivable_account, receivables_queryset
-from .web_idempotency import web_idempotent
+from .web_idempotency import is_legacy_payment_token, web_idempotent
 
 
 MONEY_QUANTUM = Decimal('0.01')
@@ -443,6 +443,157 @@ def _payment_context(document, document_type):
     }
 
 
+def _payment_form_redirect(payment, *, document_type=None, client=None):
+    if client is not None:
+        response = redirect('receivable_detail', pk=client.pk)
+    else:
+        route = 'sale_payment_list' if document_type == 'sale' else 'purchase_payment_list'
+        document_pk = payment.sale_id if document_type == 'sale' else payment.purchase_id
+        response = redirect(route, pk=document_pk)
+    response._web_idempotency_resource_id = str(payment.pk)
+    return response
+
+
+def _check_payment_target_access(request, payment, *, sale_pk=None, purchase_pk=None, client_pk=None):
+    """Recheck only present access, not remaining balance or unpaid choices."""
+    if sale_pk is not None or client_pk is not None:
+        if not payment.sale_id or (sale_pk is not None and payment.sale_id != sale_pk):
+            raise Http404
+        sale = get_object_or_404(visible_sales(request.user), pk=payment.sale_id)
+        if client_pk is not None and sale.client_id != client_pk:
+            raise Http404
+    elif purchase_pk is not None:
+        if payment.purchase_id != purchase_pk:
+            raise Http404
+        get_object_or_404(Purchase, pk=purchase_pk)
+    else:
+        raise Http404
+
+
+def _check_sale_payment_form_replay(request, record, pk):
+    payment = get_object_or_404(Payment, pk=record.resource_id)
+    _check_payment_target_access(request, payment, sale_pk=pk)
+
+
+def _check_purchase_payment_form_replay(request, record, pk):
+    payment = get_object_or_404(Payment, pk=record.resource_id)
+    _check_payment_target_access(request, payment, purchase_pk=pk)
+
+
+def _check_receivable_payment_form_replay(request, record, pk):
+    payment = get_object_or_404(Payment, pk=record.resource_id)
+    _check_payment_target_access(request, payment, client_pk=pk)
+
+
+def _legacy_payment_key(request):
+    token = request.POST.get('request_token', '')
+    return token if is_legacy_payment_token(token) else None
+
+
+def _historical_payment_matches(request, payment, *, document=None, document_type=None, client=None):
+    """Compare the old immutable receipt, without financial ModelForm cleaning.
+
+    Old rows contain no request hash. A missing historical date is therefore
+    ambiguous and must never be converted into a new payment or false success.
+    Newly registered requests retain their raw hash, including an omitted date.
+    """
+    if payment.created_by_id != request.user.pk:
+        return False
+    if client is not None:
+        sale_ids = request.POST.getlist('sale')
+        if (
+            len(sale_ids) != 1 or len(sale_ids[0]) > 20 or not sale_ids[0].isascii()
+            or not sale_ids[0].isdecimal() or int(sale_ids[0]) != payment.sale_id
+            or not payment.sale_id or payment.sale.client_id != client.pk
+        ):
+            return False
+    elif document_type == 'sale':
+        if payment.sale_id != document.pk:
+            return False
+    elif document_type == 'purchase':
+        if payment.purchase_id != document.pk:
+            return False
+    else:
+        return False
+    comparison_form = PaymentForm(document=document)
+    for name in ('amount', 'payment_type', 'created_at', 'external_reference', 'notes'):
+        values = request.POST.getlist(name)
+        if len(values) > 1:
+            return False
+        raw_value = values[0] if values else ''
+        if name == 'created_at' and not raw_value.strip():
+            return False
+        try:
+            value = comparison_form.fields[name].clean(raw_value)
+        except ValidationError:
+            return False
+        if value != getattr(payment, name):
+            return False
+    return True
+
+
+def _legacy_payment_replay(request, *, document=None, document_type=None, client=None):
+    key = _legacy_payment_key(request)
+    if key is None:
+        return None
+    payment = Payment.objects.select_related('sale', 'purchase').filter(idempotency_key=key).first()
+    if payment is None:
+        return None
+    if not _historical_payment_matches(
+        request, payment, document=document, document_type=document_type, client=client,
+    ):
+        return HttpResponse(
+            _('Ce jeton correspond à un règlement déjà enregistré qui ne peut pas être repris. '
+              'Vérifiez les règlements existants avant de rouvrir le formulaire.'),
+            status=409, content_type='text/plain; charset=utf-8',
+        )
+    _check_payment_target_access(
+        request, payment,
+        sale_pk=document.pk if document_type == 'sale' else None,
+        purchase_pk=document.pk if document_type == 'purchase' else None,
+        client_pk=client.pk if client is not None else None,
+    )
+    request._web_idempotency_replayed = True
+    messages.info(
+        request,
+        _('Ce règlement est déjà enregistré et a été annulé. Aucun nouveau règlement créé.')
+        if payment.is_cancelled else _('Ce règlement est déjà enregistré. Aucun nouveau règlement créé.'),
+    )
+    return _payment_form_redirect(payment, document_type=document_type, client=client)
+
+
+def _is_payment_key_collision(exc):
+    if isinstance(exc, ValidationError):
+        errors = getattr(exc, 'error_dict', {})
+        return set(errors) == {'idempotency_key'} and all(
+            error.code == 'unique' for error in errors['idempotency_key']
+        )
+    constraint = getattr(getattr(exc.__cause__, 'diag', None), 'constraint_name', None)
+    return (
+        constraint == 'commerce_payment_idempotency_key_key'
+        or str(exc) == 'UNIQUE constraint failed: commerce_payment.idempotency_key'
+    )
+
+
+def _save_web_payment(request, payment, *, document=None, document_type=None, client=None):
+    """Isolate only a historical key collision; never swallow business errors."""
+    payment.created_by = request.user
+    payment.idempotency_key = _legacy_payment_key(request)
+    try:
+        with transaction.atomic():
+            payment.save()
+    except (IntegrityError, ValidationError) as exc:
+        if payment.idempotency_key is None or not _is_payment_key_collision(exc):
+            raise
+        replay = _legacy_payment_replay(
+            request, document=document, document_type=document_type, client=client,
+        )
+        if replay is None:
+            raise
+        return replay
+    return None
+
+
 @permission_required('commerce.view_sale')
 def sale_payment_list(request, pk):
     sale = get_object_or_404(visible_sales(request.user, Sale.objects.select_related('client')), pk=pk)
@@ -456,30 +607,25 @@ def purchase_payment_list(request, pk):
 
 
 def _payment_create(request, document, document_type):
+    if request.method == 'POST':
+        replay = _legacy_payment_replay(request, document=document, document_type=document_type)
+        if replay is not None:
+            return replay
     form = PaymentForm(request.POST or None, document=document)
     if form.is_valid():
-        request_token = form.cleaned_data.get('request_token') or None
-        existing = Payment.objects.filter(idempotency_key=request_token).first() if request_token else None
-        if existing is not None:
-            route = 'sale_payment_list' if document_type == 'sale' else 'purchase_payment_list'
-            return redirect(route, pk=document.pk)
         payment = form.save(commit=False)
-        payment.created_by = request.user
-        payment.idempotency_key = request_token
         try:
-            payment.save()
-        except IntegrityError:
-            if request_token and Payment.objects.filter(idempotency_key=request_token).exists():
-                route = 'sale_payment_list' if document_type == 'sale' else 'purchase_payment_list'
-                return redirect(route, pk=document.pk)
-            raise
+            replay = _save_web_payment(
+                request, payment, document=document, document_type=document_type,
+            )
         except ValidationError as exc:
             for error in exc.messages:
                 form.add_error('amount' if 'amount' in getattr(exc, 'message_dict', {}) else None, error)
         else:
+            if replay is not None:
+                return replay
             messages.success(request, _('Règlement enregistré avec succès.'))
-            route = 'sale_payment_list' if document_type == 'sale' else 'purchase_payment_list'
-            return redirect(route, pk=document.pk)
+            return _payment_form_redirect(payment, document_type=document_type)
     return render(
         request,
         'commerce/payment_form.html',
@@ -493,11 +639,19 @@ def _payment_create(request, document, document_type):
 
 
 @permission_required('commerce.change_sale')
+@web_idempotent(
+    lambda request, pk: f'web.sale.{pk}.payment.create', 'payment',
+    _check_sale_payment_form_replay, allow_legacy_token=True,
+)
 def sale_payment_create(request, pk):
     return _payment_create(request, get_object_or_404(visible_sales(request.user), pk=pk), 'sale')
 
 
 @permission_required('commerce.change_purchase')
+@web_idempotent(
+    lambda request, pk: f'web.purchase.{pk}.payment.create', 'payment',
+    _check_purchase_payment_form_replay, allow_legacy_token=True,
+)
 def purchase_payment_create(request, pk):
     return _payment_create(request, get_object_or_404(Purchase, pk=pk), 'purchase')
 
@@ -584,24 +738,25 @@ def receivable_statement(request, pk):
 
 
 @permission_required('commerce.add_customerpayment')
+@web_idempotent(
+    lambda request, pk: f'web.receivable.{pk}.payment.create', 'payment',
+    _check_receivable_payment_form_replay, allow_legacy_token=True,
+)
 def receivable_payment_create(request, pk):
     client = get_object_or_404(Client, pk=pk)
+    if request.method == 'POST':
+        replay = _legacy_payment_replay(request, client=client)
+        if replay is not None:
+            return replay
     form = CustomerPaymentForm(request.POST or None, client=client, user=request.user)
     if form.is_valid():
-        request_token = form.cleaned_data.get('request_token') or None
-        existing = Payment.objects.filter(idempotency_key=request_token).first() if request_token else None
-        if existing is None:
-            payment = form.save(commit=False)
-            payment.created_by = request.user
-            payment.purchase = None
-            payment.idempotency_key = request_token
-            try:
-                payment.save()
-            except IntegrityError:
-                if not request_token or not Payment.objects.filter(idempotency_key=request_token).exists():
-                    raise
+        payment = form.save(commit=False)
+        payment.purchase = None
+        replay = _save_web_payment(request, payment, client=client)
+        if replay is not None:
+            return replay
         messages.success(request, _('Règlement client enregistré.'))
-        return redirect('receivable_detail', pk=client.pk)
+        return _payment_form_redirect(payment, client=client)
     return render(request, 'commerce/receivable_payment_form.html', {
         'client': client, 'form': form,
     })

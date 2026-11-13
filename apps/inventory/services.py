@@ -270,7 +270,9 @@ def adjust_operator_stock(*, loading_order, product, delta, movement_type, user=
 @transaction.atomic
 def validate_loading_order(loading_order, *, user=None):
     order_id = loading_order.pk if hasattr(loading_order, 'pk') else loading_order
-    order = LoadingOrder.objects.select_for_update().select_related('operator').get(pk=order_id)
+    # The operator is read-only here. Do not accidentally lock its User row
+    # through select_related: sales also reference that user through FKs.
+    order = LoadingOrder.objects.select_for_update(of=('self',)).select_related('operator').get(pk=order_id)
     if order.status != LoadingOrder.DRAFT:
         raise ValidationError({'status': _('Seul un chargement brouillon peut être validé.')})
     if LoadingOrder.objects.select_for_update().filter(

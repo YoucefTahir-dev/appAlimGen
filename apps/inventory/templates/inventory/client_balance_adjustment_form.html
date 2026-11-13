@@ -1,0 +1,23 @@
+{% extends 'base/base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "Corriger la dette antérieure" %} - El Amine ERP{% endblock %}
+{% block page_title %}{% trans "Corriger la dette antérieure" %}{% endblock %}
+
+{% block content %}
+<div class="card card-dashboard p-4 bg-white mb-4">
+    <h2 class="h4">{{ client_obj.name }}</h2>
+    <p>{% trans "Dette antérieure restante actuelle" %} : <strong>{{ client_obj.balance|floatformat:2 }} DZD</strong></p>
+    <p class="text-muted">{% trans "Cette correction ne modifie aucune facture et ne constitue pas un règlement. Elle est conservée avec son motif, son auteur et les montants avant/après." %}</p>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        {{ form.expected_balance }}{{ form.expected_balance.errors }}
+        {{ form.request_token }}{{ form.request_token.errors }}
+        <div class="mb-3">{{ form.new_balance.label_tag }}{{ form.new_balance }}{{ form.new_balance.errors }}</div>
+        <div class="mb-3">{{ form.reason.label_tag }}{{ form.reason }}{{ form.reason.errors }}</div>
+        <button class="btn btn-warning" type="submit">{% trans "Enregistrer la correction motivée" %}</button>
+    </form>
+</div>
+{% include 'inventory/_client_balance_history.html' %}
+{% endblock %}

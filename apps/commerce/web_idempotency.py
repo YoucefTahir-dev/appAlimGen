@@ -1,7 +1,7 @@
 """Bounded, transactional replay protection for the commercial Web forms.
 
-Web operations have their own registry namespace. Existing API key handling and
-the historical payment form tokens are intentionally not changed here.
+Web operations have their own registry namespace. Historical payment tokens may
+be explicitly admitted by payment routes while they migrate to signed forms.
 """
 
 from functools import wraps
@@ -24,12 +24,18 @@ WEB_TOKEN_MAX_AGE = 12 * 60 * 60
 WEB_TOKEN_SALT = 'commerce.web-mutation.v1'
 _NONCE = re.compile(r'^[0-9a-f]{32}$')
 _TOKEN = re.compile(r'^[0-9a-f]{32}:[A-Za-z0-9]+:[A-Za-z0-9_-]+$')
+_LEGACY_PAYMENT_TOKEN = re.compile(r'^[A-Za-z0-9_-]{1,64}$')
 _HASH_EXCLUDED_FIELDS = frozenset({'csrfmiddlewaretoken', 'request_token'})
 
 
 def new_web_token():
     """Issue a short-lived form intention, not a replacement for CSRF/auth."""
     return TimestampSigner(salt=WEB_TOKEN_SALT).sign(uuid4().hex)
+
+
+def is_legacy_payment_token(token):
+    """Recognize bounded historical payment tokens, never malformed signatures."""
+    return isinstance(token, str) and _LEGACY_PAYMENT_TOKEN.fullmatch(token) is not None
 
 
 def _bad_token(*, expired=False):
@@ -102,12 +108,14 @@ def _replay(request, record, digest, resource_type, replay_check, args, kwargs):
     return response
 
 
-def web_idempotent(operation, resource_type, replay_check):
+def web_idempotent(operation, resource_type, replay_check, *, allow_legacy_token=False):
     """Replay successful POST redirects only after a fresh access check.
 
     Permission decorators must surround this decorator. ``operation`` is a Web
     namespace string or a callable with the view's arguments. On success the
     view sets ``response._web_idempotency_resource_id`` to its saved resource.
+    ``allow_legacy_token`` is opt-in for the historical payment-form migration;
+    it must not relax signed-token checks on other commercial forms.
     """
     if not isinstance(resource_type, str) or not resource_type or len(resource_type) > 80:
         raise ImproperlyConfigured('A valid Web idempotency resource type is required.')
@@ -127,18 +135,19 @@ def web_idempotent(operation, resource_type, replay_check):
                 # An already-open legacy form remains compatible. Only newly
                 # rendered forms carry the transactional protection.
                 return view_func(request, *args, **kwargs)
-            if len(token) > 128 or not _TOKEN.fullmatch(token):
-                return _bad_token()
-            try:
-                nonce = TimestampSigner(salt=WEB_TOKEN_SALT).unsign(
-                    token, max_age=WEB_TOKEN_MAX_AGE,
-                )
-            except SignatureExpired:
-                return _bad_token(expired=True)
-            except BadSignature:
-                return _bad_token()
-            if not _NONCE.fullmatch(nonce):
-                return _bad_token()
+            if not (allow_legacy_token and is_legacy_payment_token(token)):
+                if len(token) > 128 or not _TOKEN.fullmatch(token):
+                    return _bad_token()
+                try:
+                    nonce = TimestampSigner(salt=WEB_TOKEN_SALT).unsign(
+                        token, max_age=WEB_TOKEN_MAX_AGE,
+                    )
+                except SignatureExpired:
+                    return _bad_token(expired=True)
+                except BadSignature:
+                    return _bad_token()
+                if not _NONCE.fullmatch(nonce):
+                    return _bad_token()
 
             operation_name = operation(request, *args, **kwargs) if callable(operation) else operation
             if (
@@ -187,7 +196,11 @@ def web_idempotent(operation, resource_type, replay_check):
                         'resource_id', 'response_status', 'response_body',
                         'completed', 'completed_at',
                     ))
-                    response['Idempotency-Replayed'] = 'false'
+                    # Adopting a verified historical payment is already a
+                    # replay, even though its scoped registry entry is new.
+                    response['Idempotency-Replayed'] = (
+                        'true' if getattr(request, '_web_idempotency_replayed', False) else 'false'
+                    )
                     return response
 
             # Leave the reservation transaction before reading the winner or

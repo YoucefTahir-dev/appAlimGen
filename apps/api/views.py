@@ -24,6 +24,7 @@ from apps.commerce.receivables import (
     allocate_client_payment,
     attach_receivable_counts,
     receivable_account,
+    receivable_sales,
     receivables_queryset,
 )
 from apps.commerce.product_search import commercial_products, search_products
@@ -46,6 +47,10 @@ from apps.inventory.historical_stock import (
 from apps.inventory.services import cancel_loading_order, close_loading_order, validate_loading_order
 from apps.inventory.pricing import get_sale_price_context, sale_packaging_allowed
 from apps.inventory.location import audit_location, location_snapshot
+from apps.inventory.balance_adjustments import (
+    adjust_client_balance, require_client_balance_corrections_enabled,
+)
+from apps.inventory.models import ClientBalanceAdjustment
 from apps.printing.models import PrinterProfile, PrintProfile
 from apps.printing.services import encode_payload, invoice_print_data, printer_test_payload, select_printer_for_user
 
@@ -53,6 +58,8 @@ from .serializers import (
     BrandSerializer,
     CategorySerializer,
     ClientSerializer,
+    ClientBalanceAdjustmentRequestSerializer,
+    ClientBalanceAdjustmentSerializer,
     CompanySettingsSerializer,
     ExpenseCategorySerializer,
     ExpenseSerializer,
@@ -75,12 +82,15 @@ from .serializers import (
     SupplierSerializer,
     UnitSerializer,
 )
-from .idempotency import idempotent
+from .idempotency import idempotent, mutation_key_required
 
 
 IDEMPOTENCY_PARAMETER = OpenApiParameter(
     name='Idempotency-Key', type=str, location=OpenApiParameter.HEADER,
-    required=False, description='Clé unique recommandée pour rejouer une écriture sans la dupliquer.',
+    required=False, description=(
+        'Clé stable de l’intention. Obligatoire si Idempotency-Policy: required-v1 '
+        'ou si l’exigence globale est activée par l’exploitant.'
+    ),
 )
 
 
@@ -504,7 +514,65 @@ class ClientViewSet(AuditMutationMixin, viewsets.ModelViewSet):
         'history': ('inventory.view_client', 'commerce.view_sale'), 'create': 'inventory.add_client',
         'update': 'inventory.change_client', 'partial_update': 'inventory.change_client',
         'destroy': 'inventory.delete_client',
+        'adjust_balance': 'inventory.adjust_client_balance',
+        'balance_adjustments': 'inventory.adjust_client_balance',
     }
+
+    @extend_schema(
+        parameters=[OpenApiParameter(
+            name='Idempotency-Key', type=str, location=OpenApiParameter.HEADER,
+            required=True, description='Clé stable obligatoire pour cette correction financière.',
+        )],
+        request=ClientBalanceAdjustmentRequestSerializer,
+        responses={201: ClientBalanceAdjustmentSerializer},
+    )
+    @action(detail=True, methods=('post',), url_path='adjust-balance')
+    def adjust_balance(self, request, pk=None):
+        # Must precede the registry: disabling a mutation also denies cached
+        # successful responses, without deleting the immutable history.
+        require_client_balance_corrections_enabled()
+        client = self.get_object()
+
+        def operation():
+            serializer = ClientBalanceAdjustmentRequestSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            try:
+                adjustment = adjust_client_balance(
+                    client_id=client.pk, user=request.user, **serializer.validated_data,
+                )
+            except DjangoValidationError as exc:
+                raise ValidationError(
+                    exc.message_dict if hasattr(exc, 'message_dict') else exc.messages,
+                ) from exc
+            self._audit('adjust_balance', status.HTTP_201_CREATED)
+            return Response(
+                ClientBalanceAdjustmentSerializer(adjustment).data,
+                status=status.HTTP_201_CREATED,
+            )
+
+        def replay_check(record):
+            # The stored id is the immutable adjustment, not the client id.
+            current = self.get_object()
+            get_object_or_404(
+                ClientBalanceAdjustment, pk=record.resource_id, client_id=current.pk,
+            )
+
+        return idempotent(
+            request, f'client.{client.pk}.adjust_balance', operation,
+            required=True, replay_check=replay_check,
+        )
+
+    @extend_schema(responses=ClientBalanceAdjustmentSerializer(many=True))
+    @action(detail=True, methods=('get',), url_path='balance-adjustments')
+    def balance_adjustments(self, request, pk=None):
+        adjustments = ClientBalanceAdjustment.objects.filter(
+            client=self.get_object(),
+        ).order_by('-created_at', '-pk')
+        page = self.paginate_queryset(adjustments)
+        serializer = ClientBalanceAdjustmentSerializer(
+            page if page is not None else adjustments, many=True,
+        )
+        return self.get_paginated_response(serializer.data) if page is not None else Response(serializer.data)
 
     @action(detail=True, methods=('get',))
     def history(self, request, pk=None):
@@ -560,7 +628,7 @@ class SaleViewSet(AuditMutationMixin, mixins.CreateModelMixin, mixins.ListModelM
 
     @extend_schema(parameters=[IDEMPOTENCY_PARAMETER])
     def create(self, request, *args, **kwargs):
-        return idempotent(request, 'sale.create', lambda: super(SaleViewSet, self).create(request, *args, **kwargs), required=False)
+        return idempotent(request, 'sale.create', lambda: super(SaleViewSet, self).create(request, *args, **kwargs), required=mutation_key_required(request))
 
     @extend_schema(parameters=[IDEMPOTENCY_PARAMETER])
     def update(self, request, *args, **kwargs):
@@ -568,7 +636,7 @@ class SaleViewSet(AuditMutationMixin, mixins.CreateModelMixin, mixins.ListModelM
         return idempotent(
             request, f'sale.{pk}.update',
             lambda: super(SaleViewSet, self).update(request, *args, **kwargs),
-            required=False,
+            required=mutation_key_required(request),
             replay_check=lambda record: self._check_replay_object_access(pk),
         )
 
@@ -608,7 +676,7 @@ class PurchaseViewSet(AuditMutationMixin, mixins.CreateModelMixin, mixins.ListMo
 
     @extend_schema(parameters=[IDEMPOTENCY_PARAMETER])
     def create(self, request, *args, **kwargs):
-        return idempotent(request, 'purchase.create', lambda: super(PurchaseViewSet, self).create(request, *args, **kwargs), required=False)
+        return idempotent(request, 'purchase.create', lambda: super(PurchaseViewSet, self).create(request, *args, **kwargs), required=mutation_key_required(request))
 
     @extend_schema(parameters=[IDEMPOTENCY_PARAMETER])
     def update(self, request, *args, **kwargs):
@@ -616,7 +684,7 @@ class PurchaseViewSet(AuditMutationMixin, mixins.CreateModelMixin, mixins.ListMo
         return idempotent(
             request, f'purchase.{pk}.update',
             lambda: super(PurchaseViewSet, self).update(request, *args, **kwargs),
-            required=False,
+            required=mutation_key_required(request),
             replay_check=lambda record: self._check_replay_object_access(pk),
         )
 
@@ -671,7 +739,7 @@ class PaymentViewSet(AuditMutationMixin, mixins.CreateModelMixin, mixins.ListMod
         return idempotent(
             request, 'payment.create',
             lambda: super(PaymentViewSet, self).create(request, *args, **kwargs),
-            required=False, replay_check=self._check_payment_replay_access,
+            required=mutation_key_required(request), replay_check=self._check_payment_replay_access,
         )
 
     def _check_payment_replay_access(self, record):
@@ -819,8 +887,32 @@ class ReceivableViewSet(AuditMutationMixin, viewsets.ReadOnlyModelViewSet):
             )
 
         return idempotent(
-            request, f'receivable.{client.pk}.allocate_payment', operation, required=False,
+            request, f'receivable.{client.pk}.allocate_payment', operation,
+            required=mutation_key_required(request),
+            replay_check=lambda record: self._check_allocation_replay_access(client.pk, record),
         )
+
+    def _check_allocation_replay_access(self, client_id, record):
+        # Recheck today's scope, not the outstanding amount (now often zero).
+        self.get_object()
+        body = record.response_body
+        if not isinstance(body, dict) or not isinstance(body.get('payments'), list):
+            raise PermissionDenied
+        payments = body['payments']
+        for stored in payments:
+            if not isinstance(stored, dict) or not isinstance(stored.get('id'), int):
+                raise PermissionDenied
+            get_object_or_404(
+                Payment.objects.filter(sale__in=receivable_sales(self.request.user)),
+                pk=stored['id'], sale__client_id=client_id,
+            )
+        opening = body.get('opening_balance_payment')
+        if opening is not None:
+            if not isinstance(opening, dict) or not isinstance(opening.get('id'), int):
+                raise PermissionDenied
+            get_object_or_404(OpeningBalancePayment, pk=opening['id'], client_id=client_id)
+        if not payments and opening is None:
+            raise PermissionDenied
 
     @action(detail=True, methods=('post',), url_path='cancel-opening-payment')
     def cancel_opening_payment(self, request, pk=None):
@@ -877,7 +969,7 @@ class LoadingOrderViewSet(AuditMutationMixin, viewsets.ModelViewSet):
 
     @extend_schema(parameters=[IDEMPOTENCY_PARAMETER])
     def create(self, request, *args, **kwargs):
-        return idempotent(request, 'loading.create', lambda: super(LoadingOrderViewSet, self).create(request, *args, **kwargs), required=False)
+        return idempotent(request, 'loading.create', lambda: super(LoadingOrderViewSet, self).create(request, *args, **kwargs), required=mutation_key_required(request))
 
     def perform_destroy(self, instance):
         if instance.status != LoadingOrder.DRAFT:
@@ -900,7 +992,7 @@ class LoadingOrderViewSet(AuditMutationMixin, viewsets.ModelViewSet):
             self._audit('validate')
             return Response(self.get_serializer(order).data)
         return idempotent(
-            request, f'loading.{pk}.validate', operation, required=False,
+            request, f'loading.{pk}.validate', operation, required=mutation_key_required(request),
             replay_check=lambda record: self._check_replay_object_access(pk),
         )
 
@@ -912,7 +1004,7 @@ class LoadingOrderViewSet(AuditMutationMixin, viewsets.ModelViewSet):
             self._audit('close')
             return Response(self.get_serializer(order).data)
         return idempotent(
-            request, f'loading.{pk}.close', operation, required=False,
+            request, f'loading.{pk}.close', operation, required=mutation_key_required(request),
             replay_check=lambda record: self._check_replay_object_access(pk),
         )
 

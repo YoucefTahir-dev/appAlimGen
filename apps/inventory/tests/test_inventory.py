@@ -180,17 +180,19 @@ class InventoryViewTests(TestCase):
             'wilaya': 'Oran',
             'email': 'client2b@example.com',
             'tax_number': '654321',
-            'balance': '150.00',
+            'balance': '100.00',
             'notes': 'Updated note',
         })
         self.assertEqual(response.status_code, 302)
         client_obj.refresh_from_db()
         self.assertEqual(client_obj.name, 'Client2 updated')
+        self.assertEqual(client_obj.balance, 100)
+        self.assertEqual(client_obj.balance_adjustments.count(), 1)
 
         url = reverse('client_delete', args=[client_obj.pk])
         response = self.client.post(url)
         self.assertEqual(response.status_code, 302)
-        self.assertFalse(Client.objects.filter(pk=client_obj.pk).exists())
+        self.assertTrue(Client.objects.filter(pk=client_obj.pk).exists())
 
     def test_supplier_create_update_delete(self):
         url = reverse('supplier_create')

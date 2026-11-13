@@ -3,6 +3,9 @@ from decimal import Decimal
 from django.db import IntegrityError, transaction
 from django.core.exceptions import ValidationError as DjangoValidationError
 from apps.inventory.location import validate_location
+from apps.inventory.balance_adjustments import (
+    create_client_with_balance_audit, save_client_profile,
+)
 from django.utils.translation import gettext as _
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
@@ -17,6 +20,7 @@ from apps.inventory.models import (
     Brand,
     Category,
     Client,
+    ClientBalanceAdjustment,
     LoadingOrder,
     LoadingOrderLine,
     OperatorStock,
@@ -301,6 +305,10 @@ class ProductSerializer(serializers.ModelSerializer):
 class ClientSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         instance = self.instance
+        if instance and 'balance' in attrs and attrs['balance'] != instance.balance:
+            raise serializers.ValidationError({
+                'balance': _('Utilisez la correction motivée de dette antérieure.'),
+            })
         latitude = attrs.get('latitude', getattr(instance, 'latitude', None))
         longitude = attrs.get('longitude', getattr(instance, 'longitude', None))
         if instance and (latitude, longitude) != (instance.latitude, instance.longitude):
@@ -313,10 +321,41 @@ class ClientSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(exc.message_dict)
         return attrs
 
+    def create(self, validated_data):
+        return create_client_with_balance_audit(
+            user=self.context['request'].user, **validated_data,
+        )
+
+    def update(self, instance, validated_data):
+        # Older Android versions resend an unchanged balance with a profile.
+        # Accept that payload, but never write a stale financial value back.
+        validated_data.pop('balance', None)
+        for field, value in validated_data.items():
+            setattr(instance, field, value)
+        save_client_profile(client=instance)
+        instance.refresh_from_db()
+        return instance
+
     class Meta:
         model = Client
         fields = '__all__'
         read_only_fields = ('created_at',)
+
+
+class ClientBalanceAdjustmentRequestSerializer(serializers.Serializer):
+    expected_balance = serializers.DecimalField(max_digits=12, decimal_places=2)
+    new_balance = serializers.DecimalField(max_digits=12, decimal_places=2)
+    reason = serializers.CharField(max_length=1000, allow_blank=False, trim_whitespace=True)
+
+
+class ClientBalanceAdjustmentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ClientBalanceAdjustment
+        fields = (
+            'id', 'client', 'kind', 'balance_before', 'balance_after', 'delta',
+            'reason', 'actor_id_snapshot', 'actor_name_snapshot', 'created_at',
+        )
+        read_only_fields = fields
 
 
 class CompanySettingsSerializer(serializers.ModelSerializer):

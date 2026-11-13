@@ -2,6 +2,7 @@ import hashlib
 import json
 import re
 
+from django.conf import settings
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework.response import Response
@@ -13,6 +14,16 @@ from .models import IdempotencyRecord
 
 IDEMPOTENCY_HEADER = 'Idempotency-Key'
 VALID_KEY = re.compile(r'^[A-Za-z0-9._:-]{8,128}$')
+
+
+def mutation_key_required(request):
+    """Stage enforcement without silently breaking older installed clients."""
+    policy = (request.headers.get('Idempotency-Policy') or '').strip()
+    if policy not in ('', 'required-v1'):
+        raise BusinessAPIException(
+            'INVALID_IDEMPOTENCY_POLICY', 'Politique d’idempotence non prise en charge.',
+        )
+    return bool(settings.API_IDEMPOTENCY_REQUIRED or policy == 'required-v1')
 
 
 def _request_hash(request):

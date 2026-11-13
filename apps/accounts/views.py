@@ -1,12 +1,12 @@
 from urllib.parse import urlsplit
 
-from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.models import Group
 from django.contrib.auth.views import (
+    INTERNAL_RESET_SESSION_TOKEN,
     LoginView,
     PasswordChangeDoneView,
     PasswordResetView,
@@ -14,7 +14,7 @@ from django.contrib.auth.views import (
     PasswordResetConfirmView,
     PasswordResetCompleteView,
 )
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models.deletion import ProtectedError
 from django.db.models import Count, Q
 from django.urls import reverse, reverse_lazy
@@ -38,6 +38,7 @@ from .forms import (
 from .models import User
 from .permissions import (
     ALL_MANAGED_PERMISSION_NAMES,
+    LEGACY_ADMIN_PERMISSIONS,
     LEGACY_MANAGER_PERMISSIONS,
     LEGACY_SELLER_PERMISSIONS,
     has_permission,
@@ -46,12 +47,14 @@ from .permissions import (
 )
 from apps.core.security import (
     LOGIN_FAILURE_EVENT,
-    is_authentication_rate_limited,
-    is_password_reset_rate_limited,
     log_security_event,
     rate_limit_action,
     password_reset_rate_limit_action,
     sanitize_log_value,
+)
+from apps.core.web_auth_rate_limit import (
+    WebAuthenticationUnavailable,
+    admit_web_authentication,
 )
 from .services import PasswordResetDeliveryError
 
@@ -83,17 +86,24 @@ class UserLoginView(LoginView):
         return reverse('profile')
 
     def post(self, request, *args, **kwargs):
-        username = sanitize_log_value(request.POST.get('username', ''))
-        if is_authentication_rate_limited(
-            request,
-            LOGIN_FAILURE_EVENT,
-            username,
-        ):
-            log_security_event(request, 'auth.login.blocked', level='warning', status_code=429)
-            form = self.get_form()
-            form.add_error(None, _('Trop de tentatives. Réessayez plus tard.'))
-            response = self.render_to_response(self.get_context_data(form=form), status=429)
-            response['Retry-After'] = str(getattr(settings, 'LOGIN_FAILURE_WINDOW_SECONDS', 900))
+        try:
+            admission = admit_web_authentication(request, 'login')
+        except WebAuthenticationUnavailable:
+            admission = None
+        if admission is None or not admission.allowed:
+            status_code = 503 if admission is None else 429
+            event = 'auth.login.unavailable' if admission is None else 'auth.login.blocked'
+            log_security_event(request, event, level='warning', status_code=status_code)
+            # A bound AuthenticationForm.add_error() would run full_clean() and
+            # authenticate even after refusal. Render an unbound form instead.
+            form = self.authentication_form(request=request)
+            form.cleaned_data = {}
+            form.add_error(None, _(
+                'Le service d’authentification est temporairement indisponible.'
+            ) if admission is None else _('Trop de tentatives. Réessayez plus tard.'))
+            response = self.render_to_response(self.get_context_data(form=form), status=status_code)
+            if admission is not None:
+                response['Retry-After'] = str(admission.retry_after)
             return response
         return super().post(request, *args, **kwargs)
 
@@ -161,13 +171,22 @@ class UserPasswordResetView(PasswordResetView):
     form_class = StyledPasswordResetForm
 
     def post(self, request, *args, **kwargs):
-        email = request.POST.get('email', '')
-        if is_password_reset_rate_limited(request, email):
-            log_security_event(request, 'auth.password_reset.blocked', level='warning', status_code=429)
-            form = self.get_form()
-            form.add_error(None, _('Trop de demandes. Réessayez plus tard.'))
-            response = self.render_to_response(self.get_context_data(form=form), status=429)
-            response['Retry-After'] = str(getattr(settings, 'PASSWORD_RESET_WINDOW_SECONDS', 3600))
+        try:
+            admission = admit_web_authentication(request, 'password_reset_request')
+        except WebAuthenticationUnavailable:
+            admission = None
+        if admission is None or not admission.allowed:
+            status_code = 503 if admission is None else 429
+            event = 'auth.password_reset.unavailable' if admission is None else 'auth.password_reset.blocked'
+            log_security_event(request, event, level='warning', status_code=status_code)
+            form = self.form_class()
+            form.cleaned_data = {}
+            form.add_error(None, _(
+                'Le service d’authentification est temporairement indisponible.'
+            ) if admission is None else _('Trop de demandes. Réessayez plus tard.'))
+            response = self.render_to_response(self.get_context_data(form=form), status=status_code)
+            if admission is not None:
+                response['Retry-After'] = str(admission.retry_after)
             return response
         return super().post(request, *args, **kwargs)
 
@@ -181,8 +200,10 @@ class UserPasswordResetView(PasswordResetView):
                 self.request, 'auth.password_reset.delivery_failed',
                 level='error', status_code=503,
             )
-            form.add_error(None, _('Le service d’envoi est temporairement indisponible.'))
-            return self.render_to_response(self.get_context_data(form=form), status=503)
+            # Public success means only that the request was considered. Do not
+            # expose whether a known account triggered a failed delivery. The
+            # synchronous transport still has a timing side channel (R-03).
+            return redirect(self.success_url)
         if dispatched:
             log_security_event(self.request, 'auth.password_reset.email_dispatched')
         return redirect(self.success_url)
@@ -195,8 +216,38 @@ class UserPasswordResetConfirmView(PasswordResetConfirmView):
     form_class = StyledSetPasswordForm
     success_url = reverse_lazy('password_reset_complete')
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['reset_uid'] = self.kwargs['uidb64']
+        kwargs['reset_token'] = self.request.session.get(INTERNAL_RESET_SESSION_TOKEN)
+        return kwargs
+
+    def post(self, request, *args, **kwargs):
+        try:
+            admission = admit_web_authentication(request, 'password_reset_confirm')
+        except WebAuthenticationUnavailable:
+            admission = None
+        if admission is None or not admission.allowed:
+            status_code = 503 if admission is None else 429
+            form = self.form_class(user=self.user)
+            form.cleaned_data = {}
+            form.add_error(None, _(
+                'Le service d’authentification est temporairement indisponible.'
+            ) if admission is None else _('Trop de demandes. Réessayez plus tard.'))
+            response = self.render_to_response(self.get_context_data(form=form), status=status_code)
+            if admission is not None:
+                response['Retry-After'] = str(admission.retry_after)
+            return response
+        return super().post(request, *args, **kwargs)
+
     def form_valid(self, form):
-        response = super().form_valid(form)
+        try:
+            response = super().form_valid(form)
+        except ValidationError:
+            # Another request may have consumed the token after dispatch()
+            # checked it. Keep the normal invalid-link public contract.
+            self.validlink = False
+            return self.render_to_response(self.get_context_data())
         log_security_event(self.request, 'auth.password_reset.completed', user=form.user)
         return response
 
@@ -243,7 +294,7 @@ def _may_manage_target(actor, target):
     )
     if not target.groups.exists():
         if target.role == target.ADMIN:
-            target_grants.update(ALL_MANAGED_PERMISSION_NAMES)
+            target_grants.update(LEGACY_ADMIN_PERMISSIONS)
         elif target.role == target.MANAGER:
             target_grants.update(LEGACY_MANAGER_PERMISSIONS)
         elif target.role == target.SELLER:
@@ -439,9 +490,25 @@ def user_password_reset_admin(request, pk):
     if request.method == 'POST' and form.is_valid():
         if not target.email:
             form.add_error(None, _('Cet utilisateur ne possède aucune adresse e-mail.'))
-        elif is_password_reset_rate_limited(request, target.email):
-            form.add_error(None, _('Trop de demandes. Réessayez plus tard.'))
         else:
+            try:
+                admission = admit_web_authentication(
+                    request, 'admin_password_reset_request', identifier=target.email,
+                )
+            except WebAuthenticationUnavailable:
+                admission = None
+            if admission is None or not admission.allowed:
+                form.add_error(None, _(
+                    'Le service d’authentification est temporairement indisponible.'
+                ) if admission is None else _('Trop de demandes. Réessayez plus tard.'))
+                response = render(
+                    request, 'accounts/user_password_reset_admin.html',
+                    {'form': form, 'target_user': target},
+                    status=503 if admission is None else 429,
+                )
+                if admission is not None:
+                    response['Retry-After'] = str(admission.retry_after)
+                return response
             try:
                 form.save(target, request=request)
             except (PasswordResetDeliveryError, ValueError):
