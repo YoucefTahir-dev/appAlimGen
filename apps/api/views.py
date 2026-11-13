@@ -18,12 +18,14 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import serializers
 from apps.accounts.permissions import has_permission
+from apps.commerce.visibility import personal_sales_only
 
 from apps.commerce.models import OpeningBalancePayment, Payment, Purchase, Sale
 from apps.commerce.receivables import (
     allocate_client_payment,
     attach_receivable_counts,
     receivable_account,
+    receivable_account_page,
     receivable_sales,
     receivables_queryset,
 )
@@ -68,6 +70,7 @@ from .serializers import (
     OperatorStockSerializer,
     PaymentSerializer,
     ReceivableSerializer,
+    ReceivableAccountPageSerializer,
     ReceivablePaymentAllocationSerializer,
     OpeningBalancePaymentSerializer,
     ProductSerializer,
@@ -577,9 +580,7 @@ class ClientViewSet(AuditMutationMixin, viewsets.ModelViewSet):
     @action(detail=True, methods=('get',))
     def history(self, request, pk=None):
         sales = self.get_object().sales.select_related('created_by').prefetch_related('lines__product', 'payments').order_by('-created_at')
-        if LoadingOrder.objects.filter(operator=request.user).exists() and not has_permission(
-            request.user, 'inventory.view_all_loadingorders'
-        ):
+        if personal_sales_only(request.user):
             sales = sales.filter(created_by=request.user)
         page = self.paginate_queryset(sales)
         serializer = SaleSerializer(page if page is not None else sales, many=True, context={'request': request})
@@ -642,9 +643,7 @@ class SaleViewSet(AuditMutationMixin, mixins.CreateModelMixin, mixins.ListModelM
 
     def get_queryset(self):
         queryset = super().get_queryset()
-        if LoadingOrder.objects.filter(operator=self.request.user).exists() and not has_permission(
-            self.request.user, 'inventory.view_all_loadingorders'
-        ):
+        if personal_sales_only(self.request.user):
             queryset = queryset.filter(created_by=self.request.user)
         start, end = date_filters(self.request)
         if start:
@@ -722,9 +721,7 @@ class PaymentViewSet(AuditMutationMixin, mixins.CreateModelMixin, mixins.ListMod
         can_sales = has_permission(self.request.user, 'commerce.view_sale')
         can_purchases = has_permission(self.request.user, 'commerce.view_purchase')
         queryset = super().get_queryset()
-        if LoadingOrder.objects.filter(operator=self.request.user).exists() and not has_permission(
-            self.request.user, 'inventory.view_all_loadingorders'
-        ):
+        if personal_sales_only(self.request.user):
             queryset = queryset.filter(Q(sale__created_by=self.request.user) | Q(purchase__isnull=False))
         if can_sales and can_purchases:
             return queryset
@@ -779,6 +776,7 @@ class ReceivableViewSet(AuditMutationMixin, viewsets.ReadOnlyModelViewSet):
     required_permissions = {
         'metadata': (),
         'list': 'commerce.view_receivables', 'retrieve': 'commerce.view_receivables',
+        'account_page': 'commerce.view_receivables',
         'allocate_payment': 'commerce.add_customerpayment',
         'cancel_opening_payment': 'commerce.cancel_customerpayment',
     }
@@ -847,6 +845,47 @@ class ReceivableViewSet(AuditMutationMixin, viewsets.ReadOnlyModelViewSet):
                 account['opening_balance_payments'], many=True,
                 context={'request': request},
             ).data,
+        })
+
+    @extend_schema(responses=ReceivableAccountPageSerializer, parameters=[
+        OpenApiParameter('page', OpenApiTypes.INT),
+        OpenApiParameter('payments_page', OpenApiTypes.INT),
+        OpenApiParameter('opening_page', OpenApiTypes.INT),
+        OpenApiParameter('page_size', OpenApiTypes.INT),
+    ])
+    @action(detail=True, methods=('get',), url_path='account-page')
+    def account_page(self, request, pk=None):
+        """Versioned opt-in history; legacy retrieve remains unchanged."""
+        client = self.get_object()
+        arguments = {}
+        for key in ('page', 'payments_page', 'opening_page', 'page_size'):
+            arguments[key] = serializers.IntegerField(min_value=1, max_value=100 if key == 'page_size' else None).run_validation(
+                request.query_params.get(key, 25 if key == 'page_size' else 1),
+            )
+        account = receivable_account_page(request.user, client, **arguments)
+
+        def pagination(page):
+            return {'page': page.number, 'pages': page.paginator.num_pages,
+                    'count': page.paginator.count, 'page_size': page.paginator.per_page,
+                    'has_next': page.has_next(), 'has_previous': page.has_previous()}
+
+        return Response({
+            'contract': 'receivable-account-page-v1',
+            'client': ClientSerializer(client, context={'request': request}).data,
+            **{key: str(account[key]) for key in ('total_invoiced', 'total_paid', 'balance_due', 'opening_balance')},
+            'unreconciled_invoice_count': account['unreconciled_count'],
+            'invoices': [
+                {key: str(value) if isinstance(value, Decimal) else value
+                 for key, value in row.items() if key != 'pk'}
+                for row in account['sales']
+            ],
+            'payments': PaymentSerializer(account['payments'], many=True, context={'request': request}).data,
+            'opening_balance_payments': OpeningBalancePaymentSerializer(
+                account['opening_balance_payments'], many=True, context={'request': request},
+            ).data,
+            'pagination': {key: pagination(account[name]) for key, name in (
+                ('invoices', 'invoice_page'), ('payments', 'payment_page'), ('opening_balance_payments', 'opening_payment_page'),
+            )},
         })
 
     @extend_schema(parameters=[IDEMPOTENCY_PARAMETER], request=ReceivablePaymentAllocationSerializer)
@@ -1068,9 +1107,7 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
-        if LoadingOrder.objects.filter(operator=self.request.user).exists() and not has_permission(
-            self.request.user, 'inventory.view_all_loadingorders'
-        ):
+        if personal_sales_only(self.request.user):
             queryset = queryset.filter(created_by=self.request.user)
         return queryset
 
@@ -1318,6 +1355,8 @@ class AlertsView(APIView):
                 'minimum_stock': product.minimum_stock,
             })
         sales = Sale.objects.filter(payment_tracking_initialized=True).select_related('client').prefetch_related('payments')
+        if personal_sales_only(request.user):
+            sales = sales.filter(created_by=request.user)
         if not has_permission(request.user, 'commerce.view_sale'):
             sales = sales.none()
         for sale in sales.order_by('-created_at')[:100]:

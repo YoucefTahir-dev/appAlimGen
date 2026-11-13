@@ -13,6 +13,7 @@ from rest_framework.exceptions import PermissionDenied
 from apps.accounts.permissions import has_permission
 from apps.core.models import CompanySettings
 from apps.commerce.models import OpeningBalancePayment, Payment, Purchase, PurchaseLine, Sale, SaleLine
+from apps.commerce.visibility import personal_sales_only
 from apps.commerce.services import create_purchase, create_sale, update_purchase, update_sale
 from apps.commerce.utils import legacy_snapshot_warning
 from apps.expenses.models import Expense, ExpenseCategory
@@ -792,9 +793,7 @@ class PaymentSerializer(serializers.ModelSerializer):
         permission = 'commerce.add_customerpayment' if sale else 'commerce.change_purchase'
         if not has_permission(request.user, permission):
             raise PermissionDenied(_('Vous ne disposez pas de la permission requise.'))
-        if sale and LoadingOrder.objects.filter(operator=request.user).exists() and not has_permission(
-            request.user, 'inventory.view_all_loadingorders'
-        ) and sale.created_by_id != request.user.pk:
+        if sale and personal_sales_only(request.user) and sale.created_by_id != request.user.pk:
             raise PermissionDenied(_('Cette vente appartient à un autre opérateur.'))
 
     def create(self, validated_data):
@@ -863,6 +862,39 @@ class OpeningBalancePaymentSerializer(serializers.ModelSerializer):
             'cancellation_reason',
         )
         read_only_fields = fields
+
+
+class ReceivableHistoryPageInfoSerializer(serializers.Serializer):
+    page = serializers.IntegerField()
+    pages = serializers.IntegerField()
+    count = serializers.IntegerField()
+    page_size = serializers.IntegerField()
+    has_next = serializers.BooleanField()
+    has_previous = serializers.BooleanField()
+
+
+class ReceivableHistoryInvoiceSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    invoice_number = serializers.CharField()
+    created_at = serializers.DateTimeField()
+    total = serializers.DecimalField(max_digits=14, decimal_places=2)
+    amount_paid = serializers.DecimalField(max_digits=14, decimal_places=2)
+    balance_due = serializers.DecimalField(max_digits=14, decimal_places=2)
+    payment_status = serializers.CharField()
+
+
+class ReceivableAccountPageSerializer(serializers.Serializer):
+    contract = serializers.CharField()
+    client = ClientSerializer()
+    total_invoiced = serializers.DecimalField(max_digits=14, decimal_places=2)
+    total_paid = serializers.DecimalField(max_digits=14, decimal_places=2)
+    balance_due = serializers.DecimalField(max_digits=14, decimal_places=2)
+    opening_balance = serializers.DecimalField(max_digits=14, decimal_places=2)
+    unreconciled_invoice_count = serializers.IntegerField()
+    invoices = ReceivableHistoryInvoiceSerializer(many=True)
+    payments = PaymentSerializer(many=True)
+    opening_balance_payments = OpeningBalancePaymentSerializer(many=True)
+    pagination = serializers.DictField(child=ReceivableHistoryPageInfoSerializer())
 
 
 class LoadingOrderLineSerializer(serializers.ModelSerializer):

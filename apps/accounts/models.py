@@ -6,11 +6,28 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import F, Q
 from django.db.models.functions import Lower, Trim
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from apps.core.security import validate_image_upload
 
 from .email_policy import normalize_user_email, validate_user_email
+
+
+class PasswordResetDispatch(models.Model):
+    """Durable technical outbox; no plaintext recipient, password or reset token."""
+    encrypted_email = models.TextField(blank=True)
+    state = models.CharField(max_length=16, default='pending')
+    attempts = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(default=timezone.now)
+    available_at = models.DateTimeField(default=timezone.now)
+    expires_at = models.DateTimeField()
+    lease = models.UUIDField(null=True, editable=False)
+    lease_until = models.DateTimeField(null=True)
+
+    class Meta:
+        default_permissions = ()
+        indexes = [models.Index(fields=['state', 'available_at'], name='reset_dispatch_ready_idx')]
 
 
 def profile_photo_upload_to(instance, filename):

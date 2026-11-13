@@ -1,4 +1,5 @@
 from django.utils.translation import gettext as _
+from django.conf import settings
 from drf_spectacular.utils import extend_schema, inline_serializer
 from rest_framework import permissions, serializers, status
 from rest_framework.response import Response
@@ -213,7 +214,8 @@ class PasswordResetRequestView(APIView):
             # remain internally observable; synchronous timing remains R-03.
             dispatched = 0
         if dispatched:
-            log_security_event(request, 'api.auth.password_reset.email_dispatched')
+            event = 'queued' if settings.PASSWORD_RESET_ASYNC_ENABLED else 'email_dispatched'
+            log_security_event(request, f'api.auth.password_reset.{event}')
         return Response({
             'message': _(
                 'Si une adresse correspond à un compte, un lien de réinitialisation a été envoyé.'

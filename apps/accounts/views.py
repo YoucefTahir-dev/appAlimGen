@@ -1,4 +1,5 @@
 from urllib.parse import urlsplit
+from django.conf import settings
 
 from django.contrib import messages
 from django.contrib.auth import login, logout, update_session_auth_hash
@@ -205,7 +206,8 @@ class UserPasswordResetView(PasswordResetView):
             # synchronous transport still has a timing side channel (R-03).
             return redirect(self.success_url)
         if dispatched:
-            log_security_event(self.request, 'auth.password_reset.email_dispatched')
+            event = 'queued' if settings.PASSWORD_RESET_ASYNC_ENABLED else 'email_dispatched'
+            log_security_event(self.request, f'auth.password_reset.{event}')
         return redirect(self.success_url)
 
 class UserPasswordResetDoneView(PasswordResetDoneView):

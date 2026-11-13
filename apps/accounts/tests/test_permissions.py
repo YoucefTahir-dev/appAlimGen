@@ -154,6 +154,10 @@ class InventoryPermissionTests(TestCase):
         self.assertIn(reverse('login'), response['Location'])
 
     def test_seller_can_create_sales_and_download_invoices_but_cannot_manage_purchases(self):
+        # This test checks functional permissions on an owned invoice. Foreign
+        # invoices are now rejected independently of the seller's loading state.
+        self.sale.created_by = self.seller
+        self.sale.save(update_fields=['created_by'])
         self.login_as(self.seller)
 
         allowed_gets = [

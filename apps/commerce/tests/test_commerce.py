@@ -903,6 +903,9 @@ class PaymentAndHistoricalCostTests(TestCase):
         self.assertTrue(supplier_payment.is_cancelled)
 
     def test_payment_mutations_require_the_standard_document_change_permission(self):
+        # Isolate the mutation permission from the foreign-document boundary.
+        self.sale.created_by = self.seller
+        self.sale.save(update_fields=['created_by'])
         self.client.force_login(self.seller)
 
         view_response = self.client.get(reverse('sale_payment_list', args=[self.sale.pk]))

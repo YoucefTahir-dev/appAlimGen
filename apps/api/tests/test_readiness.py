@@ -88,7 +88,9 @@ class AndroidReadinessTests(APITestCase):
             self.assertEqual(self.client.get(reverse(route, args=[pk])).status_code, 200)
 
     def test_sale_cost_visibility_and_wire_contract(self):
-        sale = self.sale()
+        # Scope and cost visibility are separate protections: read an owned
+        # invoice, then verify purchase costs remain hidden without their right.
+        sale = create_sale(client=self.customer, lines=[{'product': self.product, 'quantity': 1}], user=self.reader)
         self.grant('commerce.view_sale', 'accounts.view_invoices')
         self.auth(self.reader)
         for route in ('api-sale-detail', 'api-invoice-detail'):
