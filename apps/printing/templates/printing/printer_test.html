@@ -1,4 +1,4 @@
-{% load i18n %}
+{% load i18n static %}
 <!doctype html>
 <html lang="{{ LANGUAGE_CODE|default:'fr' }}" dir="{% if LANGUAGE_CODE == 'ar' %}rtl{% else %}ltr{% endif %}">
 <head>
@@ -52,10 +52,11 @@
             .ticket { width: 100%; min-height: 0; margin: 0; padding: 0; }
         }
     </style>
+    <script src="{% static 'js/print-controls.js' %}" defer></script>
 </head>
 <body>
     <div class="controls">
-        <button type="button" onclick="window.print()">{% trans "Imprimer" %}</button>
+        <button type="button" data-print-page>{% trans "Imprimer" %}</button>
         <a href="{% url 'printer_list' %}">{% trans "Retour" %}</a>
     </div>
     <main class="ticket" aria-label="{% trans 'Test imprimante' %}">
@@ -73,10 +74,6 @@
         <p>{{ test_protocol }}</p>
         <p>{% now "Y-m-d H:i:s" %}</p>
     </main>
-    <script>
-        window.addEventListener('load', function () {
-            window.setTimeout(function () { window.print(); }, 300);
-        });
-    </script>
+<script src="{% static 'js/printer-test.js' %}"></script>
 </body>
 </html>

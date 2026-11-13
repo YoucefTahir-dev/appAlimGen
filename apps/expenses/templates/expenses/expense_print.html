@@ -1,4 +1,4 @@
-{% load i18n %}
+{% load i18n static %}
 {% get_current_language as CURRENT_LANGUAGE %}
 {% get_current_language_bidi as LANGUAGE_BIDI %}
 <!DOCTYPE html>
@@ -14,9 +14,10 @@
         .text-end { text-align: right; }
         @media print { .no-print { display: none; } }
     </style>
+    <script src="{% static 'js/print-controls.js' %}" defer></script>
 </head>
 <body>
-<button class="no-print" onclick="window.print()">{% trans "Imprimer" %}</button>
+<button class="no-print" data-print-page>{% trans "Imprimer" %}</button>
 <h1>{% trans "Rapport des charges" %}</h1>
 <p>{% trans "Total" %} : <strong>{{ total_amount|floatformat:2 }} {% trans "DZD" %}</strong></p>
 <table>

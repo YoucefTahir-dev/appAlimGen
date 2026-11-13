@@ -150,13 +150,14 @@
             }
         }
     </style>
+    <script src="{% static 'js/print-controls.js' %}" defer></script>
 </head>
 <body>
 <div class="ticket-actions">
     <a href="{% url 'sale_list' %}">{% trans "Retour" %}</a>
     <a href="{% url 'sale_ticket_preview' sale.pk 80 %}">{% trans "Format 80 mm" %}</a>
     <a href="{% url 'sale_ticket_preview' sale.pk 58 %}">{% trans "Format 58 mm" %}</a>
-    <button onclick="window.print()">{% trans "Imprimer" %}</button>
+    <button data-print-page>{% trans "Imprimer" %}</button>
 </div>
 
 <main class="ticket">
@@ -253,9 +254,7 @@
 </main>
 
 {% if auto_print %}
-<script>
-window.addEventListener('load', () => window.print());
-</script>
+<script src="{% static 'js/auto-print.js' %}"></script>
 {% endif %}
 </body>
 </html>

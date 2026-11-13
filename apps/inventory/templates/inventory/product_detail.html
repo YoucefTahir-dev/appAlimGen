@@ -56,7 +56,7 @@
                 <img src="{{ product.barcode_image.url }}" alt="{% trans "Code-barres" %} {{ product.barcode }}" class="img-fluid mb-2" />
                 <div class="form-actions justify-content-lg-center">
                     <a href="{% url 'product_barcode_download' product.pk %}" class="btn btn-outline-primary">{% trans "Télécharger" %}</a>
-                    <button class="btn btn-outline-success" onclick="window.print();">{% trans "Imprimer" %}</button>
+                    <button class="btn btn-outline-success" data-print-page>{% trans "Imprimer" %}</button>
                 </div>
             </div>
             {% endif %}
@@ -66,8 +66,8 @@
             <img src="{{ product.qr_code.url }}" alt="{% trans 'QR Code' %}" class="img-fluid qr-image mb-3" />
             <div class="form-actions justify-content-lg-center">
                 <a href="{% url 'product_qr_download' product.pk %}" class="btn btn-outline-primary">{% trans "Télécharger QR" %}</a>
-                <button class="btn btn-outline-secondary" onclick="window.open('{{ product.qr_code.url }}');">{% trans "Ouvrir QR" %}</button>
-                <button class="btn btn-outline-success" onclick="window.print();">{% trans "Imprimer" %}</button>
+                <a class="btn btn-outline-secondary" href="{{ product.qr_code.url }}" target="_blank" rel="noopener noreferrer">{% trans "Ouvrir QR" %}</a>
+                <button class="btn btn-outline-success" data-print-page>{% trans "Imprimer" %}</button>
             </div>
             {% endif %}
         </div>
