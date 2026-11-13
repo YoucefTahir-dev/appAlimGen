@@ -3,6 +3,7 @@ from decimal import Decimal
 from django.contrib.auth.models import Group
 from django.test import TestCase
 from django.urls import reverse
+from django.templatetags.static import static
 from rest_framework.test import APITestCase
 
 from apps.accounts.models import User
@@ -83,8 +84,8 @@ class PrinterDomainTests(TestCase):
         self.assertContains(response, 'RPP02N')
         self.assertContains(response, 'rpp02n_diagnostic')
         self.assertContains(response, 'data-print-page')
-        self.assertContains(response, 'js/print-controls.js')
-        self.assertContains(response, 'js/printer-test.js')
+        self.assertContains(response, static('js/print-controls.js'))
+        self.assertContains(response, static('js/printer-test.js'))
         self.assertNotContains(response, 'onclick=')
 
     def test_web_test_redirects_instead_of_500_for_unsupported_protocol(self):
