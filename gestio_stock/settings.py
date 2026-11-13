@@ -130,7 +130,10 @@ SECURITY_RESPONSE_HEADERS = {
     'Content-Security-Policy': os.getenv(
         'CONTENT_SECURITY_POLICY',
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "script-src 'self' "
+        "https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js "
+        "https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js; "
+        "script-src-attr 'none'; "
         "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
         "font-src 'self' https://cdn.jsdelivr.net data:; "
         f"img-src 'self' data: {MEDIA_CSP_ORIGINS}; "

@@ -37,5 +37,9 @@ def audit_location(request, client, before):
 
     after = location_snapshot(client)
     if before != after and (before is not None or client.latitude is not None):
-        old = before[:2] if before else (None, None)
-        log_security_event(request, f'client.location.updated id={client.pk} old={old} new={after[:2]}')
+        # Keep the actor/client/time audit trail, never duplicate coordinates,
+        # accuracy, addresses or provider place IDs into audit/console logs.
+        change = 'cleared' if client.latitude is None else (
+            'set' if before is None or before[0] is None else 'changed'
+        )
+        log_security_event(request, f'client.location.updated id={client.pk} change={change}')

@@ -838,10 +838,7 @@ class ReceivableSerializer(serializers.ModelSerializer):
         return obj.receivable_invoice_count + int(has_opening)
 
     def get_unpaid_invoice_count(self, obj) -> int:
-        cached = getattr(obj, 'receivable_unpaid_count', None)
-        if cached is not None:
-            return cached
-        return sum(1 for sale in obj.receivable_sales_cache if sale.balance_due > 0)
+        return obj.receivable_unpaid_count
 
 
 class ReceivablePaymentAllocationSerializer(serializers.Serializer):

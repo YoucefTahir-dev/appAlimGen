@@ -3,7 +3,7 @@ from decimal import Decimal
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Count, DateTimeField, DecimalField, F, OuterRef, Prefetch, Subquery, Sum, Value
-from django.db.models.functions import Coalesce
+from django.db.models.functions import Coalesce, Round
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
@@ -99,6 +99,22 @@ def receivable_sales(user):
 
 def receivables_queryset(user):
     sales = receivable_sales(user)
+    # Count outstanding invoices in SQL, not by instantiating every invoice and
+    # payment behind a client-list page. Keep the same visibility and active-
+    # payment rules as the account calculation (including partial payments).
+    paid_per_sale = Payment.objects.filter(
+        sale_id=OuterRef('pk'), cancelled_at__isnull=True,
+    ).order_by().values('sale_id').annotate(value=Sum('amount')).values('value')[:1]
+    unpaid_counts = sales.filter(client_id=OuterRef('pk')).annotate(
+        active_paid=Coalesce(
+            # Monetary amounts have two decimal places. Rounding also avoids
+            # SQLite floating-point SUM artefacts marking a paid bill unpaid.
+            Round(Subquery(paid_per_sale, output_field=MONEY_FIELD), precision=2),
+            Value(Decimal('0.00')), output_field=MONEY_FIELD,
+        ),
+    ).filter(total__gt=F('active_paid')).order_by().values('client_id').annotate(
+        value=Count('pk'),
+    ).values('value')[:1]
     totals = sales.filter(client_id=OuterRef('pk')).values('client_id').annotate(
         value=Sum('total'),
     ).values('value')[:1]
@@ -129,30 +145,15 @@ def receivables_queryset(user):
             + Coalesce(Subquery(opening_payments, output_field=MONEY_FIELD), Value(Decimal('0.00')), output_field=MONEY_FIELD)
         ),
         receivable_invoice_count=Coalesce(Subquery(invoice_counts), Value(0)),
+        receivable_unpaid_count=Coalesce(Subquery(unpaid_counts), Value(0)),
         receivable_opening_payment_count=Count('opening_balance_payments'),
         receivable_last_payment=Subquery(last_payments, output_field=DateTimeField()),
         receivable_unreconciled_count=Coalesce(Subquery(unreconciled), Value(0)),
-    ).prefetch_related(Prefetch(
-        'sales',
-        queryset=sales.prefetch_related(Prefetch(
-            'payments',
-            queryset=Payment.objects.filter(cancelled_at__isnull=True),
-            to_attr='active_payments',
-        )),
-        to_attr='receivable_sales_cache',
-    ))
+    )
 
 
 def attach_receivable_counts(clients):
-    for client in clients:
-        client.receivable_unpaid_count = sum(
-            1
-            for sale in client.receivable_sales_cache
-            if sale.total > sum(
-                (payment.amount for payment in sale.active_payments),
-                Decimal('0.00'),
-            )
-        )
+    """Compatibility hook: counts are now already annotated by SQL."""
     return clients
 
 

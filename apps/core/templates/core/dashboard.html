@@ -1,5 +1,5 @@
 {% extends 'base/base.html' %}
-{% load i18n access_tags %}
+{% load i18n access_tags static %}
 
 {% block title %}{% trans "Tableau de bord" %} - El Amine ERP{% endblock %}
 
@@ -153,7 +153,7 @@
     <div class="col-12 col-xl-8">
         <div class="card card-dashboard p-4 bg-white h-100">
             <h5>{% trans "Évolution financière" %}</h5>
-            <canvas id="financialTrendChart" height="120"></canvas>
+<canvas id="financialTrendChart" height="120" data-revenue="{% trans "Chiffre d'affaires" %}" data-purchases="{% trans "Achats" %}" data-expenses="{% trans "Charges" %}" data-gross-profit="{% trans "Gain brut" %}" data-net-profit="{% trans "Gain net" %}"></canvas>
         </div>
     </div>
 </div>
@@ -198,56 +198,6 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-    const periodSelect = document.getElementById('dashboardPeriod');
-    const customFields = document.querySelectorAll('.custom-period-field');
-    const updateCustomFields = () => {
-        const isCustom = periodSelect && periodSelect.value === 'custom';
-        customFields.forEach((field) => {
-            field.classList.toggle('d-none', !isCustom);
-            const input = field.querySelector('input');
-            if (input) input.required = isCustom;
-        });
-    };
-    updateCustomFields();
-    if (periodSelect) {
-        periodSelect.addEventListener('change', updateCustomFields);
-    }
-
-    const data = JSON.parse(document.getElementById('dashboard-data').textContent);
-    const moneyTicks = (value) => `${Number(value).toLocaleString()} DZD`;
-    const chartOptions = {
-        responsive: true,
-        interaction: { mode: 'index', intersect: false },
-        plugins: { legend: { position: 'bottom' } },
-        scales: { y: { ticks: { callback: moneyTicks } } }
-    };
-    new Chart(document.getElementById('financialTrendChart'), {
-        type: 'line',
-        data: {
-            labels: data.trend.labels,
-            datasets: [
-                { label: "{% trans "Chiffre d'affaires" %}", data: data.trend.revenue, borderColor: '#198754', backgroundColor: 'rgba(25,135,84,.12)', tension: .35 },
-                { label: "{% trans "Achats" %}", data: data.trend.purchases, borderColor: '#0d6efd', backgroundColor: 'rgba(13,110,253,.12)', tension: .35 },
-                { label: "{% trans "Charges" %}", data: data.trend.expenses, borderColor: '#dc3545', backgroundColor: 'rgba(220,53,69,.12)', tension: .35 },
-                { label: "{% trans "Gain brut" %}", data: data.trend.gross_profit, borderColor: '#ffc107', backgroundColor: 'rgba(255,193,7,.12)', tension: .35 },
-                { label: "{% trans "Gain net" %}", data: data.trend.net_profit, borderColor: '#6f42c1', backgroundColor: 'rgba(111,66,193,.12)', tension: .35 },
-            ]
-        },
-        options: chartOptions
-    });
-    new Chart(document.getElementById('salesCategoryChart'), {
-        type: 'doughnut',
-        data: { labels: data.sales_categories.labels, datasets: [{ data: data.sales_categories.values }] },
-        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
-    });
-    new Chart(document.getElementById('expenseCategoryChart'), {
-        type: 'doughnut',
-        data: { labels: data.expense_categories.labels, datasets: [{ data: data.expense_categories.values }] },
-        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
-    });
-});
-</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"></script>
+<script src="{% static 'js/dashboard.js' %}"></script>
 {% endblock %}

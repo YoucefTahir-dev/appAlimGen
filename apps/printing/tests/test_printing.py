@@ -82,7 +82,10 @@ class PrinterDomainTests(TestCase):
         self.assertTemplateUsed(response, 'printing/printer_test.html')
         self.assertContains(response, 'RPP02N')
         self.assertContains(response, 'rpp02n_diagnostic')
-        self.assertContains(response, 'window.print()')
+        self.assertContains(response, 'data-print-page')
+        self.assertContains(response, 'js/print-controls.js')
+        self.assertContains(response, 'js/printer-test.js')
+        self.assertNotContains(response, 'onclick=')
 
     def test_web_test_redirects_instead_of_500_for_unsupported_protocol(self):
         admin = User.objects.create_superuser(username='unsupported-web-admin', password='StrongPass123!')
