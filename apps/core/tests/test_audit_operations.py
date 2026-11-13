@@ -128,7 +128,21 @@ class DatabasePostureTests(TransactionTestCase):
             self.assertNotIn('inventory_client', sql)
             self.assertNotIn('commerce_sale', sql)
         self.assertTrue(any('SET TRANSACTION READ ONLY' in sql for sql in queries))
-        self.assertNotIn(connection.settings_dict['USER'], output.getvalue())
+        # Check the payload schema, not substrings: CI's role is "postgres",
+        # which is also part of the public metadata key "postgres_major".
+        self.assertEqual(set(report), {
+            'superuser', 'can_create_roles', 'can_create_databases', 'bypasses_rls',
+            'session_tls', 'public_schema_create', 'postgres_major',
+            'diagnostic_statement_timeout_enabled', 'idle_transaction_timeout_enabled',
+            'scope', 'business_data_read', 'privileges_modified',
+            'backup_retention_verified', 'alert_delivery_verified',
+            'role_separation_verified', 'review_required',
+        })
+        self.assertEqual(report['scope'], 'readonly_database_metadata')
+        self.assertIs(type(report['postgres_major']), int)
+        for key, value in report.items():
+            if key not in ('scope', 'postgres_major'):
+                self.assertIs(type(value), bool, key)
         with connection.cursor() as cursor:
             cursor.execute('SHOW transaction_read_only')
             self.assertEqual(cursor.fetchone()[0], 'off')
