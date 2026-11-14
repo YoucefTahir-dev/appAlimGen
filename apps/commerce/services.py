@@ -33,15 +33,17 @@ def _invoice_snapshot_values(
     *, client, subtotal, tax_amount, issued_at=None,
     integrity_status=Sale.SNAPSHOT_COMPLETE, snapshot_version=INVOICE_SNAPSHOT_VERSION,
 ):
+    # Capture on issuance and deliberate edits, like the existing identity
+    # snapshots. Merely reading or reprinting never invokes this helper.
     company = CompanySettings.objects.order_by('pk').first()
-    return {
+    values = {
         'issued_at': issued_at or timezone.now(),
         'snapshot_version': snapshot_version,
         'snapshot_integrity_status': integrity_status,
         'currency_snapshot': 'DZD',
         'subtotal_ht_snapshot': money(subtotal),
         'tax_amount_snapshot': money(tax_amount),
-        'company_name_snapshot': company.company_name if company else DEFAULT_COMPANY_NAME_FR,
+        'company_name_snapshot': company.company_name if company else '',
         'company_name_ar_snapshot': DEFAULT_COMPANY_NAME_AR,
         'company_address_snapshot': company.address if company else '',
         'company_phone_snapshot': company.phone if company else '',
@@ -50,6 +52,7 @@ def _invoice_snapshot_values(
         'company_tax_number_snapshot': company.tax_number if company else '',
         'company_nis_snapshot': company.nis if company else '',
         'company_article_number_snapshot': company.article_number if company else '',
+        'company_share_capital_snapshot': company.share_capital if company else None,
         'company_logo_snapshot': company.logo.name if company and company.logo else '',
         'client_name_snapshot': client.name,
         'client_phone_snapshot': client.phone,
@@ -60,6 +63,7 @@ def _invoice_snapshot_values(
         'client_trade_register_number_snapshot': client.trade_register_number,
         'client_customer_type_snapshot': client.customer_type,
     }
+    return values
 
 
 def refresh_invoice_snapshot(sale):

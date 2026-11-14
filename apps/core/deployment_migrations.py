@@ -26,6 +26,17 @@ APPROVED_EXPANSIONS = {
         'sha256': '776ce53c77766f25049726995507930d7fc83db91863c96a6392370cec3a22f3',
         'operations': (migrations.AlterModelOptions, migrations.CreateModel),
     },
+    # Owner-authorized optional capital expansion: two nullable decimal columns,
+    # no defaults, backfill, relations, indexes or changes to existing values.
+    # Older code may continue to read and insert while these columns stay null.
+    ('core', '0006_companysettings_share_capital'): {
+        'sha256': '7577bd3b0da9bd0cced6b8b3dc44653b552999b8d0cb57e20e9971706e96519f',
+        'operations': (migrations.AddField,),
+    },
+    ('commerce', '0018_sale_company_share_capital_snapshot'): {
+        'sha256': 'a4bf12b34bf4ee95ada0efa77de227b4daf6a262b1b16b0626fcb01b63ad36f5',
+        'operations': (migrations.AddField,),
+    },
 }
 
 

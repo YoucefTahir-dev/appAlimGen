@@ -21,7 +21,7 @@ class CompanySettingsForm(forms.ModelForm):
         model = CompanySettings
         fields = (
             'company_name', 'address', 'phone', 'email', 'tax_number', 'nis',
-            'rc_number', 'article_number', 'tax_rate', 'logo',
+            'rc_number', 'article_number', 'share_capital', 'tax_rate', 'logo',
         )
         widgets = {
             'company_name': forms.TextInput(attrs={'class': 'form-control'}),
@@ -32,6 +32,9 @@ class CompanySettingsForm(forms.ModelForm):
             'nis': forms.TextInput(attrs={'class': 'form-control'}),
             'rc_number': forms.TextInput(attrs={'class': 'form-control'}),
             'article_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'share_capital': forms.NumberInput(attrs={
+                'class': 'form-control', 'min': '0', 'step': '0.01',
+            }),
             'tax_rate': forms.NumberInput(attrs={
                 'class': 'form-control', 'min': '0', 'max': '100', 'step': '0.01',
             }),

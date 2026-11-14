@@ -37,6 +37,7 @@
                 <dt class="col-sm-4">NIS</dt><dd class="col-sm-8">{{ company.nis|default:"—" }}</dd>
                 <dt class="col-sm-4">RC</dt><dd class="col-sm-8">{{ company.rc_number|default:"—" }}</dd>
                 <dt class="col-sm-4">AI</dt><dd class="col-sm-8">{{ company.article_number|default:"—" }}</dd>
+                <dt class="col-sm-4">{% trans "Capital social" %}</dt><dd class="col-sm-8">{% if company.share_capital is not None %}{{ company.share_capital|floatformat:2 }} DZD{% else %}—{% endif %}</dd>
             </dl>
         </div>
     </div>

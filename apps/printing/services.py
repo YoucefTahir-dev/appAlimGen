@@ -144,7 +144,14 @@ def invoice_print_data(sale, *, paper_width=80, language='bilingual'):
             'totals': {'total_ttc': str(context['total_ttc'])},
         }
         if not show_ticket_information:
-            return minimal_payload
+            ticket_company = context['company']
+            return {
+                **minimal_payload,
+                'company': {
+                    'name_fr': ticket_company.company_name if ticket_company else '',
+                    'logo_url': ticket_company.logo.url if ticket_company and ticket_company.logo else None,
+                },
+            }
 
         return {
             **minimal_payload,

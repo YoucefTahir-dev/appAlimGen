@@ -60,7 +60,8 @@
                 {% trans "Adresse" %} : {{ company.address|default:"" }}<br>
                 Téléphone : {{ company.phone|default:"" }} | {% trans "Email" %} : {{ company.email|default:"" }}<br>
                 NIF : {{ company.tax_number|default:"" }} | NIS : {{ company.nis|default:"" }}<br>
-                {% trans "RC" %} : {{ company.rc_number|default:"" }} | AI : {{ company.article_number|default:"" }}
+                {% trans "RC" %} : {{ company.rc_number|default:"" }} | AI : {{ company.article_number|default:"" }}{% if company and company.share_capital != None %}<br>
+                {% trans "Capital social" %} : {{ company.share_capital|floatformat:2 }} DZD{% endif %}
             </div>
         </div>
         <div class="col-md-4">
