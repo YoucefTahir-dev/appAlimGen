@@ -122,6 +122,8 @@ PASSWORD_RESET_TIMEOUT = env_int('PASSWORD_RESET_TIMEOUT', 60 * 60)
 PASSWORD_RESET_PUBLIC_BASE_URL = os.getenv('PASSWORD_RESET_PUBLIC_BASE_URL', '').strip()
 # Opt-in only: activate after the durable worker and alerts are provisioned.
 PASSWORD_RESET_ASYNC_ENABLED = env_bool('PASSWORD_RESET_ASYNC_ENABLED', False)
+# Set only by the colocated supervisor, to its private ephemeral directory.
+PASSWORD_RESET_WAKE_DIRECTORY = os.getenv('PASSWORD_RESET_WAKE_DIRECTORY', '')
 MAX_IMAGE_UPLOAD_SIZE = env_int('MAX_IMAGE_UPLOAD_SIZE', 5 * 1024 * 1024)
 MAX_EXCEL_UPLOAD_SIZE = env_int('MAX_EXCEL_UPLOAD_SIZE', 10 * 1024 * 1024)
 MAX_RECEIPT_UPLOAD_SIZE = env_int('MAX_RECEIPT_UPLOAD_SIZE', 10 * 1024 * 1024)

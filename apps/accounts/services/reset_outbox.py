@@ -7,7 +7,7 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
-from django.db import DatabaseError
+from django.db import DatabaseError, transaction
 from django.db.models import Q
 from django.utils import timezone
 from django.views.decorators.debug import sensitive_variables
@@ -15,6 +15,7 @@ from django.views.decorators.debug import sensitive_variables
 from apps.accounts.email_policy import normalize_user_email
 from apps.accounts.models import PasswordResetDispatch
 from .password_reset import PasswordResetDeliveryError, PasswordResetService
+from .reset_wakeup import notify_reset, wake_directory
 
 logger = logging.getLogger('security')
 MAX_ATTEMPTS = 3
@@ -34,11 +35,16 @@ def enqueue_reset(email):
         raise ImproperlyConfigured('Async reset requires a trusted public base URL.')
     now = timezone.now()
     try:
-        PasswordResetDispatch.objects.create(
-            encrypted_email=cipher().encrypt(normalize_user_email(email).encode()).decode('ascii'),
-            expires_at=now + timedelta(minutes=10),
-        )
-    except DatabaseError:
+        # Colocated notification must precede the OUTERMOST commit. Public
+        # endpoints are not ATOMIC_REQUESTS; refuse unsupported nesting rather
+        # than risk an invisible commit after a discarded wake hint.
+        with transaction.atomic(durable=wake_directory() is not None):
+            item = PasswordResetDispatch.objects.create(
+                encrypted_email=cipher().encrypt(normalize_user_email(email).encode()).decode('ascii'),
+                expires_at=now + timedelta(minutes=10),
+            )
+            notify_reset(item.pk)
+    except (DatabaseError, OSError, RuntimeError):
         logger.error('Password reset queue unavailable')
         raise PasswordResetDeliveryError from None
 
