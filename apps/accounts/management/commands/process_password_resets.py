@@ -110,7 +110,9 @@ class Command(BaseCommand):
                                           'failed': PasswordResetDispatch.objects.filter(state='failed').count(),
                                           'pending': PasswordResetDispatch.objects.filter(state='pending').count()}))
             if colocated:
-                active = PasswordResetDispatch.objects.filter(state__in=('pending', 'processing')).exists()
+                active = (len(stale) == 1000 or PasswordResetDispatch.objects.filter(
+                    state__in=('pending', 'processing'),
+                ).exists())
                 prune_markers()
                 maintenance_at = time.monotonic() + 86400
                 if not active:

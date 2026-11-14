@@ -64,7 +64,9 @@ changement du plan Render n'est réalisé ou supposé.
 - Après cinq minutes de réconciliation au démarrage (chevauchement des instances
   Render), et sans demandes/reprises actives, le worker vérifie les marqueurs et
   son heartbeat **sans requête SQL**, en fermant sa connexion. Un nettoyage
-  technique journalier peut réveiller la base. Les marqueurs ne remplacent pas
+  technique journalier peut réveiller la base ; un lot plein de 1 000 anciennes
+  lignes techniques maintient le worker actif pour vider les lots suivants,
+  plutôt que de reporter le reliquat au lendemain. Les marqueurs ne remplacent pas
   la file SQL durable ; au démarrage le worker réconcilie toujours celle-ci.
   Les transactions Web englobantes/ATOMIC_REQUESTS sont refusées pour cette
   admission durable, pas silencieusement imbriquées.
@@ -126,6 +128,22 @@ puis permet le traitement après commit. Autres preuves : annulation sur erreur
 de notification, aucune requête au repos, reprise sur marqueur, conservation des
 notifications de demandes encore actives et purge des marqueurs orphelins.
 Cluster jetable arrêté et runtime supprimé. Une CI du nouveau commit reste requise.
+
+Le commit `65ce6bce831349908b3e1a143ed47bb9d35d595f` passe ensuite la
+[CI 43590755005](https://github.com/YoucefTahir-dev/appAlimGen/actions/runs/43590755005) :
+**1 086 tests réussis**, course avant commit et quatre cas natifs Linux inclus,
+audit de dépendances sans vulnérabilité connue détectée. La campagne SQLite
+complète correspondante compte **1 216 cas : 1 172 réussis, 44 réservés à
+PostgreSQL/POSIX, aucun échec/erreur** ; rapport
+`sqlite_tests-1794656207940733500.json`. Migrations, déploiement, statiques,
+compilation, OpenAPI et intégrité du snapshot sont PASS.
+
+Dernier ajustement : maintien actif lors d'un lot plein de nettoyage technique,
+avec test de 1 001 lignes fictives. Qualification ciblée : **78 cas, 74 réussis,
+4 réservés au POSIX, aucun échec/erreur**, rapport
+`postgresql_tests-1794656610587660400.json`, cluster arrêté/runtime supprimé.
+La CI finale doit confirmer cet ajustement ; les résultats précédents ne sont
+pas présentés comme ayant exercé cette ligne supplémentaire.
 
 ## Conditions avant activation — pas des actions déjà effectuées
 

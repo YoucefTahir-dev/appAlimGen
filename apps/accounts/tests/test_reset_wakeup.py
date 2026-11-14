@@ -3,6 +3,8 @@ import io
 import os
 from pathlib import Path
 import tempfile
+from datetime import timedelta
+from itertools import chain, repeat
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
 from unittest import skipUnless
@@ -10,6 +12,7 @@ from unittest.mock import Mock, patch
 
 from django.db import close_old_connections, connection, connections, transaction
 from django.test import TestCase, TransactionTestCase, override_settings
+from django.utils import timezone
 
 from apps.accounts.management.commands.process_password_resets import Command
 from apps.accounts.models import PasswordResetDispatch
@@ -114,6 +117,27 @@ class ResetWakeupTests(TestCase):
         with override_settings(PASSWORD_RESET_WAKE_DIRECTORY=str(Path(self.folder) / 'missing')), \
                 self.assertRaises(PasswordResetDeliveryError):
             enqueue_reset('synthetic-wake@example.invalid')
+        self.assertEqual(PasswordResetDispatch.objects.count(), 0)
+
+    def test_old_technical_backlog_is_drained_in_bounded_batches_before_idle(self):
+        old = timezone.now() - timedelta(days=8)
+        PasswordResetDispatch.objects.bulk_create([
+            PasswordResetDispatch(state='sent', encrypted_email='', created_at=old, expires_at=old)
+            for _ in range(1001)
+        ])
+        stop = Mock()
+        stop.is_set.side_effect = [False, False, False, False, True]
+        command = Command()
+        command.stdout = io.StringIO()
+        with patch('apps.accounts.management.commands.process_password_resets.time.monotonic',
+                   side_effect=chain([0, 0], repeat(1000))), \
+                patch('apps.accounts.management.commands.process_password_resets.close_old_connections'), \
+                patch.object(connections, 'close_all'):
+            # Force the first daily maintenance pass without a wake hint. Its
+            # full batch must keep the loop active for the remaining one row.
+            with patch('apps.accounts.management.commands.process_password_resets.markers_present',
+                       side_effect=[True]):
+                command.work_loop({'limit': 1, 'poll_seconds': 15, 'once': False}, stop)
         self.assertEqual(PasswordResetDispatch.objects.count(), 0)
 
 
