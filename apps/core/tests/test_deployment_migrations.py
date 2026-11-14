@@ -17,7 +17,18 @@ from django.db.migrations.state import ProjectState
 from django.test import SimpleTestCase, TransactionTestCase
 from django.test.utils import CaptureQueriesContext
 
-from apps.core.deployment_migrations import MIGRATION_LOCK_ID, forward_plan, migration_lock
+from apps.core.deployment_migrations import APPROVED_EXPANSIONS, MIGRATION_LOCK_ID, forward_plan, migration_lock
+
+
+def share_capital_expansions():
+    from importlib import import_module
+
+    for app_label, name in (
+        ('core', '0006_companysettings_share_capital'),
+        ('commerce', '0018_sale_company_share_capital_snapshot'),
+    ):
+        cls = import_module(f'apps.{app_label}.migrations.{name}').Migration
+        yield cls(name, app_label)
 
 
 class DeploymentPlanTests(SimpleTestCase):
@@ -32,6 +43,57 @@ class DeploymentPlanTests(SimpleTestCase):
         self.assertIsInstance(migration.operations[0], migrations.CreateModel)
         self.assertEqual(migration.operations[0].name, 'PasswordResetDispatch')
         self.assertTrue(all(not field.is_relation for _name, field in migration.operations[0].fields))
+
+    def test_share_capital_expansions_are_exact_optional_columns_without_defaults(self):
+        expected = {
+            'core': ('companysettings', 'share_capital'),
+            'commerce': ('sale', 'company_share_capital_snapshot'),
+        }
+        plan = [(migration, False) for migration in share_capital_expansions()]
+        executor = self.executor(plan)
+        with patch('apps.core.deployment_migrations.MigrationExecutor', return_value=executor):
+            self.assertEqual(forward_plan(Mock()), plan)
+        executor.migrate.assert_not_called()
+        for migration, _backwards in plan:
+            with self.subTest(migration=migration.name):
+                self.assertTrue(migration.atomic)
+                self.assertEqual(len(migration.operations), 1)
+                operation = migration.operations[0]
+                self.assertIsInstance(operation, migrations.AddField)
+                self.assertEqual((operation.model_name, operation.name), expected[migration.app_label])
+                self.assertIsInstance(operation.field, models.DecimalField)
+                self.assertTrue(operation.field.null)
+                self.assertTrue(operation.field.blank)
+                self.assertFalse(operation.field.has_default())
+                self.assertFalse(operation.field.is_relation)
+                self.assertFalse(operation.field.db_index)
+                self.assertFalse(operation.field.unique)
+                self.assertEqual(operation.field.max_digits, 14)
+                self.assertEqual(operation.field.decimal_places, 2)
+
+    def test_each_share_capital_expansion_requires_its_reviewed_source_digest(self):
+        for migration in share_capital_expansions():
+            with self.subTest(migration=migration.name):
+                key = (migration.app_label, migration.name)
+                approvals = dict(APPROVED_EXPANSIONS)
+                approvals[key] = {'sha256': '0' * 64, 'operations': (migrations.AddField,)}
+                executor = self.executor([(migration, False)])
+                with patch('apps.core.deployment_migrations.MigrationExecutor', return_value=executor), patch(
+                    'apps.core.deployment_migrations.APPROVED_EXPANSIONS', approvals,
+                ):
+                    with self.assertRaisesMessage(CommandError, 'digest changed'):
+                        forward_plan(Mock())
+                executor.migrate.assert_not_called()
+
+    def test_each_share_capital_expansion_refuses_an_extra_operation(self):
+        for migration in share_capital_expansions():
+            with self.subTest(migration=migration.name):
+                migration.operations = list(migration.operations) + [migrations.RunSQL('SELECT 1')]
+                executor = self.executor([(migration, False)])
+                with patch('apps.core.deployment_migrations.MigrationExecutor', return_value=executor):
+                    with self.assertRaisesMessage(CommandError, 'operation contract'):
+                        forward_plan(Mock())
+                executor.migrate.assert_not_called()
 
     def executor(self, plan):
         executor = Mock()
@@ -173,6 +235,86 @@ class PostgreSQLDeploymentLockTests(TransactionTestCase):
     def setUp(self):
         if connection.vendor != 'postgresql':
             self.skipTest('Deployment locking requires isolated PostgreSQL.')
+
+    def test_guarded_capital_upgrade_preserves_old_rows_and_old_code_compatibility(self):
+        before = [
+            ('core', '0005_authratelimitbucket'),
+            ('commerce', '0017_openingbalancepayment'),
+        ]
+        expected_pending = {
+            ('core', '0006_companysettings_share_capital'),
+            ('commerce', '0018_sale_company_share_capital_snapshot'),
+        }
+        executor = MigrationExecutor(connection)
+        original_targets = executor.loader.graph.leaf_nodes()
+        try:
+            # Schema downgrade is test setup only, in the runner's empty
+            # disposable database. The deployment command itself is forward-only.
+            executor.migrate(before)
+            old_apps = executor.loader.project_state(before).apps
+            OldCompany = old_apps.get_model('core', 'CompanySettings')
+            OldClient = old_apps.get_model('inventory', 'Client')
+            OldSale = old_apps.get_model('commerce', 'Sale')
+            company, _created = OldCompany.objects.update_or_create(
+                pk=1, defaults={'company_name': 'Synthetic company before capital'},
+            )
+            customer = OldClient.objects.create(name='Synthetic capital deploy client')
+            old_sales = []
+            for label, version, status in (
+                ('CERTIFIED', 1, 'complete'), ('LEGACY', 0, 'legacy_unknown'),
+            ):
+                old_sales.append(OldSale.objects.create(
+                    invoice_number=f'CAPITAL-GUARD-{label}', client=customer,
+                    total=Decimal('0.00'), snapshot_version=version,
+                    snapshot_integrity_status=status,
+                    company_name_snapshot='Synthetic historical company',
+                ))
+
+            plan = forward_plan(connection)
+            self.assertEqual({(migration.app_label, migration.name) for migration, _ in plan}, expected_pending)
+            self.assertTrue(all(not backwards for _migration, backwards in plan))
+            output = StringIO()
+            with CaptureQueriesContext(connection) as captured:
+                call_command('deploy_migrate', plan_only=True, stdout=output, verbosity=0)
+            self.assertIn('Reviewed pending migrations: 2. No migration applied.', output.getvalue())
+            for query in captured.captured_queries:
+                self.assertFalse(query['sql'].lstrip().upper().startswith(
+                    ('INSERT', 'UPDATE', 'DELETE', 'CREATE', 'ALTER', 'DROP', 'TRUNCATE'),
+                ))
+
+            output = StringIO()
+            call_command('deploy_migrate', direct_connection_confirmed=True, stdout=output, verbosity=0)
+            self.assertIn('Applying reviewed forward expansions: 2', output.getvalue())
+            self.assertEqual(forward_plan(connection), [])
+
+            from apps.commerce.models import Sale
+            from apps.core.models import CompanySettings
+
+            self.assertIsNone(CompanySettings.objects.get(pk=company.pk).share_capital)
+            for old in old_sales:
+                upgraded = Sale.objects.get(pk=old.pk)
+                self.assertIsNone(upgraded.company_share_capital_snapshot)
+                self.assertEqual(upgraded.snapshot_version, old.snapshot_version)
+                self.assertEqual(upgraded.snapshot_integrity_status, old.snapshot_integrity_status)
+                self.assertEqual(upgraded.company_name_snapshot, old.company_name_snapshot)
+
+            # Old model classes still read/update existing columns and insert
+            # after expansion without knowing either newly nullable column.
+            company = OldCompany.objects.get(pk=company.pk)
+            company.phone = 'SYNTHETIC-OLD-CODE-PHONE'
+            company.save(update_fields=['phone'])
+            self.assertEqual(CompanySettings.objects.get(pk=company.pk).phone, company.phone)
+            inserted = OldSale.objects.create(
+                invoice_number='CAPITAL-GUARD-OLD-CODE-INSERT', client=customer,
+                total=Decimal('0.00'),
+            )
+            self.assertIsNone(Sale.objects.get(pk=inserted.pk).company_share_capital_snapshot)
+            CompanySettings.objects.filter(pk=company.pk).update(share_capital=Decimal('12345.67'))
+            self.assertTrue(all(value is None for value in Sale.objects.filter(
+                pk__in=[old.pk for old in old_sales] + [inserted.pk],
+            ).values_list('company_share_capital_snapshot', flat=True)))
+        finally:
+            MigrationExecutor(connection).migrate(original_targets)
 
     def test_competing_build_times_out_without_mutation_then_can_retry(self):
         started = Event()
