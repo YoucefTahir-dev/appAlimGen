@@ -9,6 +9,14 @@ python scripts/check_drive_backup_runtime.py --expected-postgres-major 18 --buil
 # the pre-deploy command was omitted, failed or applied an incomplete plan.
 python manage.py deploy_migrate --check-applied
 
+# Default remains the existing single Web process. Never start an unsupervised
+# worker with "&": this explicit opt-in owns both process groups and readiness.
+case "${PASSWORD_RESET_COLOCATED_WORKER_ENABLED:-false}" in
+  [Tt][Rr][Uu][Ee]) exec python scripts/run_colocated_reset.py ;;
+  [Ff][Aa][Ll][Ss][Ee]) ;;
+  *) echo "Invalid colocated reset worker flag" >&2; exit 1 ;;
+esac
+
 echo "Starting Gunicorn on 0.0.0.0:${PORT:-8000}"
 # %(U)s excludes query strings: OAuth codes/state must not enter access logs.
 # Access logging remains disabled unless separately configured by the operator.

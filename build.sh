@@ -11,6 +11,13 @@ case "${DRIVE_BACKUP_BUILD_DEPENDENCIES:-false}" in
   [Ff][Aa][Ll][Ss][Ee]|0) ;;
   *) echo "Invalid Drive dependency build flag" >&2; exit 1 ;;
 esac
+# The existing hashed optional lock also provides the outbox's cryptography.
+# Installing it neither activates Drive nor changes the mail provider.
+case "${PASSWORD_RESET_COLOCATED_WORKER_ENABLED:-false}" in
+  [Tt][Rr][Uu][Ee]) pip install --only-binary=:all: --require-hashes -r requirements-drive-backup.lock ;;
+  [Ff][Aa][Ll][Ss][Ee]) ;;
+  *) echo "Invalid colocated reset worker flag" >&2; exit 1 ;;
+esac
 python scripts/check_drive_backup_runtime.py --expected-postgres-major 18 --build-guard
 
 python manage.py collectstatic --noinput
