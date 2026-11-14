@@ -101,7 +101,8 @@ class SaleForm(WebMutationForm):
         super().__init__(*args, **kwargs)
         self.fields['show_legal_information'].label = _('Afficher les informations du ticket')
         self.fields['show_legal_information'].help_text = _(
-            'Désactivé : le ticket thermique contient uniquement les produits et le total général. '
+            'Désactivé : le ticket thermique conserve le logo et le nom de l’entreprise, '
+            'les produits et le total général. '
             'Les factures officielles conservent toujours leurs mentions obligatoires.'
         )
         if self.instance and self.instance.pk:

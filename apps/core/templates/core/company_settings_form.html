@@ -13,7 +13,7 @@
         <legend class="h5 mb-3">{% trans "Coordonnées" %}</legend>
         <div class="row g-3">
             {% for field in form %}
-                {% if field.name != 'tax_number' and field.name != 'nis' and field.name != 'rc_number' and field.name != 'article_number' %}
+                {% if field.name != 'tax_number' and field.name != 'nis' and field.name != 'rc_number' and field.name != 'article_number' and field.name != 'share_capital' %}
                     <div class="col-12 {% if field.name != 'logo' %}col-md-6{% endif %}">
                         {{ field.label_tag }}{{ field }}{{ field.errors }}
                         {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
@@ -30,6 +30,10 @@
             <div class="col-12 col-md-6">{{ form.nis.label_tag }}{{ form.nis }}{{ form.nis.errors }}</div>
             <div class="col-12 col-md-6">{{ form.rc_number.label_tag }}{{ form.rc_number }}{{ form.rc_number.errors }}</div>
             <div class="col-12 col-md-6">{{ form.article_number.label_tag }}{{ form.article_number }}{{ form.article_number.errors }}</div>
+            <div class="col-12 col-md-6">
+                {{ form.share_capital.label_tag }}{{ form.share_capital }}{{ form.share_capital.errors }}
+                {% if form.share_capital.help_text %}<div class="form-text">{{ form.share_capital.help_text }}</div>{% endif %}
+            </div>
         </div>
     </fieldset>
 

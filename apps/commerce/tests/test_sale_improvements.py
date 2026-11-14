@@ -87,8 +87,9 @@ class SalePaymentAndLegalInformationTests(TestCase):
             self.assertContains(ticket, 'Produit paiement')
             self.assertContains(ticket, 'Conditionnement')
             self.assertContains(ticket, 'TOTAL GÉNÉRAL')
+            self.assertContains(ticket, 'ENTREPRISE-EL-AMINE')
             for forbidden in (
-                'ENTREPRISE-EL-AMINE', 'ADRESSE-SOCIETE', '0666-SOCIETE',
+                'ADRESSE-SOCIETE', '0666-SOCIETE',
                 'NIF-SOCIETE', 'NIS-SOCIETE', 'AI-SOCIETE', 'RC-SOCIETE',
                 sale.invoice_number, sale.ticket_number,
                 'Client légal', '0555-CLIENT', 'ADRESSE-CLIENT',
@@ -108,9 +109,12 @@ class SalePaymentAndLegalInformationTests(TestCase):
             self.assertFalse(thermal['show_legal_information'])
             self.assertFalse(thermal['show_complete_customer_details'])
             self.assertEqual(set(thermal['totals']), {'total_ttc'})
+            self.assertEqual(thermal['company'], {
+                'name_fr': 'ENTREPRISE-EL-AMINE', 'logo_url': None,
+            })
             for forbidden_key in (
                 'invoice_number', 'ticket_number', 'issued_at', 'cashier',
-                'company', 'customer', 'qr_code', 'messages',
+                'customer', 'qr_code', 'messages',
             ):
                 self.assertNotIn(forbidden_key, thermal)
 

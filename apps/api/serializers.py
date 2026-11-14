@@ -1,3 +1,4 @@
+from copy import copy
 from decimal import Decimal
 
 from django.db import IntegrityError, transaction
@@ -360,13 +361,19 @@ class ClientBalanceAdjustmentSerializer(serializers.ModelSerializer):
 
 
 class CompanySettingsSerializer(serializers.ModelSerializer):
+    share_capital = serializers.DecimalField(
+        max_digits=14, decimal_places=2, min_value=Decimal('0.00'),
+        allow_null=True, required=False,
+        label=_('Capital social (DZD)'),
+        help_text='Capital social en DZD. Facultatif ; envoyer null (ou une chaîne vide) pour effacer.',
+    )
     logo_url = serializers.SerializerMethodField()
 
     class Meta:
         model = CompanySettings
         fields = (
             'id', 'company_name', 'address', 'phone', 'email', 'rc_number',
-            'tax_number', 'nis', 'article_number', 'tax_rate', 'logo_url',
+            'tax_number', 'nis', 'article_number', 'share_capital', 'tax_rate', 'logo_url',
             'updated_at',
         )
         read_only_fields = ('id', 'logo_url', 'updated_at')
@@ -538,6 +545,7 @@ class SaleSerializer(serializers.ModelSerializer):
                 tax_number=obj.company_tax_number_snapshot,
                 nis=obj.company_nis_snapshot,
                 article_number=obj.company_article_number_snapshot,
+                share_capital=obj.company_share_capital_snapshot,
                 tax_rate=obj.tax_rate,
             )
             if obj.company_logo_snapshot:
@@ -546,9 +554,13 @@ class SaleSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         company = getattr(request, '_company_settings', None) if request else None
         if company is None:
-            company = CompanySettings.objects.order_by('pk').first() or CompanySettings()
+            company = CompanySettings.objects.order_by('pk').first() or CompanySettings(company_name='')
             if request:
                 request._company_settings = company
+        # Only an explicitly captured capital may be shown on legacy invoices;
+        # never borrow current capital or mutate the request-cached settings.
+        company = copy(company)
+        company.share_capital = obj.company_share_capital_snapshot
         return CompanySettingsSerializer(company, context=self.context).data
 
     def get_payments(self, obj) -> list:

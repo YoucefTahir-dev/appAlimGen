@@ -1,4 +1,7 @@
+from decimal import Decimal
+
 from django.conf import settings
+from django.core.validators import MinValueValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
@@ -13,6 +16,11 @@ class CompanySettings(models.Model):
     tax_number = models.CharField(_('NIF'), max_length=100, blank=True)
     nis = models.CharField(_('NIS'), max_length=100, blank=True)
     article_number = models.CharField(_('Article d’imposition (AI)'), max_length=100, blank=True)
+    share_capital = models.DecimalField(
+        _('Capital social (DZD)'), max_digits=14, decimal_places=2,
+        null=True, blank=True, validators=[MinValueValidator(Decimal('0.00'))],
+        help_text=_('Facultatif. Laisser vide si le capital social n’est pas renseigné.'),
+    )
     tax_rate = models.DecimalField(_('TVA (%)'), max_digits=5, decimal_places=2, default=19.00)
     logo = models.ImageField(_('Logo entreprise'), upload_to=company_logo_upload_to, validators=[validate_image_upload], blank=True, null=True)
     updated_at = models.DateTimeField(auto_now=True)

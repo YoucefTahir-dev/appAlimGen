@@ -1,5 +1,6 @@
 import io
 import base64
+from copy import copy
 from decimal import Decimal
 from pathlib import Path
 
@@ -178,6 +179,7 @@ def build_invoice_context(sale):
             tax_number=sale.company_tax_number_snapshot,
             nis=sale.company_nis_snapshot,
             article_number=sale.company_article_number_snapshot,
+            share_capital=sale.company_share_capital_snapshot,
         )
         if sale.company_logo_snapshot:
             company.logo.name = sale.company_logo_snapshot
@@ -197,6 +199,16 @@ def build_invoice_context(sale):
         total_ttc = sale.total
     else:
         company = CompanySettings.objects.first()
+        # Never infer legacy capital from current settings. A stored value may
+        # have been captured by a deliberate edit; old untouched rows stay null.
+        # Keep the existing legacy identity fallback and warning unchanged.
+        if company is not None:
+            company = copy(company)
+            company.share_capital = sale.company_share_capital_snapshot
+        elif sale.company_share_capital_snapshot is not None:
+            company = CompanySettings(
+                company_name='', share_capital=sale.company_share_capital_snapshot,
+            )
         client = sale.client
         total_ht = None
         tax_amount = None
@@ -305,6 +317,11 @@ def generate_invoice_pdf(response, sale):
             styles['ERPSubTitle'],
         ),
     ]
+    if company and company.share_capital is not None:
+        company_lines.append(Paragraph(
+            f"Capital social : {money(company.share_capital)}",
+            styles['ERPSubTitle'],
+        ))
     invoice_box = Table(
         [
             [Paragraph('<b>FACTURE</b>', styles['ERPBoxTitle'])],

@@ -7506,6 +7506,13 @@ components:
           type: string
           title: Article d’imposition (AI)
           maxLength: 100
+        share_capital:
+          type: string
+          format: decimal
+          nullable: true
+          pattern: ^\d{0,12}(?:\.\d{0,2})?$
+          title: Capital social (DZD)
+          description: Capital social en DZD. Facultatif ; envoyer null (ou une chaîne vide) pour effacer.
         tax_rate:
           type: string
           format: decimal
@@ -8334,6 +8341,13 @@ components:
           type: string
           title: Article d’imposition (AI)
           maxLength: 100
+        share_capital:
+          type: string
+          format: decimal
+          nullable: true
+          pattern: ^\d{0,12}(?:\.\d{0,2})?$
+          title: Capital social (DZD)
+          description: Capital social en DZD. Facultatif ; envoyer null (ou une chaîne vide) pour effacer.
         tax_rate:
           type: string
           format: decimal

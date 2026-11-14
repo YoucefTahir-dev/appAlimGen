@@ -2,6 +2,7 @@ from decimal import Decimal
 from uuid import uuid4
 
 from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator
 from django.db import models, transaction
 from django.db.models import F, Q, Sum
 from django.utils import timezone
@@ -451,6 +452,10 @@ class Sale(models.Model):
     company_tax_number_snapshot = models.CharField(max_length=100, blank=True, editable=False)
     company_nis_snapshot = models.CharField(max_length=100, blank=True, editable=False)
     company_article_number_snapshot = models.CharField(max_length=100, blank=True, editable=False)
+    company_share_capital_snapshot = models.DecimalField(
+        max_digits=14, decimal_places=2, null=True, blank=True, editable=False,
+        validators=[MinValueValidator(Decimal('0.00'))],
+    )
     company_logo_snapshot = models.CharField(max_length=500, blank=True, editable=False)
     client_name_snapshot = models.CharField(max_length=200, blank=True, editable=False)
     client_phone_snapshot = models.CharField(max_length=50, blank=True, editable=False)
