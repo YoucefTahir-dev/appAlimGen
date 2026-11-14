@@ -1,5 +1,6 @@
 import json
 import signal
+import time
 from datetime import timedelta
 from pathlib import Path
 from threading import Event
@@ -7,11 +8,12 @@ from urllib.parse import urlsplit
 
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
-from django.db import close_old_connections, DatabaseError
+from django.db import close_old_connections, connections, DatabaseError
 from django.utils import timezone
 
 from apps.accounts.models import PasswordResetDispatch
 from apps.accounts.services.reset_outbox import cipher, process_one
+from apps.accounts.services.reset_wakeup import markers_present, prune_markers, wake_directory
 
 
 class Command(BaseCommand):
@@ -42,6 +44,11 @@ class Command(BaseCommand):
             if (url.scheme != 'https' or not url.hostname or url.username or
                     url.password or url.query or url.fragment or url.path not in ('', '/')):
                 raise ValueError('Invalid public origin')
+            directory = wake_directory()
+            if directory is not None and (
+                    not directory.is_absolute() or directory.is_symlink() or not directory.is_dir()
+                    or settings.DATABASES['default'].get('ATOMIC_REQUESTS', False)):
+                raise ValueError('Invalid colocated wake configuration')
             token = cipher().encrypt(b'reset-worker-preflight')
             if cipher().decrypt(token) != b'reset-worker-preflight':
                 raise ValueError('Invalid cipher')
@@ -71,8 +78,22 @@ class Command(BaseCommand):
                 Path(options['ready_file']).unlink(missing_ok=True)
 
     def work_loop(self, options, stop):
+        colocated = wake_directory() is not None
+        # Reconcile the shared durable queue across the Render deployment
+        # overlap (old Web/worker can still be finishing). Afterwards no DB
+        # polling while idle: let Neon scale to zero. Daily technical cleanup
+        # costs one wake, not continuous activity. No backup is scheduled here.
+        warm_until = time.monotonic() + 300
+        maintenance_at = time.monotonic() + 86400
+        active = False
         while not stop.is_set():
             close_old_connections()
+            if colocated and not (active or time.monotonic() < warm_until or
+                                  time.monotonic() >= maintenance_at or markers_present()):
+                connections.close_all()
+                self.heartbeat(options)
+                stop.wait(options['poll_seconds'])
+                continue
             processed = 0
             for _ in range(options['limit']):
                 if stop.is_set():
@@ -88,8 +109,18 @@ class Command(BaseCommand):
             self.stdout.write(json.dumps({'processed': processed, 'scope': 'reset_worker',
                                           'failed': PasswordResetDispatch.objects.filter(state='failed').count(),
                                           'pending': PasswordResetDispatch.objects.filter(state='pending').count()}))
-            if options.get('ready_file'):
-                Path(options['ready_file']).touch()
+            if colocated:
+                active = PasswordResetDispatch.objects.filter(state__in=('pending', 'processing')).exists()
+                prune_markers()
+                maintenance_at = time.monotonic() + 86400
+                if not active:
+                    connections.close_all()
+            self.heartbeat(options)
             if options['once']:
                 return
             stop.wait(options['poll_seconds'])
+
+    @staticmethod
+    def heartbeat(options):
+        if options.get('ready_file'):
+            Path(options['ready_file']).touch()

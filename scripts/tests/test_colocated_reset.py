@@ -42,6 +42,7 @@ class ColocatedResetSupervisorTests(unittest.TestCase):
             self.assertTrue(call.kwargs['start_new_session'])
             self.assertEqual(call.kwargs['stdin'], subprocess.DEVNULL)
             self.assertNotIn('shell', call.kwargs)
+            self.assertIn('PASSWORD_RESET_WAKE_DIRECTORY', call.kwargs['env'])
         self.assertEqual(self.kill.call_args_list[0].args, (101, signal.SIGTERM))
         self.worker.wait.assert_called()
         self.web.wait.assert_called()

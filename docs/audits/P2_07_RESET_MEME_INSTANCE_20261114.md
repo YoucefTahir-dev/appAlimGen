@@ -56,6 +56,18 @@ changement du plan Render n'est réalisé ou supposé.
 - Un décès inattendu de l'un des deux processus ou l'absence de heartbeat pendant
   cinq minutes fait sortir l'unité en erreur. Le répertoire de heartbeat n'est
   supprimé qu'après l'arrêt des enfants.
+- En mode partagé, le superviseur fournit un répertoire de réveil privé aux deux
+  processus. Une demande crée un marqueur vide nommé avec son identifiant
+  technique, **avant** le commit SQL durable. Un échec du marqueur annule
+  l'insertion ; le worker conserve les marqueurs dont le commit n'est pas encore
+  visible. Aucun destinataire/token n'est inscrit dans ces fichiers.
+- Après cinq minutes de réconciliation au démarrage (chevauchement des instances
+  Render), et sans demandes/reprises actives, le worker vérifie les marqueurs et
+  son heartbeat **sans requête SQL**, en fermant sa connexion. Un nettoyage
+  technique journalier peut réveiller la base. Les marqueurs ne remplacent pas
+  la file SQL durable ; au démarrage le worker réconcilie toujours celle-ci.
+  Les transactions Web englobantes/ATOMIC_REQUESTS sont refusées pour cette
+  admission durable, pas silencieusement imbriquées.
 - Le build opt-in installe le verrou haché optionnel existant pour garantir la
   dépendance cryptographique. Cela **n'active ni Drive ni OAuth**.
 
@@ -65,6 +77,16 @@ présenté comme une isolation équivalente à un service distinct ou comme une
 garantie de zéro interruption. Le heartbeat ne démontre pas la livraison d'un
 mail ni l'absence d'échecs Brevo. Les compteurs de file, la réception réelle et
 la surveillance opérationnelle restent nécessaires.
+
+Cette adaptation évite le polling permanent de Neon par le worker au repos :
+des requêtes espacées de 15 secondes pourraient empêcher la suspension après
+cinq minutes d'inactivité. La mise en veille réelle dépend aussi des autres
+connexions, transactions et sondes de l'ERP ; aucune baisse de consommation réelle
+ou garantie de quota n'est revendiquée avant exploitation. Référence officielle :
+[Neon Scale to Zero](https://neon.com/docs/introduction/scale-to-zero).
+La réconciliation de cinq minutes couvre le délai de chevauchement Render
+documenté (60 secondes avant SIGTERM, puis arrêt gracieux borné par notre
+superviseur), pas une coordination distribuée générale de workers externes.
 
 ## Qualification et limites de preuve
 
@@ -90,6 +112,20 @@ l'arrêt et la confidentialité des erreurs. Les scénarios POSIX ajoutés véri
 les vrais signaux/groupes et l'attente des enfants ; ils doivent passer en CI
 Linux avant toute activation. La syntaxe Bash de `build.sh` et `start.sh` a été
 vérifiée avec `bash -n`.
+
+Premier commit de revue `e93b0755876b852da643b840e51613d0e60cd345` :
+[CI 43589675345 réussie](https://github.com/YoucefTahir-dev/appAlimGen/actions/runs/43589675345),
+**1 075 tests**, dont les quatre cas de signaux/groupes natifs Linux, audit de
+dépendances sans vulnérabilité connue détectée. Cette CI précède l'adaptation
+des réveils locaux pour Neon et ne la qualifie donc pas.
+
+Après adaptation : **77 cas locaux comptés, 73 réussis, 4 réservés au POSIX natif**,
+aucun échec/erreur, rapport `postgresql_tests-1794655913146993500.json`. Le test
+PostgreSQL concurrent vérifie qu'un marqueur survit à une lecture avant commit,
+puis permet le traitement après commit. Autres preuves : annulation sur erreur
+de notification, aucune requête au repos, reprise sur marqueur, conservation des
+notifications de demandes encore actives et purge des marqueurs orphelins.
+Cluster jetable arrêté et runtime supprimé. Une CI du nouveau commit reste requise.
 
 ## Conditions avant activation — pas des actions déjà effectuées
 

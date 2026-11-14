@@ -81,6 +81,9 @@ class Supervisor:
         try:
             folder = tempfile.TemporaryDirectory(prefix='reset-worker-')
             marker = Path(folder.name) / 'ready'
+            wake_directory = Path(folder.name) / 'wake'
+            wake_directory.mkdir(mode=0o700)
+            self.env['PASSWORD_RESET_WAKE_DIRECTORY'] = str(wake_directory)
             worker = self.spawn([sys.executable, '-u', 'manage.py', 'process_password_resets',
                                  '--limit', '10', '--poll-seconds', '15', '--ready-file', str(marker)])
             deadline = time.monotonic() + self.startup_seconds
