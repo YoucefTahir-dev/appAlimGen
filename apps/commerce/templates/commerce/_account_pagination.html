@@ -1,0 +1,9 @@
+{% load i18n %}
+{% if account_page.paginator.num_pages > 1 %}
+<nav class="my-3" aria-label="{{ label }}">
+    <strong>{{ label }}</strong>
+    <span>{% blocktrans with current=account_page.number total=account_page.paginator.num_pages count=account_page.paginator.count %}Page {{ current }} sur {{ total }} — {{ count }} écritures{% endblocktrans %}</span>
+    {% if account_page.has_previous %}<a class="btn btn-sm btn-outline-secondary" href="?{% if query %}{{ query }}&amp;{% endif %}{{ parameter }}={{ account_page.previous_page_number }}">{% trans "Précédent" %}</a>{% endif %}
+    {% if account_page.has_next %}<a class="btn btn-sm btn-outline-secondary" href="?{% if query %}{{ query }}&amp;{% endif %}{{ parameter }}={{ account_page.next_page_number }}">{% trans "Suivant" %}</a>{% endif %}
+</nav>
+{% endif %}

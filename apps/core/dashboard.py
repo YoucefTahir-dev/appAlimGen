@@ -10,6 +10,7 @@ from django.utils.translation import gettext as _
 
 from apps.accounts.permissions import is_manager
 from apps.commerce.models import Purchase, PurchaseLine, Sale, SaleLine
+from apps.commerce.visibility import personal_sales_only
 from apps.expenses.models import Expense
 from apps.inventory.models import Client, Product, Supplier
 
@@ -76,7 +77,7 @@ def _form_error_messages(form):
 def get_period_bounds(request, strict=False, dashboard_user=None):
     today = timezone.localdate()
     request_user = getattr(request, 'user', None)
-    can_filter_users = is_manager(request_user)
+    can_filter_users = is_manager(request_user) and not personal_sales_only(request_user)
     dashboard_user = dashboard_user if dashboard_user is not None else request_user
     form_data = request.GET.copy() if request.GET else {"period": "today"}
     if form_data.get('user') == 'all':

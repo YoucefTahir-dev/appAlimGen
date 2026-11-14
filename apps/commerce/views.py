@@ -29,7 +29,8 @@ from .models import Payment, Purchase, Sale
 from .services import create_sale, create_purchase, ensure_ticket_number, refresh_invoice_snapshot
 from .utils import build_invoice_context, generate_invoice_pdf, qr_code_data_uri
 from .product_search import commercial_products, search_products
-from .receivables import attach_receivable_counts, receivable_account, receivables_queryset
+from .receivables import attach_receivable_counts, receivable_account_page, receivables_queryset
+from .visibility import personal_sales_only
 from .web_idempotency import is_legacy_payment_token, web_idempotent
 
 
@@ -52,9 +53,7 @@ def _client_search_rate_limited(user):
 
 def visible_sales(user, queryset=None):
     queryset = queryset if queryset is not None else Sale.objects.all()
-    if LoadingOrder.objects.filter(operator=user).exists() and not has_permission(
-        user, 'inventory.view_all_loadingorders'
-    ):
+    if personal_sales_only(user):
         queryset = queryset.filter(created_by=user)
     return queryset
 
@@ -724,7 +723,7 @@ def receivable_detail(request, pk):
     client = get_object_or_404(Client, pk=pk)
     return render(
         request, 'commerce/receivable_detail.html',
-        receivable_account(request.user, client),
+        _receivable_page_context(request, client),
     )
 
 
@@ -733,8 +732,22 @@ def receivable_statement(request, pk):
     client = get_object_or_404(Client, pk=pk)
     return render(
         request, 'commerce/receivable_statement.html',
-        receivable_account(request.user, client),
+        _receivable_page_context(request, client),
     )
+
+
+def _receivable_page_context(request, client):
+    context = receivable_account_page(
+        request.user, client, page=request.GET.get('page', 1),
+        payments_page=request.GET.get('payments_page', 1),
+        opening_page=request.GET.get('opening_page', 1),
+    )
+    # Navigation in one table preserves the other two tables' positions.
+    for key, parameter in (('invoice', 'page'), ('payment', 'payments_page'), ('opening', 'opening_page')):
+        query = request.GET.copy()
+        query.pop(parameter, None)
+        context[f'{key}_pagination_query'] = query.urlencode()
+    return context
 
 
 @permission_required('commerce.add_customerpayment')

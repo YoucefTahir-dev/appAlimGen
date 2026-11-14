@@ -33,6 +33,7 @@
             <td><a class="btn btn-sm btn-outline-secondary" href="{% url 'sale_payment_list' sale.pk %}">{% trans "Détails" %}</a></td>
         </tr>{% empty %}<tr><td colspan="7" class="text-center text-muted">{% trans "Aucune facture suivie." %}</td></tr>{% endfor %}</tbody>
     </table></div>
+    {% include 'commerce/_account_pagination.html' with account_page=invoice_page parameter='page' query=invoice_pagination_query label='Factures' %}
 </div>
 
 <div class="card card-dashboard p-4 bg-white">
@@ -44,5 +45,12 @@
             <td>{% if payment.is_cancelled %}<span class="badge bg-secondary">{% trans "Annulé" %}</span><div class="small text-decoration-none">{{ payment.cancellation_reason }}</div>{% else %}<span class="badge bg-success">{% trans "Validé" %}</span>{% endif %}</td>
         </tr>{% empty %}<tr><td colspan="6" class="text-center text-muted">{% trans "Aucun règlement." %}</td></tr>{% endfor %}</tbody>
     </table></div>
+    {% include 'commerce/_account_pagination.html' with account_page=payment_page parameter='payments_page' query=payment_pagination_query label='Règlements' %}
+</div>
+<div class="card card-dashboard p-4 bg-white mt-4">
+    <h5>{% trans "Règlements de dette antérieure" %}</h5>
+    <p>{% trans "Dette antérieure restante" %} : {{ opening_balance|floatformat:2 }} DZD</p>
+    {% for payment in opening_balance_payments %}<p>{{ payment.created_at|date:'d/m/Y H:i' }} — {{ payment.reference }} — {{ payment.amount|floatformat:2 }} DZD{% if payment.is_cancelled %} — {% trans "Annulé" %}{% endif %}</p>{% empty %}<p>{% trans "Aucun règlement." %}</p>{% endfor %}
+    {% include 'commerce/_account_pagination.html' with account_page=opening_payment_page parameter='opening_page' query=opening_pagination_query label='Dette antérieure' %}
 </div>
 {% endblock %}

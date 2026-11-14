@@ -150,6 +150,10 @@ class ReceivableApiTests(APITestCase):
         self.assertEqual(self.sale.balance_due, Decimal('80.00'))
 
     def test_cancel_payment_requires_dedicated_permission(self):
+        # Keep the target inside today's seller scope so this tests the missing
+        # cancellation right, not the earlier foreign-object 404 boundary.
+        self.sale.created_by = self.seller
+        self.sale.save(update_fields=['created_by'])
         payment = Payment.objects.create(
             sale=self.sale, amount=Decimal('10.00'), payment_type=Payment.CASH,
             created_by=self.admin,

@@ -1,16 +1,17 @@
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
+from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Count, DateTimeField, DecimalField, F, OuterRef, Prefetch, Subquery, Sum, Value
 from django.db.models.functions import Coalesce, Round
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
-from apps.accounts.permissions import has_permission
-from apps.inventory.models import Client, LoadingOrder
+from apps.inventory.models import Client
 
 from .models import OpeningBalancePayment, Payment, Sale
+from .visibility import personal_sales_only
 
 
 MONEY_FIELD = DecimalField(max_digits=14, decimal_places=2)
@@ -90,9 +91,7 @@ def allocate_client_payment(
 
 def receivable_sales(user):
     sales = Sale.objects.filter(payment_tracking_initialized=True)
-    if LoadingOrder.objects.filter(operator=user).exists() and not has_permission(
-        user, 'inventory.view_all_loadingorders',
-    ):
+    if personal_sales_only(user):
         sales = sales.filter(created_by=user)
     return sales
 
@@ -127,8 +126,11 @@ def receivables_queryset(user):
     last_payments = Payment.objects.filter(
         sale__in=sales, sale__client_id=OuterRef('pk'), cancelled_at__isnull=True,
     ).order_by('-created_at').values('created_at')[:1]
-    unreconciled = Sale.objects.filter(
-        client_id=OuterRef('pk'), payment_tracking_initialized=False,
+    historical_sales = Sale.objects.filter(payment_tracking_initialized=False)
+    if personal_sales_only(user):
+        historical_sales = historical_sales.filter(created_by=user)
+    unreconciled = historical_sales.filter(
+        client_id=OuterRef('pk'),
     ).values('client_id').annotate(value=Count('pk')).values('value')[:1]
     opening_payments = OpeningBalancePayment.objects.filter(
         client_id=OuterRef('pk'), cancelled_at__isnull=True,
@@ -155,6 +157,58 @@ def receivables_queryset(user):
 def attach_receivable_counts(clients):
     """Compatibility hook: counts are now already annotated by SQL."""
     return clients
+
+
+def receivable_account_page(user, client, *, page=1, payments_page=1, opening_page=1, page_size=25):
+    """Bound each history independently; totals always cover the whole account.
+
+    Separate from the installed clients' legacy complete-response contract.
+    Invoice amounts are SQL annotations, never an unbounded payment prefetch.
+    """
+    page_size = max(1, min(int(page_size), 100))
+    summary = receivables_queryset(user).get(pk=client.pk)
+    sales = receivable_sales(user).filter(client=client)
+    paid = Payment.objects.filter(
+        sale_id=OuterRef('pk'), cancelled_at__isnull=True,
+    ).order_by().values('sale_id').annotate(value=Sum('amount')).values('value')[:1]
+    invoice_rows = sales.annotate(
+        active_paid=Coalesce(
+            Round(Subquery(paid, output_field=MONEY_FIELD), precision=2),
+            Value(Decimal('0.00')), output_field=MONEY_FIELD,
+        ),
+    ).order_by('-created_at', '-pk').values(
+        'id', 'invoice_number', 'created_at', 'total', 'active_paid',
+    )
+    invoice_page = Paginator(invoice_rows, page_size).get_page(page)
+    rows = []
+    for row in invoice_page.object_list:
+        amount_paid = row.pop('active_paid')
+        due = max(row['total'] - amount_paid, Decimal('0.00'))
+        row.update(pk=row['id'], amount_paid=amount_paid, balance_due=due,
+                   payment_status='paid' if due == 0 else ('partial' if amount_paid > 0 else 'unpaid'))
+        rows.append(row)
+    invoice_page.object_list = rows
+    payment_page = Paginator(
+        Payment.objects.filter(sale__in=sales).select_related('sale', 'created_by', 'cancelled_by')
+        .order_by('-created_at', '-pk'), page_size,
+    ).get_page(payments_page)
+    opening_payment_page = Paginator(
+        OpeningBalancePayment.objects.filter(client=client)
+        .select_related('created_by', 'cancelled_by').order_by('-created_at', '-pk'), page_size,
+    ).get_page(opening_page)
+    return {
+        'client': client,
+        'sales': invoice_page, 'payments': payment_page,
+        'opening_balance_payments': opening_payment_page,
+        'invoice_page': invoice_page, 'payment_page': payment_page,
+        'opening_payment_page': opening_payment_page,
+        'opening_balance': client.balance,
+        'total_invoiced': summary.receivable_invoiced,
+        'total_paid': summary.receivable_paid,
+        'balance_due': max(summary.receivable_invoiced - summary.receivable_paid, Decimal('0.00')),
+        'unreconciled_count': summary.receivable_unreconciled_count,
+        'history_paginated': True,
+    }
 
 
 def receivable_account(user, client):
@@ -200,7 +254,5 @@ def receivable_account(user, client):
         'unpaid_sales': [sale for sale in sales if sale.balance_due == sale.total],
         'partial_sales': [sale for sale in sales if 0 < sale.balance_due < sale.total],
         'paid_sales': [sale for sale in sales if sale.balance_due == 0],
-        'unreconciled_count': Sale.objects.filter(
-            client=client, payment_tracking_initialized=False,
-        ).count(),
+        'unreconciled_count': receivables_queryset(user).get(pk=client.pk).receivable_unreconciled_count,
     }

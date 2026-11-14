@@ -21,6 +21,18 @@ from apps.core.deployment_migrations import MIGRATION_LOCK_ID, forward_plan, mig
 
 
 class DeploymentPlanTests(SimpleTestCase):
+    def test_outbox_expansion_is_exact_and_does_not_mutate_existing_tables(self):
+        from importlib import import_module
+        cls = import_module('apps.accounts.migrations.0007_passwordresetdispatch').Migration
+        migration = cls('0007_passwordresetdispatch', 'accounts')
+        executor = self.executor([(migration, False)])
+        with patch('apps.core.deployment_migrations.MigrationExecutor', return_value=executor):
+            self.assertEqual(forward_plan(Mock()), [(migration, False)])
+        self.assertEqual(len(migration.operations), 1)
+        self.assertIsInstance(migration.operations[0], migrations.CreateModel)
+        self.assertEqual(migration.operations[0].name, 'PasswordResetDispatch')
+        self.assertTrue(all(not field.is_relation for _name, field in migration.operations[0].fields))
+
     def executor(self, plan):
         executor = Mock()
         executor.loader.detect_conflicts.return_value = {}

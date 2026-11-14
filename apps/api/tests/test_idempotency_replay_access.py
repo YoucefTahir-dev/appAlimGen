@@ -134,7 +134,9 @@ class ReplayApiFixtures:
         return create_sale(
             client=self.customer,
             lines=[{'product': self.product, 'quantity': 2, 'unit_price': 20}],
-            user=creator or self.other,
+            # Ordinary replay fixtures must be inside the seller's own scope.
+            # Tests of foreign targets request that creator explicitly.
+            user=creator or self.writer,
         )
 
     def purchase(self, reference='REPLAY-PURCHASE'):
@@ -203,13 +205,16 @@ class ReplayAccessApiTests(ReplayApiFixtures, APITestCase):
         self.assertEqual(self.financial_state(), baseline)
 
     def test_payment_replay_rechecks_operator_scope_after_assignment_changes(self):
-        self.grant('commerce.add_customerpayment')
-        sale = self.sale()
+        self.grant('commerce.add_customerpayment', 'inventory.view_all_loadingorders')
+        sale = self.sale(creator=self.other)
         payload = {'sale': sale.pk, 'amount': '10.00', 'payment_type': 'cash'}
         self.assertEqual(self.payment(payload).status_code, 201)
         LoadingOrder.objects.create(
             number='REPLAY-NEW-OPERATOR', operator=self.writer, created_by=self.admin,
         )
+        # A first loading no longer controls seller confidentiality. Remove the
+        # explicit global delegation to test loss of today's foreign scope.
+        self.deny('inventory.view_all_loadingorders')
         baseline = self.financial_state()
         replay = self.payment(payload)
         self.assertEqual(replay.status_code, 403, replay.data)
@@ -273,8 +278,8 @@ class ReplayAccessApiTests(ReplayApiFixtures, APITestCase):
         self.assertEqual(list(IdempotencyRecord.objects.values()), records)
 
     def test_sale_update_replay_rechecks_scope_without_repeating_stock_mutations(self):
-        self.grant('commerce.change_sale')
-        sale = self.sale()
+        self.grant('commerce.change_sale', 'inventory.view_all_loadingorders')
+        sale = self.sale(creator=self.other)
         url = reverse('api-sale-detail', args=[sale.pk])
         payload = {'discount': '1.00'}
         first = self.client.patch(url, payload, format='json', HTTP_IDEMPOTENCY_KEY='sale-update-replay')
@@ -288,6 +293,7 @@ class ReplayAccessApiTests(ReplayApiFixtures, APITestCase):
         LoadingOrder.objects.create(
             number='REPLAY-SALE-SCOPE', operator=self.writer, created_by=self.admin,
         )
+        self.deny('inventory.view_all_loadingorders')
         denied = self.client.patch(url, payload, format='json', HTTP_IDEMPOTENCY_KEY='sale-update-replay')
         self.assertEqual(denied.status_code, 404, denied.data)
         self.assertEqual(self.financial_state(), baseline)

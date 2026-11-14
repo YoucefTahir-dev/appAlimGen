@@ -9,11 +9,17 @@
 <div class="no-print d-flex gap-2 justify-content-end mb-3"><button class="btn btn-primary" data-print-page>{% trans "Imprimer" %}</button><a class="btn btn-outline-secondary" href="{% url 'receivable_detail' client.pk %}">{% trans "Retour" %}</a></div>
 <div class="card p-4 bg-white">
     <h3>{% trans "Relevé de compte" %}</h3><h5>{{ client.name }}</h5>
+    <p class="alert alert-info">{% trans "Extrait paginé : les totaux concernent le compte complet, les écritures ci-dessous uniquement les pages indiquées. Cet extrait n’est pas un relevé intégral." %}</p>
     <p>{{ client.address }}{% if client.phone %}<br>{{ client.phone }}{% endif %}{% if client.tax_number %}<br>NIF : {{ client.tax_number }}{% endif %}</p>
     <p><strong>{% trans "Total facturé" %} :</strong> {{ total_invoiced|floatformat:2 }} DZD &nbsp; <strong>{% trans "Total encaissé" %} :</strong> {{ total_paid|floatformat:2 }} DZD &nbsp; <strong>{% trans "Solde" %} :</strong> {{ balance_due|floatformat:2 }} DZD</p>
     <table class="table table-bordered"><thead><tr><th>{% trans "Date" %}</th><th>{% trans "Facture" %}</th><th class="text-end">{% trans "Débit" %}</th><th class="text-end">{% trans "Crédit" %}</th><th>{% trans "Observation" %}</th></tr></thead><tbody>
         {% for sale in sales %}<tr><td>{{ sale.created_at|date:'d/m/Y' }}</td><td>{{ sale.invoice_number }}</td><td class="text-end">{{ sale.total|floatformat:2 }}</td><td></td><td>{% trans "Facture" %}</td></tr>{% endfor %}
         {% for payment in payments %}<tr><td>{{ payment.created_at|date:'d/m/Y' }}</td><td>{{ payment.sale.invoice_number }}</td><td></td><td class="text-end">{% if not payment.is_cancelled %}{{ payment.amount|floatformat:2 }}{% endif %}</td><td>{{ payment.reference }}{% if payment.is_cancelled %} — {% trans "Annulé" %}: {{ payment.cancellation_reason }}{% endif %}</td></tr>{% endfor %}
     </tbody></table>
+    {% include 'commerce/_account_pagination.html' with account_page=invoice_page parameter='page' query=invoice_pagination_query label='Factures' %}
+    {% include 'commerce/_account_pagination.html' with account_page=payment_page parameter='payments_page' query=payment_pagination_query label='Règlements' %}
+    <p>{% trans "Dette antérieure restante" %} : {{ opening_balance|floatformat:2 }} DZD</p>
+    {% for payment in opening_balance_payments %}<p>{{ payment.created_at|date:'d/m/Y' }} — {{ payment.reference }} — {{ payment.amount|floatformat:2 }} DZD{% if payment.is_cancelled %} — {% trans "Annulé" %}{% endif %}</p>{% endfor %}
+    {% include 'commerce/_account_pagination.html' with account_page=opening_payment_page parameter='opening_page' query=opening_pagination_query label='Dette antérieure' %}
 </div>
 {% endblock %}

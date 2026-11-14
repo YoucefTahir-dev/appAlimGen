@@ -62,11 +62,12 @@ class ReceivableReplayScopeTests(ReplayApiFixtures, APITestCase):
         self.assertEqual(self.financial_state(), before)
 
     def test_replay_denied_when_previous_invoice_leaves_current_operator_scope(self):
-        self.grant('commerce.add_customerpayment')
+        self.grant('commerce.add_customerpayment', 'inventory.view_all_loadingorders')
         self.sale(creator=self.other)
         first = self.allocate()
         self.assertEqual(first.status_code, 201, first.data)
         LoadingOrder.objects.create(operator=self.writer, created_by=self.admin, number='SCOPE-CHANGE')
+        self.deny('inventory.view_all_loadingorders')
         before = self.financial_state()
         replay = self.allocate()
         self.assertEqual(replay.status_code, 404, replay.data)

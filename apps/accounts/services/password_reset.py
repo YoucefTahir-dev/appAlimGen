@@ -236,6 +236,17 @@ class PasswordResetService:
         self.token_generator = token_generator or default_token_generator
 
     def request(self, email: str, *, request=None) -> int:
+        if settings.PASSWORD_RESET_ASYNC_ENABLED:
+            from .reset_outbox import enqueue_reset
+
+            enqueue_reset(email)
+            # One durable insert for every syntactically valid submitted email,
+            # without a user lookup or provider call in the public request.
+            return 1
+        return self.dispatch_request(email, request=request)
+
+    def dispatch_request(self, email: str, *, request=None) -> int:
+        """Worker/synchronous compatibility path, never re-enqueue itself."""
         normalized = normalize_user_email(email)
         if not normalized:
             return 0

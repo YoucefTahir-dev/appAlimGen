@@ -16,6 +16,12 @@ MIGRATION_LOCK_ID = 0x454C414D494E45
 # Each expansion is reviewed together with its old/new-code compatibility.
 # Do not add a blanket wildcard or approve a migration merely to unblock CI.
 APPROVED_EXPANSIONS = {
+    # Additive, empty technical outbox only: no business-table rewrite, foreign
+    # keys, data migration or automatic activation. Older code ignores it.
+    ('accounts', '0007_passwordresetdispatch'): {
+        'sha256': '8284462061ac92966c04ce4b9451feaff942930aa5450fc447d48fd68cbaba32',
+        'operations': (migrations.CreateModel,),
+    },
     ('inventory', '0024_clientbalanceadjustment_and_client_permission'): {
         'sha256': '776ce53c77766f25049726995507930d7fc83db91863c96a6392370cec3a22f3',
         'operations': (migrations.AlterModelOptions, migrations.CreateModel),
