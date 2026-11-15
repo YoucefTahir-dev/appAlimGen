@@ -20,4 +20,4 @@ esac
 echo "Starting Gunicorn on 0.0.0.0:${PORT:-8000}"
 # %(U)s excludes query strings: OAuth codes/state must not enter access logs.
 # Access logging remains disabled unless separately configured by the operator.
-exec gunicorn gestio_stock.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers ${WEB_CONCURRENCY:-2} --timeout ${WEB_TIMEOUT:-120} --access-logformat '%(m)s %(U)s %(s)s'
+exec gunicorn gestio_stock.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers ${WEB_CONCURRENCY:-2} --timeout ${WEB_TIMEOUT:-120} --access-logformat '%(m)s %(U)s %(s)s' --logger-class apps.core.access_logging.ResetSafeLogger

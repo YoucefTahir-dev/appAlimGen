@@ -30,7 +30,8 @@ def web_command(env):
     timeout = positive('WEB_TIMEOUT', '120', 600)
     return [sys.executable, '-m', 'gunicorn', 'gestio_stock.wsgi:application',
             '--bind', '0.0.0.0:' + port, '--workers', workers, '--timeout', timeout,
-            '--access-logformat', '%(m)s %(U)s %(s)s']
+            '--access-logformat', '%(m)s %(U)s %(s)s',
+            '--logger-class', 'apps.core.access_logging.ResetSafeLogger']
 
 
 class Supervisor:

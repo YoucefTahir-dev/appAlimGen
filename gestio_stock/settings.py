@@ -414,9 +414,18 @@ if not DEBUG and PASSWORD_RESET_EMAIL_PROVIDER == 'brevo_api' and not BREVO_API_
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'filters': {
+        'reset_link_privacy': {'()': 'apps.core.log_redaction.ResetLinkLogFilter'},
+        'require_debug_false': {'()': 'django.utils.log.RequireDebugFalse'},
+    },
     'formatters': {
         'standard': {
             'format': '[{asctime}] {levelname} {name}: {message}',
+            'style': '{',
+        },
+        'django.server': {
+            '()': 'django.utils.log.ServerFormatter',
+            'format': '[{server_time}] {message}',
             'style': '{',
         },
     },
@@ -424,6 +433,19 @@ LOGGING = {
         'console': {
             'class': 'logging.StreamHandler',
             'formatter': 'standard',
+            'filters': ['reset_link_privacy'],
+        },
+        # Preserve Django's default error-mail/debug-server behavior while
+        # removing reset-link paths and request/traceback payloads from copies.
+        'mail_admins': {
+            'class': 'django.utils.log.AdminEmailHandler',
+            'level': 'ERROR',
+            'filters': ['require_debug_false', 'reset_link_privacy'],
+        },
+        'django.server': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'django.server',
+            'filters': ['reset_link_privacy'],
         },
     },
     'loggers': {
@@ -431,6 +453,13 @@ LOGGING = {
             'handlers': ['console'],
             'level': os.getenv('SECURITY_LOG_LEVEL', 'INFO'),
             'propagate': False,
+            'filters': ['reset_link_privacy'],
+        },
+        'django.request': {'filters': ['reset_link_privacy']},
+        'django.security.csrf': {'filters': ['reset_link_privacy']},
+        'django.server': {
+            'handlers': ['django.server'], 'level': 'INFO', 'propagate': False,
+            'filters': ['reset_link_privacy'],
         },
     },
 }
