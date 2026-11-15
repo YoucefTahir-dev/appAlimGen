@@ -19,4 +19,4 @@ RUN DJANGO_DEBUG=True python manage.py collectstatic --noinput
 
 USER erp
 
-CMD ["gunicorn", "gestio_stock.wsgi:application", "--bind", "0.0.0.0:8000"]
+CMD ["gunicorn", "gestio_stock.wsgi:application", "--bind", "0.0.0.0:8000", "--logger-class", "apps.core.access_logging.ResetSafeLogger"]

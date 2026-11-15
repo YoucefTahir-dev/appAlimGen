@@ -19,6 +19,8 @@ from django.utils.translation import gettext as _
 from openpyxl import load_workbook
 from PIL import Image, UnidentifiedImageError
 
+from .log_redaction import redact_reset_context, redact_reset_urls
+
 
 security_logger = logging.getLogger('security')
 
@@ -110,8 +112,8 @@ def log_security_event(request, action, user=None, level='info', status_code=Non
     if not getattr(current_user, 'is_authenticated', False):
         current_user = None
 
-    safe_action = sanitize_log_value(action, max_length=255)
-    safe_path = sanitize_log_value(request.path, max_length=255)
+    safe_action = sanitize_log_value(redact_reset_context(action, request.path), max_length=255)
+    safe_path = sanitize_log_value(redact_reset_urls(request.path), max_length=255)
 
     try:
         from apps.core.models import AuditLog
@@ -128,7 +130,8 @@ def log_security_event(request, action, user=None, level='info', status_code=Non
         security_logger.exception('Unable to write security audit log')
 
     log_method = getattr(security_logger, level, security_logger.info)
-    log_method('%s path=%s user=%s status=%s ip=%s', safe_action, safe_path, current_user, status_code, get_client_ip(request))
+    safe_user = redact_reset_context(current_user, request.path)
+    log_method('%s path=%s user=%s status=%s ip=%s', safe_action, safe_path, safe_user, status_code, get_client_ip(request))
 
 
 def _secure_upload_name(directory, filename):
