@@ -3,9 +3,9 @@ from pathlib import Path
 
 from django.contrib.auth.models import AbstractUser, UserManager as DjangoUserManager
 from django.core.exceptions import ValidationError
-from django.db import models
-from django.db.models import F, Q
-from django.db.models.functions import Lower, Trim
+from django.db import models, router, transaction
+from django.db.models import Case, F, Q, Value, When
+from django.db.models.functions import Greatest, Lower, Trim
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
@@ -35,12 +35,76 @@ def profile_photo_upload_to(instance, filename):
     return f"profiles/{uuid.uuid4().hex}{Path(filename).suffix.lower()}"
 
 
+class UserQuerySet(models.QuerySet):
+    """Keep supported bulk status changes atomic with JWT revocation.
+
+    Raw SQL and deliberately bypassing this manager are not supported account
+    mutation APIs. Expressions/bulk_update cannot describe an unambiguous
+    account transition, so callers must use save() or update(is_active=bool).
+    """
+
+    def update(self, **kwargs):
+        version_field = self.model._meta.get_field('auth_token_version')
+        if 'is_active' in kwargs:
+            active = kwargs['is_active']
+            if not isinstance(active, bool):
+                raise ValueError('Account status updates require a boolean.')
+            if 'auth_token_version' in kwargs:
+                raise ValueError('Do not combine status and token version updates.')
+            if not active:
+                kwargs['auth_token_version'] = Case(
+                    When(
+                        is_active=True,
+                        then=F('auth_token_version') + Value(1, output_field=version_field),
+                    ),
+                    default=F('auth_token_version'),
+                    output_field=version_field,
+                )
+        elif 'auth_token_version' in kwargs:
+            version = kwargs['auth_token_version']
+            if isinstance(version, bool) or not isinstance(version, int) or version < 1:
+                raise ValueError('Token versions must be positive integers.')
+            kwargs['auth_token_version'] = Greatest(
+                F('auth_token_version'),
+                Value(version, output_field=version_field),
+                output_field=version_field,
+            )
+        return super().update(**kwargs)
+
+    def bulk_update(self, objs, fields, batch_size=None):
+        names = {getattr(field, 'name', field) for field in fields}
+        if {'is_active', 'auth_token_version'}.intersection(names):
+            raise ValueError('Use save() or a boolean status update for account revocation.')
+        return super().bulk_update(objs, fields, batch_size=batch_size)
+
+    def bulk_create(
+        self, objs, batch_size=None, ignore_conflicts=False,
+        update_conflicts=False, update_fields=None, unique_fields=None,
+    ):
+        names = {getattr(field, 'name', field) for field in (update_fields or ())}
+        if update_conflicts and {'is_active', 'auth_token_version'}.intersection(names):
+            raise ValueError(
+                'Conflict updates cannot bypass account status revocation; use save().'
+            )
+        return super().bulk_create(
+            objs, batch_size=batch_size, ignore_conflicts=ignore_conflicts,
+            update_conflicts=update_conflicts, update_fields=update_fields,
+            unique_fields=unique_fields,
+        )
+
+    def _revoke_api_tokens(self):
+        return super().update(auth_token_version=F('auth_token_version') + 1)
+
+
 class UserManager(DjangoUserManager):
     """Normalize accounts created through Django's supported manager API."""
 
     @classmethod
     def normalize_email(cls, email):
         return normalize_user_email(email)
+
+    def get_queryset(self):
+        return UserQuerySet(self.model, using=self._db, hints=self._hints)
 
 
 class User(AbstractUser):
@@ -79,6 +143,91 @@ class User(AbstractUser):
     )
 
     objects = UserManager()
+
+    _AUTH_STATE_FIELDS = ('is_active', 'password', 'force_password_change')
+
+    def _remember_auth_state(self):
+        self._loaded_auth_state = {
+            name: getattr(self, name) for name in self._AUTH_STATE_FIELDS
+        }
+
+    @classmethod
+    def from_db(cls, db, field_names, values):
+        instance = super().from_db(db, field_names, values)
+        instance._loaded_auth_state = {
+            name: instance.__dict__[name]
+            for name in cls._AUTH_STATE_FIELDS if name in instance.__dict__
+        }
+        return instance
+
+    def refresh_from_db(self, using=None, fields=None, from_queryset=None):
+        super().refresh_from_db(using=using, fields=fields, from_queryset=from_queryset)
+        loaded = getattr(self, '_loaded_auth_state', {}).copy()
+        for name in self._AUTH_STATE_FIELDS:
+            if (fields is None or name in fields) and name in self.__dict__:
+                loaded[name] = self.__dict__[name]
+        self._loaded_auth_state = loaded
+
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+        """Serialize status transitions and never restore a stale JWT version.
+
+        A full save preserves concurrently changed authentication fields when
+        they were not changed since loading. To intentionally update a field
+        without loading it first, use explicit update_fields.
+        """
+        if update_fields is not None:
+            update_fields = frozenset(update_fields)
+            if not update_fields:
+                return
+        using = using or router.db_for_write(type(self), instance=self)
+        if not self.pk or force_insert:
+            result = super().save(
+                force_insert=force_insert, force_update=force_update,
+                using=using, update_fields=update_fields,
+            )
+            self._remember_auth_state()
+            return result
+        with transaction.atomic(using=using):
+            current = type(self).objects.using(using).select_for_update().filter(pk=self.pk).first()
+            if current is None:
+                return super().save(
+                    force_insert=force_insert, force_update=force_update,
+                    using=using, update_fields=update_fields,
+                )
+            if update_fields is None:
+                # Preserve Django's deferred-field save semantics.
+                deferred = self.get_deferred_fields()
+                persisted = {
+                    field.attname for field in self._meta.concrete_fields
+                    if not field.primary_key and field.attname not in deferred
+                }
+                loaded = getattr(self, '_loaded_auth_state', {})
+                for name in self._AUTH_STATE_FIELDS:
+                    if name not in persisted or name not in loaded or self.__dict__.get(name) == loaded[name]:
+                        setattr(self, name, getattr(current, name))
+            else:
+                persisted = set(update_fields)
+                for name in self._AUTH_STATE_FIELDS:
+                    if name not in persisted:
+                        setattr(self, name, getattr(current, name))
+            # A model save may carry a deliberate synthetic/higher generation,
+            # but no stale instance can ever lower the persisted generation.
+            requested_version = self.auth_token_version
+            self.auth_token_version = max(
+                current.auth_token_version,
+                requested_version if 'auth_token_version' in persisted else current.auth_token_version,
+            )
+            if 'is_active' in persisted and current.is_active and not self.is_active:
+                self.auth_token_version = max(
+                    self.auth_token_version, current.auth_token_version + 1,
+                )
+                persisted.add('auth_token_version')
+            result = super().save(
+                force_insert=force_insert, force_update=force_update,
+                using=using, update_fields=persisted,
+            )
+            self._remember_auth_state()
+            return result
 
     class Meta:
         verbose_name = _('Utilisateur')
@@ -167,5 +316,7 @@ class User(AbstractUser):
         """Invalidate every JWT previously issued for this user."""
         if not self.pk:
             return
-        type(self).objects.filter(pk=self.pk).update(auth_token_version=F('auth_token_version') + 1)
-        self.refresh_from_db(fields=['auth_token_version'])
+        using = router.db_for_write(type(self), instance=self)
+        with transaction.atomic(using=using):
+            type(self).objects.using(using).filter(pk=self.pk)._revoke_api_tokens()
+            self.refresh_from_db(using=using, fields=['auth_token_version'])

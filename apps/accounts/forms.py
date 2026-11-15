@@ -8,6 +8,7 @@ from django.contrib.auth.forms import (
     PasswordChangeForm,
     SetPasswordForm,
 )
+from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 
 from .models import User
@@ -45,6 +46,16 @@ def validate_permission_overrides(form, cleaned_data):
         form.add_error('individual_permissions', message)
         form.add_error('denied_permissions', message)
     return cleaned_data
+
+
+def changed_concrete_fields(form, instance):
+    """Return only concrete model fields explicitly changed by this form."""
+    return [
+        field.name for field in instance._meta.concrete_fields
+        if not field.primary_key
+        and field.name in form.fields
+        and field.name in form.changed_data
+    ]
 
 
 class LoginForm(AuthenticationForm):
@@ -195,17 +206,22 @@ class UserUpdateForm(UserChangeForm):
         return validate_permission_overrides(self, super().clean())
 
     def save(self, commit=True):
-        user = super().save(commit=commit)
+        user = super().save(commit=False)
         if commit:
-            assigned_role = self.cleaned_data['assigned_role']
-            user.groups.set([assigned_role])
-            user.user_permissions.set(self.cleaned_data['individual_permissions'])
-            user.denied_permissions.set(self.cleaned_data['denied_permissions'])
-            legacy_role = LEGACY_ROLE_BY_GROUP.get(assigned_role.name)
-            if legacy_role and user.role != legacy_role:
-                user.role = legacy_role
-                user.save(update_fields=['role'])
-            clear_permission_caches(user)
+            with transaction.atomic():
+                update_fields = changed_concrete_fields(self, user)
+                if update_fields:
+                    user.save(update_fields=update_fields)
+                self._save_m2m()
+                assigned_role = self.cleaned_data['assigned_role']
+                user.groups.set([assigned_role])
+                user.user_permissions.set(self.cleaned_data['individual_permissions'])
+                user.denied_permissions.set(self.cleaned_data['denied_permissions'])
+                legacy_role = LEGACY_ROLE_BY_GROUP.get(assigned_role.name)
+                if legacy_role and user.role != legacy_role:
+                    user.role = legacy_role
+                    user.save(update_fields=['role'])
+                clear_permission_caches(user)
         return user
 
 
@@ -230,6 +246,15 @@ class ProfileForm(forms.ModelForm):
                 attrs={'class': 'form-control', 'accept': 'image/*'}
             ),
         }
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        if commit:
+            update_fields = changed_concrete_fields(self, user)
+            if update_fields:
+                user.save(update_fields=update_fields)
+            self._save_m2m()
+        return user
 
 
 class RoleForm(forms.ModelForm):
@@ -292,8 +317,9 @@ class StyledPasswordChangeForm(PasswordChangeForm):
         user = super().save(commit=False)
         user.force_password_change = False
         if commit:
-            user.save()
-            user.revoke_api_tokens()
+            with transaction.atomic():
+                user.save(update_fields=['password', 'force_password_change'])
+                user.revoke_api_tokens()
         return user
 
 
