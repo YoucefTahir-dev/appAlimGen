@@ -16,6 +16,7 @@ from django.contrib.auth.views import (
     PasswordResetCompleteView,
 )
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.db import transaction
 from django.db.models.deletion import ProtectedError
 from django.db.models import Count, Q
 from django.urls import reverse, reverse_lazy
@@ -430,14 +431,24 @@ def user_update(request, pk):
 @require_POST
 @permission_required('accounts.change_user')
 def user_toggle_active(request, pk):
-    target = get_object_or_404(User, pk=pk)
-    if target == request.user:
+    # Serialize read/invert/write so concurrent toggles cannot both act on the
+    # same stale account state.
+    with transaction.atomic():
+        target = get_object_or_404(User.objects.select_for_update(), pk=pk)
+        if target == request.user:
+            changed = False
+        elif not _may_manage_target(request.user, target):
+            raise PermissionDenied
+        else:
+            target.is_active = not target.is_active
+            target.save(update_fields=['is_active'])
+            changed = True
+
+    # Audit is deliberately outside the account transition: a journal outage
+    # must not silently roll back a successful revocation after it was reported.
+    if not changed:
         messages.error(request, _('Vous ne pouvez pas désactiver votre propre compte.'))
-    elif not _may_manage_target(request.user, target):
-        raise PermissionDenied
     else:
-        target.is_active = not target.is_active
-        target.save(update_fields=['is_active'])
         action = (
             _('Réactivation utilisateur : %(username)s')
             if target.is_active
