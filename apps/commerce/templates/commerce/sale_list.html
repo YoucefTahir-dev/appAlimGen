@@ -56,6 +56,9 @@
                                 {% if can_download_invoice %}<a class="btn btn-sm btn-outline-danger" href="{% url 'sale_invoice_pdf' sale.pk %}">
                                     <i class="bi bi-file-earmark-pdf"></i> PDF
                                 </a>{% endif %}
+                                {% if can_view_invoice %}<a class="btn btn-sm btn-outline-success" href="{% url 'sale_delivery_note_preview' sale.pk %}">
+                                    <i class="bi bi-truck"></i> {% trans "Bon de livraison" %}
+                                </a>{% endif %}
                                 {% if can_print_invoice and can_view_invoice %}<a class="btn btn-sm btn-outline-secondary" href="{% url 'sale_invoice_preview' sale.pk %}?print=1" target="_blank">
                                     <i class="bi bi-printer"></i> {% trans "Imprimer" %}
                                 </a>{% endif %}

@@ -64,7 +64,9 @@ class ScriptSourceContractTests(SimpleTestCase):
                         self.assertEqual(attrs.get('integrity'), PINNED_CDN[url])
                         self.assertEqual(attrs.get('crossorigin'), 'anonymous')
                         seen.append(url)
-        self.assertEqual(len(seen), 5)
+        # The standalone invoice and delivery-note previews each load the same
+        # pinned Bootstrap stylesheet; every occurrence remains audited.
+        self.assertEqual(len(seen), 6)
         self.assertEqual(set(seen), set(PINNED_CDN))
 
     def test_extracted_scripts_exist_and_have_no_template_expressions(self):
