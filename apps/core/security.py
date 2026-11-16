@@ -1,5 +1,7 @@
 import hashlib
+import io
 import logging
+import re
 import uuid
 import warnings
 from ipaddress import ip_address
@@ -18,6 +20,9 @@ from django.utils.deprecation import MiddlewareMixin
 from django.utils.translation import gettext as _
 from openpyxl import load_workbook
 from PIL import Image, UnidentifiedImageError
+from pypdf import PdfReader
+from pypdf.errors import PyPdfError
+from pypdf.generic import ArrayObject, DictionaryObject, IndirectObject, NameObject
 
 from .log_redaction import redact_reset_context, redact_reset_urls
 
@@ -47,6 +52,34 @@ ALLOWED_EXCEL_MIME_TYPES = {
 ALLOWED_RECEIPT_MIME_TYPES = ALLOWED_IMAGE_MIME_TYPES | {'application/pdf'}
 MAX_XLSX_UNCOMPRESSED_SIZE = 50 * 1024 * 1024
 MAX_XLSX_MEMBERS = 1000
+PDF_HEADER = re.compile(br'%PDF-(?:1\.[0-7]|2\.0)(?:\r\n|\r|\n)')
+PDF_TRAILING_WHITESPACE = b'\x00\x09\x0a\x0c\x0d\x20'
+FORBIDDEN_PDF_KEYS = {
+    '/AA',
+    '/AF',
+    '/EF',
+    '/EmbeddedFiles',
+    '/JavaScript',
+    '/JS',
+    '/OpenAction',
+    '/RichMediaContent',
+    '/RichMediaSettings',
+    '/XFA',
+}
+FORBIDDEN_PDF_ACTIONS = {
+    '/GoToR',
+    '/ImportData',
+    '/JavaScript',
+    '/Launch',
+    '/Movie',
+    '/Named',
+    '/Rendition',
+    '/RichMediaExecute',
+    '/Sound',
+    '/SubmitForm',
+    '/URI',
+}
+FORBIDDEN_PDF_SUBTYPES = {'/3D', '/FileAttachment', '/Movie', '/RichMedia', '/Screen', '/Sound'}
 LOGIN_FAILURE_EVENT = 'auth.login.failed'
 ADMIN_LOGIN_FAILURE_EVENT = 'auth.admin_login.failed'
 PASSWORD_RESET_EVENT = 'auth.password_reset.request'
@@ -219,11 +252,86 @@ def _validate_xlsx_content(uploaded_file):
 def _validate_pdf_content(uploaded_file):
     _rewind(uploaded_file)
     try:
-        header = uploaded_file.read(1024)
+        max_size = getattr(settings, 'MAX_RECEIPT_UPLOAD_SIZE', 10 * 1024 * 1024)
+        payload = uploaded_file.read(max_size + 1)
     finally:
         _rewind(uploaded_file)
-    if not header.lstrip().startswith(b'%PDF-'):
+
+    if len(payload) > max_size:
+        raise ValidationError(_('Le fichier PDF est trop volumineux.'))
+    if not PDF_HEADER.match(payload[:9]):
         raise ValidationError(_('Le contenu du fichier PDF est invalide.'))
+    if not payload.rstrip(PDF_TRAILING_WHITESPACE).endswith(b'%%EOF'):
+        raise ValidationError(_('Le contenu du fichier PDF est invalide.'))
+
+    try:
+        reader = PdfReader(io.BytesIO(payload), strict=True)
+        if reader.is_encrypted:
+            raise ValidationError(_('Les fichiers PDF chiffrés ne sont pas autorisés.'))
+
+        max_pages = getattr(settings, 'MAX_RECEIPT_PDF_PAGES', 500)
+        page_count = len(reader.pages)
+        if page_count < 1 or page_count > max_pages:
+            raise ValidationError(
+                _('Le fichier PDF contient un nombre de pages non autorisé.')
+            )
+
+        max_objects = getattr(settings, 'MAX_RECEIPT_PDF_OBJECTS', 20000)
+        xref_count = sum(len(section) for section in reader.xref.values()) + len(reader.xref_objStm)
+        if xref_count > max_objects:
+            raise ValidationError(_('Le fichier PDF est trop complexe.'))
+        _validate_pdf_object_graph(reader.trailer, max_objects=max_objects)
+    except ValidationError:
+        raise
+    except (OSError, PyPdfError, RecursionError, TypeError, ValueError) as exc:
+        raise ValidationError(_('Le contenu du fichier PDF est invalide.')) from exc
+
+
+def _validate_pdf_object_graph(root, *, max_objects):
+    """Reject executable/remote PDF features without inflating stream data."""
+    stack = [(root, 0)]
+    visited_indirect = set()
+    visited_containers = set()
+    examined = 0
+
+    while stack:
+        current, depth = stack.pop()
+        if depth > 64:
+            raise ValidationError(_('Le fichier PDF est trop complexe.'))
+
+        if isinstance(current, IndirectObject):
+            identity = (current.idnum, current.generation, id(current.pdf))
+            if identity in visited_indirect:
+                continue
+            visited_indirect.add(identity)
+            current = current.get_object()
+
+        if not isinstance(current, (DictionaryObject, ArrayObject)):
+            continue
+        identity = id(current)
+        if identity in visited_containers:
+            continue
+        visited_containers.add(identity)
+        examined += 1
+        if examined > max_objects:
+            raise ValidationError(_('Le fichier PDF est trop complexe.'))
+
+        if isinstance(current, ArrayObject):
+            stack.extend((item, depth + 1) for item in current)
+            continue
+
+        for key, value in current.items():
+            key_name = str(key)
+            if key_name in FORBIDDEN_PDF_KEYS:
+                raise ValidationError(_('Le contenu actif dans les fichiers PDF n’est pas autorisé.'))
+            if key_name in {'/S', '/Subtype'}:
+                inspected_value = value.get_object() if isinstance(value, IndirectObject) else value
+                value_name = str(inspected_value) if isinstance(inspected_value, NameObject) else ''
+                if key_name == '/S' and value_name in FORBIDDEN_PDF_ACTIONS:
+                    raise ValidationError(_('Les actions dans les fichiers PDF ne sont pas autorisées.'))
+                if key_name == '/Subtype' and value_name in FORBIDDEN_PDF_SUBTYPES:
+                    raise ValidationError(_('Les pièces jointes et médias PDF ne sont pas autorisés.'))
+            stack.append((value, depth + 1))
 
 
 def validate_image_upload(uploaded_file):
