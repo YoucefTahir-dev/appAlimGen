@@ -10,7 +10,16 @@ from django.utils import timezone
 from apps.core.models import AuditLog
 
 
-LEGACY = re.compile(r'^client\.location\.updated id=(\d+) old=')
+NUMBER = r'[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?'
+COORDINATE = rf'(?:None|{NUMBER})'
+# Match only the exact tuple representation emitted by the historical
+# ``audit_location`` implementation. Unknown or truncated formats remain
+# untouched and are reported for an explicit review.
+LEGACY = re.compile(
+    rf'^client\.location\.updated id=(?P<client_id>\d+) '
+    rf'old=\({COORDINATE}, {COORDINATE}\) '
+    rf'new=\({COORDINATE}, {COORDINATE}\)$'
+)
 CONFIRMATION = 'ANONYMISER GPS 90 JOURS'
 
 
@@ -47,7 +56,10 @@ class Command(BaseCommand):
                 changed += 1
                 if options['apply']:
                     AuditLog.objects.filter(pk=row.pk, action=row.action).update(
-                        action=f'client.location.updated id={match[1]} change=legacy_redacted',
+                        action=(
+                            'client.location.updated '
+                            f'id={match.group("client_id")} change=legacy_redacted'
+                        ),
                     )
         self.stdout.write(json.dumps({
             'mode': 'apply' if options['apply'] else 'dry_run',
