@@ -63,7 +63,7 @@
                         <td>{{ expense.amount|floatformat:2 }} {% trans "DZD" %}</td>
                         <td>{{ expense.get_payment_method_display }}</td>
                         <td>{{ expense.supplier.name|default:'-' }}</td>
-                        <td>{% if expense.receipt %}<a href="{{ expense.receipt.url }}" target="_blank">{% trans "Voir" %}</a>{% else %}<span class="badge text-bg-warning">{% trans "Absent" %}</span>{% endif %}</td>
+                        <td>{% if expense.receipt %}<a href="{{ expense.receipt.url }}" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" download>{% trans "Voir" %}</a>{% else %}<span class="badge text-bg-warning">{% trans "Absent" %}</span>{% endif %}</td>
                         <td>
                             <div class="table-actions">
                                 {% if can_change_expense %}<a class="btn btn-sm btn-outline-success" href="{% url 'expense_update' expense.pk %}">{% trans "Modifier" %}</a>{% endif %}
