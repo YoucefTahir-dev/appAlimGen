@@ -27,7 +27,14 @@ from .forms import (
 )
 from .models import Payment, Purchase, Sale
 from .services import create_sale, create_purchase, ensure_ticket_number, refresh_invoice_snapshot
-from .utils import build_invoice_context, generate_invoice_pdf, qr_code_data_uri
+from .utils import (
+    build_delivery_note_context,
+    build_invoice_context,
+    delivery_note_filename,
+    generate_delivery_note_pdf,
+    generate_invoice_pdf,
+    qr_code_data_uri,
+)
 from .product_search import commercial_products, search_products
 from .receivables import attach_receivable_counts, receivable_account_page, receivables_queryset
 from .visibility import personal_sales_only
@@ -812,6 +819,39 @@ def sale_invoice_preview(request, pk):
     context = build_invoice_context(sale)
     context['auto_print'] = request.GET.get('print') == '1'
     return render(request, 'commerce/sale_invoice_preview.html', context)
+
+
+@seller_required
+def sale_delivery_note_pdf(request, pk):
+    sale = get_object_or_404(
+        visible_sales(
+            request.user,
+            Sale.objects.select_related('client').prefetch_related(
+                'lines__product__unit', 'lines__packaging',
+            ),
+        ),
+        pk=pk,
+    )
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{delivery_note_filename(sale)}"'
+    generate_delivery_note_pdf(response, sale)
+    return response
+
+
+@seller_required
+def sale_delivery_note_preview(request, pk):
+    sale = get_object_or_404(
+        visible_sales(
+            request.user,
+            Sale.objects.select_related('client').prefetch_related(
+                'lines__product__unit', 'lines__packaging',
+            ),
+        ),
+        pk=pk,
+    )
+    context = build_delivery_note_context(sale)
+    context['auto_print'] = request.GET.get('print') == '1'
+    return render(request, 'commerce/sale_delivery_note_preview.html', context)
 
 
 @seller_required

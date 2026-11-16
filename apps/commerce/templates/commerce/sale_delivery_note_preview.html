@@ -1,0 +1,106 @@
+{% load i18n access_tags %}
+{% load static %}
+{% has_access 'accounts.download_invoice_pdf' as can_download_invoice %}
+{% has_access 'accounts.print_invoice' as can_print_invoice %}
+<!DOCTYPE html>
+<html lang="{% get_current_language as LANGUAGE_CODE %}{{ LANGUAGE_CODE|default:'fr' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% trans "Bon de livraison" %} {{ delivery_note_number }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+    <style>
+        body { background: #eef2f4; color: #1f2933; }
+        .delivery-page { max-width: 210mm; min-height: 297mm; margin: 24px auto; background: #fff; padding: 16mm; box-shadow: 0 16px 40px rgba(15,23,42,.16); }
+        .brand { color: #163b2f; }
+        .delivery-logo { max-width: 88px; max-height: 88px; object-fit: contain; }
+        .delivery-title { background: #163b2f; color: #fff; border-radius: 14px; padding: 18px; }
+        .delivery-table th { background: #163b2f; color: #fff; white-space: nowrap; }
+        .delivery-table td { vertical-align: middle; }
+        .signature-box { min-height: 120px; }
+        .print-actions { position: sticky; top: 0; z-index: 5; background: rgba(238,242,244,.92); backdrop-filter: blur(8px); }
+        @page { size: A4; margin: 0; }
+        @media print {
+            body { background: #fff; }
+            .print-actions { display: none !important; }
+            .delivery-page { margin: 0; box-shadow: none; max-width: none; min-height: auto; padding: 10mm; }
+            a[href]:after { content: ""; }
+        }
+        @media (max-width: 575.98px) {
+            .delivery-page { margin: 0; padding: 1rem; min-height: auto; }
+            .print-actions .btn { flex: 1 1 100%; }
+        }
+    </style>
+    <script src="{% static 'js/print-controls.js' %}" defer></script>
+</head>
+<body>
+<div class="print-actions py-3">
+    <div class="container d-flex flex-wrap gap-2 justify-content-end">
+        <a href="{% url 'sale_list' %}" class="btn btn-outline-secondary">{% trans "Retour" %}</a>
+        {% if can_download_invoice %}<a href="{% url 'sale_delivery_note_pdf' sale.pk %}" class="btn btn-danger">{% trans "Télécharger PDF" %}</a>{% endif %}
+        {% if can_print_invoice %}<button data-print-page class="btn btn-success">{% trans "Imprimer" %}</button>{% endif %}
+    </div>
+</div>
+
+<main class="delivery-page">
+    {% if snapshot_warning %}<div class="alert alert-warning" role="alert">{{ snapshot_warning }}</div>{% endif %}
+    <header class="row g-4 align-items-start mb-4">
+        <div class="col-md-2">
+            {% if company and company.logo %}<img src="{{ company.logo.url }}" class="delivery-logo" alt="Logo">
+            {% else %}<div class="delivery-logo rounded-circle border d-flex align-items-center justify-content-center brand fw-bold">A</div>{% endif %}
+        </div>
+        <div class="col-md-6">
+            <h1 class="h4 brand mb-1">{{ company_name_fr }}</h1>
+            <div class="h5 brand text-end" dir="rtl">{{ company_name_ar }}</div>
+            <div class="small text-muted mt-2">
+                {% trans "Adresse" %} : {{ company.address|default:"" }}<br>
+                {% trans "Téléphone" %} : {{ company.phone|default:"" }} | {% trans "Email" %} : {{ company.email|default:"" }}
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="delivery-title">
+                <div class="h3 mb-2">{% trans "BON DE LIVRAISON" %}</div>
+                <div>N° : <strong>{{ delivery_note_number }}</strong></div>
+                <div>{% trans "Date" %} : {{ issued_at|date:"d/m/Y" }}</div>
+                <div>{% trans "Facture" %} : {{ sale.invoice_number }}</div>
+            </div>
+        </div>
+    </header>
+
+    <section class="border rounded-3 p-3 mb-4 bg-light">
+        <h2 class="h6 brand">{% trans "Client" %}</h2>
+        <div class="row">
+            <div class="col-md-6"><strong>{{ invoice_client.name }}</strong></div>
+            <div class="col-md-6">{% trans "Téléphone" %} : {{ invoice_client.phone }}</div>
+            <div class="col-md-6">{% trans "Adresse" %} : {{ invoice_client.address }}</div>
+            {% for label, value in client_legal_identifiers %}<div class="col-md-6"><strong>{{ label }}</strong> : {{ value }}</div>{% endfor %}
+        </div>
+    </section>
+
+    <section class="table-responsive mb-4">
+        <table class="table table-bordered delivery-table">
+            <thead><tr><th>N°</th><th>{% trans "Référence" %}</th><th>{% trans "Désignation" %}</th><th class="text-end">{% trans "Quantité" %}</th><th>{% trans "Unité" %}</th></tr></thead>
+            <tbody>
+                {% for line in lines %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td><bdi dir="auto">{{ line.invoice_product_reference }}</bdi></td>
+                        <td><bdi dir="auto">{{ line.invoice_product_name }}</bdi></td>
+                        <td class="text-end">{{ line.packaging_quantity }}</td>
+                        <td><bdi dir="auto">{% firstof line.packaging_name line.invoice_unit_name %}</bdi></td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <section class="row g-3 mt-4">
+        <div class="col-md-6"><div class="border rounded-3 p-3 signature-box"><strong>{% trans "Signature du livreur" %}</strong></div></div>
+        <div class="col-md-6"><div class="border rounded-3 p-3 signature-box"><strong>{% trans "Signature du client" %}</strong></div></div>
+    </section>
+    <p class="small text-muted mt-4 mb-0">{% trans "La génération de ce document ne confirme pas à elle seule la livraison effective." %}</p>
+</main>
+
+{% if auto_print %}<script src="{% static 'js/auto-print.js' %}"></script>{% endif %}
+</body>
+</html>

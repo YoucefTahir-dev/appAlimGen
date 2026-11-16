@@ -372,6 +372,8 @@ ROUTE_PERMISSIONS = {
     'receivable_payment_create': ('commerce.add_customerpayment',),
     'sale_invoice_preview': ('accounts.view_invoices',),
     'sale_invoice_pdf': ('accounts.download_invoice_pdf',),
+    'sale_delivery_note_preview': ('accounts.view_invoices',),
+    'sale_delivery_note_pdf': ('accounts.download_invoice_pdf',),
     'sale_ticket_preview': ('accounts.print_invoice',),
     'purchase_list': ('commerce.view_purchase',),
     'purchase_create': ('commerce.add_purchase',),

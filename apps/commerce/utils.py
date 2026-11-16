@@ -1,5 +1,6 @@
 import io
 import base64
+import re
 from copy import copy
 from decimal import Decimal
 from pathlib import Path
@@ -245,6 +246,200 @@ def build_invoice_context(sale):
         'uses_historical_snapshot': uses_historical_snapshot,
         'snapshot_warning': '' if uses_historical_snapshot else legacy_snapshot_warning(),
     }
+
+
+def delivery_note_number(sale):
+    """Return the stable one-to-one delivery-note reference for an invoice."""
+    return f'BL-{sale.invoice_number}'
+
+
+def delivery_note_filename(sale):
+    """Build an ASCII filename without trusting the invoice number as a header."""
+    safe_number = re.sub(r'[^A-Za-z0-9._-]+', '_', delivery_note_number(sale)).strip('._')
+    return f'{safe_number[:120] or "bon-livraison"}.pdf'
+
+
+def build_delivery_note_context(sale):
+    """Expose only non-financial invoice snapshot data to the delivery note."""
+    invoice = build_invoice_context(sale)
+    return {
+        'company': invoice['company'],
+        'company_name_fr': invoice['company_name_fr'],
+        'company_name_ar': invoice['company_name_ar'],
+        'sale': sale,
+        'delivery_note_number': delivery_note_number(sale),
+        'invoice_client': invoice['invoice_client'],
+        'client_legal_identifiers': invoice['client_legal_identifiers'],
+        'lines': invoice['lines'],
+        'issued_at': invoice['issued_at'],
+        'uses_historical_snapshot': invoice['uses_historical_snapshot'],
+        'snapshot_warning': invoice['snapshot_warning'],
+    }
+
+
+def _pdf_directional_text(value):
+    text = pdf_safe_text(value)
+    if any('\u0600' <= character <= '\u06ff' for character in str(value or '')):
+        return format_arabic(text)
+    return text
+
+
+def generate_delivery_note_pdf(response, sale):
+    context = build_delivery_note_context(sale)
+    font_name = register_unicode_font()
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(
+        name='BLTitle', fontName=font_name, fontSize=18, leading=22,
+        alignment=TA_CENTER, textColor=colors.white,
+    ))
+    styles.add(ParagraphStyle(
+        name='BLHeading', fontName=font_name, fontSize=15, leading=19,
+        textColor=BRAND_COLOR,
+    ))
+    styles.add(ParagraphStyle(name='BLBody', fontName=font_name, fontSize=9, leading=12))
+    styles.add(ParagraphStyle(
+        name='BLArabic', fontName=font_name, fontSize=13, leading=16,
+        alignment=TA_RIGHT, textColor=BRAND_COLOR,
+    ))
+    styles.add(ParagraphStyle(name='BLSmall', fontName=font_name, fontSize=8, leading=10))
+
+    doc = SimpleDocTemplate(
+        response,
+        pagesize=A4,
+        rightMargin=12 * mm,
+        leftMargin=12 * mm,
+        topMargin=12 * mm,
+        bottomMargin=12 * mm,
+        title=f"Bon de livraison {context['delivery_note_number']}",
+    )
+    story = []
+    company = context['company']
+    logo_path = get_company_logo_path(company)
+    logo_cell = ''
+    if logo_path:
+        try:
+            logo_cell = Image(logo_path, width=26 * mm, height=26 * mm, kind='proportional')
+        except Exception:
+            logo_cell = ''
+
+    company_lines = [
+        Paragraph(f"<b>{_pdf_directional_text(context['company_name_fr'])}</b>", styles['BLHeading']),
+        Paragraph(_pdf_directional_text(context['company_name_ar']), styles['BLArabic']),
+        Paragraph(
+            f"Adresse : {_pdf_directional_text(company.address if company else '')}",
+            styles['BLBody'],
+        ),
+        Paragraph(
+            f"Téléphone : {_pdf_directional_text(company.phone if company else '')} | "
+            f"Email : {_pdf_directional_text(company.email if company else '')}",
+            styles['BLBody'],
+        ),
+    ]
+    document_box = Table(
+        [
+            [Paragraph('<b>BON DE LIVRAISON</b>', styles['BLTitle'])],
+            [Paragraph(
+                f"<b>N° :</b> {_pdf_directional_text(context['delivery_note_number'])}",
+                styles['BLBody'],
+            )],
+            [Paragraph(f"<b>Date :</b> {context['issued_at']:%d/%m/%Y}", styles['BLBody'])],
+            [Paragraph(
+                f"<b>Facture :</b> {_pdf_directional_text(sale.invoice_number)}",
+                styles['BLBody'],
+            )],
+        ],
+        colWidths=[54 * mm],
+    )
+    document_box.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, 0), BRAND_COLOR),
+        ('BOX', (0, 0), (-1, -1), 0.8, BRAND_COLOR),
+        ('INNERGRID', (0, 0), (-1, -1), 0.3, colors.HexColor('#d8dee4')),
+        ('PADDING', (0, 0), (-1, -1), 6),
+    ]))
+    header = Table([[logo_cell, company_lines, document_box]], colWidths=[30 * mm, 92 * mm, 56 * mm])
+    header.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP')]))
+    story.extend([header, Spacer(1, 9 * mm)])
+
+    client = context['invoice_client']
+    client_lines = [
+        '<b>Client</b>',
+        _pdf_directional_text(client.name),
+        f"Téléphone : {_pdf_directional_text(client.phone)}",
+        f"Adresse : {_pdf_directional_text(client.address)}",
+    ]
+    client_lines.extend(
+        f'{_pdf_directional_text(label)} : {_pdf_directional_text(value)}'
+        for label, value in context['client_legal_identifiers']
+    )
+    client_table = Table(
+        [[Paragraph('<br/>'.join(client_lines), styles['BLBody'])]],
+        colWidths=[178 * mm],
+    )
+    client_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f5f7f9')),
+        ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#ccd6dd')),
+        ('PADDING', (0, 0), (-1, -1), 8),
+    ]))
+    story.extend([client_table, Spacer(1, 7 * mm)])
+
+    table_data = [['N°', 'Référence', 'Désignation', 'Quantité', 'Unité']]
+    for index, line in enumerate(context['lines'], start=1):
+        table_data.append([
+            str(index),
+            Paragraph(_pdf_directional_text(line.invoice_product_reference), styles['BLSmall']),
+            Paragraph(_pdf_directional_text(line.invoice_product_name), styles['BLSmall']),
+            str(line.packaging_quantity),
+            Paragraph(
+                _pdf_directional_text(line.packaging_name or line.invoice_unit_name),
+                styles['BLSmall'],
+            ),
+        ])
+    products_table = Table(
+        table_data,
+        colWidths=[10 * mm, 34 * mm, 78 * mm, 24 * mm, 32 * mm],
+        repeatRows=1,
+    )
+    products_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), BRAND_COLOR),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, -1), font_name),
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('GRID', (0, 0), (-1, -1), 0.3, colors.HexColor('#cbd5dc')),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#fbfcfd')]),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('ALIGN', (0, 1), (0, -1), 'CENTER'),
+        ('ALIGN', (3, 1), (3, -1), 'RIGHT'),
+        ('PADDING', (0, 0), (-1, -1), 5),
+    ]))
+    story.extend([products_table, Spacer(1, 10 * mm)])
+
+    signatures = Table(
+        [[
+            Paragraph('<b>Signature du livreur</b><br/><br/><br/>____________________________', styles['BLBody']),
+            Paragraph('<b>Signature du client</b><br/><br/><br/>____________________________', styles['BLBody']),
+        ]],
+        colWidths=[89 * mm, 89 * mm],
+    )
+    signatures.setStyle(TableStyle([
+        ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#9aa8b2')),
+        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#9aa8b2')),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('PADDING', (0, 0), (-1, -1), 10),
+    ]))
+    story.append(signatures)
+    story.extend([
+        Spacer(1, 6 * mm),
+        Paragraph(
+            'La génération de ce document ne confirme pas à elle seule la livraison effective.',
+            styles['BLSmall'],
+        ),
+    ])
+    if context['snapshot_warning']:
+        story.extend([
+            Spacer(1, 3 * mm),
+            Paragraph(_pdf_directional_text(context['snapshot_warning']), styles['BLSmall']),
+        ])
+    doc.build(story)
 
 
 def qr_code_image_reader(sale, total_ttc, client_name=None):
