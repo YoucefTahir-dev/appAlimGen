@@ -72,9 +72,99 @@ class LocationRetentionTests(TestCase):
         self.assertEqual(AuditLog.objects.count(), 3)
         self.assertEqual(self.run_command()['eligible'], 0)
 
-    def test_bounded_batch_and_truncated_legacy_payload(self):
+    def test_89_and_90_days_stay_while_91_days_is_eligible(self):
+        reference = timezone.now()
+        AuditLog.objects.filter(pk=self.old.pk).update(
+            created_at=reference - timedelta(days=89),
+        )
+        exactly_90 = AuditLog.objects.create(action=self.raw)
+        older_91 = AuditLog.objects.create(action=self.raw)
+        AuditLog.objects.filter(pk=exactly_90.pk).update(
+            created_at=reference - timedelta(days=90),
+        )
+        AuditLog.objects.filter(pk=older_91.pk).update(
+            created_at=reference - timedelta(days=91),
+        )
+
+        with patch(
+            'apps.core.management.commands.anonymize_location_logs.timezone.now',
+            return_value=reference,
+        ):
+            result = self.run_command(
+                apply=True,
+                confirm='ANONYMISER GPS 90 JOURS',
+            )
+
+        self.assertEqual((result['examined'], result['updated']), (1, 1))
+        for row in (self.old, exactly_90):
+            row.refresh_from_db()
+            self.assertEqual(row.action, self.raw)
+        older_91.refresh_from_db()
+        self.assertEqual(
+            older_91.action,
+            'client.location.updated id=42 change=legacy_redacted',
+        )
+
+    def test_known_no_coordinate_event_is_normalised_without_deleting_metadata(self):
+        action = 'client.location.updated id=81 old=(None, None) new=(None, None)'
+        row = AuditLog.objects.create(
+            user=self.actor,
+            action=action,
+            path='/synthetic/no-coordinates/',
+            status_code=202,
+            level=AuditLog.LEVEL_WARNING,
+        )
+        AuditLog.objects.filter(pk=row.pk).update(
+            created_at=timezone.now() - timedelta(days=91),
+        )
+        before = AuditLog.objects.get(pk=row.pk)
+
+        result = self.run_command(
+            apply=True,
+            confirm='ANONYMISER GPS 90 JOURS',
+        )
+
+        self.assertEqual(result['updated'], 2)
+        row.refresh_from_db()
+        self.assertEqual(
+            row.action,
+            'client.location.updated id=81 change=legacy_redacted',
+        )
+        for key in ('pk', 'user_id', 'created_at', 'path', 'status_code', 'level'):
+            self.assertEqual(getattr(row, key), getattr(before, key))
+
+    def test_malformed_or_unknown_legacy_format_is_reported_and_untouched(self):
+        actions = (
+            'client.location.updated id=91 old=(36.1, 3.1) new=(36.',
+            'client.location.updated id=92 old=(secret) new=(unknown)',
+        )
+        rows = []
+        for action in actions:
+            row = AuditLog.objects.create(action=action)
+            AuditLog.objects.filter(pk=row.pk).update(
+                created_at=timezone.now() - timedelta(days=91),
+            )
+            rows.append(row)
+
+        result = self.run_command(
+            apply=True,
+            confirm='ANONYMISER GPS 90 JOURS',
+        )
+
+        self.assertEqual(result['updated'], 1)
+        self.assertEqual(result['unrecognised'], 2)
+        for row, action in zip(rows, actions):
+            row.refresh_from_db()
+            self.assertEqual(row.action, action)
+
+    def test_bounded_batch_leaves_remaining_known_rows_for_explicit_rerun(self):
         for i in range(2):
-            row = AuditLog.objects.create(action=f'client.location.updated id={100+i} old=(None, None) new=(36.')
+            row = AuditLog.objects.create(
+                action=(
+                    f'client.location.updated id={100+i} '
+                    'old=(None, None) new=(36.1, 3.1)'
+                ),
+            )
             AuditLog.objects.filter(pk=row.pk).update(created_at=timezone.now() - timedelta(days=92))
         result = self.run_command(apply=True, confirm='ANONYMISER GPS 90 JOURS', limit=1)
         self.assertTrue(result['limit_reached'])
