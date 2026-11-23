@@ -471,6 +471,9 @@ class Sale(models.Model):
     class Meta:
         verbose_name = 'Vente'
         verbose_name_plural = 'Ventes'
+        permissions = [
+            ('override_sale_price', 'Peut déroger au tarif de vente'),
+        ]
 
     def __str__(self):
         return self.invoice_number

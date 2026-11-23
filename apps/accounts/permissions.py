@@ -79,6 +79,7 @@ PERMISSION_MATRIX = OrderedDict(
                 ('commerce.add_sale', _('Ajouter')),
                 ('commerce.change_sale', _('Modifier')),
                 ('commerce.delete_sale', _('Supprimer')),
+                ('commerce.override_sale_price', _('Déroger au tarif de vente')),
             ],
         ),
         (
@@ -172,7 +173,10 @@ ALL_MANAGED_PERMISSION_NAMES = frozenset(
 )
 
 # Sensitive new rights are opt-in, including for legacy administrators.
-LEGACY_ADMIN_PERMISSIONS = ALL_MANAGED_PERMISSION_NAMES - {'inventory.adjust_client_balance'}
+LEGACY_ADMIN_PERMISSIONS = ALL_MANAGED_PERMISSION_NAMES - {
+    'inventory.adjust_client_balance',
+    'commerce.override_sale_price',
+}
 
 LEGACY_MANAGER_PERMISSIONS = frozenset(
     permission
@@ -192,6 +196,7 @@ LEGACY_MANAGER_PERMISSIONS = frozenset(
         'accounts.restore_backups',
         'core.change_companysettings',
         'inventory.adjust_client_balance',
+        'commerce.override_sale_price',
     }
 )
 

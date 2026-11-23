@@ -1,0 +1,53 @@
+name: Windows client CI
+
+on:
+  push:
+    branches: [main, 'feature/**', 'fix/**', 'security/**']
+    paths:
+      - 'windows-client/**'
+      - '.github/workflows/windows-client-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'windows-client/**'
+      - '.github/workflows/windows-client-ci.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-client-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust-test:
+    runs-on: windows-2025
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: windows-client/src-tauri
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Select audited Rust toolchain
+        shell: pwsh
+        run: |
+          rustup toolchain install 1.99.1 --profile minimal
+          rustup default 1.99.1
+          rustc --version
+
+      - name: Test locked Windows client
+        run: cargo test --locked
+
+      - name: Reject target-inapplicable advisory dependencies
+        shell: pwsh
+        run: |
+          $tree = cargo tree --locked --target x86_64-pc-windows-msvc
+          if ($tree -match '(?m)^[^\r\n]*(?:glib|proc-macro-error) v[0-9]') {
+            Write-Error 'A dependency excluded by the Windows-target audit is present.'
+            exit 1
+          }
+
+      - name: Compile locked release executable
+        run: cargo build --locked --release
