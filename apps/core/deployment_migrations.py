@@ -37,6 +37,13 @@ APPROVED_EXPANSIONS = {
         'sha256': 'a4bf12b34bf4ee95ada0efa77de227b4daf6a262b1b16b0626fcb01b63ad36f5',
         'operations': (migrations.AddField,),
     },
+    # Permission metadata only: no business-row rewrite or destructive schema
+    # operation. post_migrate creates the opt-in Django permission; no role is
+    # granted automatically and older application code ignores it.
+    ('commerce', '0019_alter_sale_options'): {
+        'sha256': '4f9c681331a0dc11bc235b9bfa83782ef72ec63d3b0783de010595d770ca0697',
+        'operations': (migrations.AlterModelOptions,),
+    },
 }
 
 

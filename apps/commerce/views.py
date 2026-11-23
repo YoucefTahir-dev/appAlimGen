@@ -27,6 +27,7 @@ from .forms import (
 )
 from .models import Payment, Purchase, Sale
 from .services import create_sale, create_purchase, ensure_ticket_number, refresh_invoice_snapshot
+from .price_controls import record_sale_price_overrides
 from .utils import (
     build_delivery_note_context,
     build_invoice_context,
@@ -245,8 +246,13 @@ def purchase_list(request):
 )
 def sale_create(request):
     form = SaleForm(request.POST or None)
-    formset = SaleLineFormSet(request.POST or None, prefix='lines')
-    if form.is_valid() and formset.is_valid():
+    formset = SaleLineFormSet(
+        request.POST or None, prefix='lines', price_user=request.user,
+    )
+    form_valid = form.is_valid()
+    if form_valid:
+        formset.price_client = form.cleaned_data['client']
+    if form_valid and formset.is_valid():
         try:
             sale = create_sale(
                 client=form.cleaned_data['client'],
@@ -333,8 +339,14 @@ def purchase_create(request):
 def sale_update(request, pk):
     sale = get_object_or_404(visible_sales(request.user), pk=pk)
     form = SaleForm(request.POST or None, instance=sale)
-    formset = SaleLineFormSet(request.POST or None, instance=sale, prefix='lines')
-    if form.is_valid() and formset.is_valid():
+    formset = SaleLineFormSet(
+        request.POST or None, instance=sale, prefix='lines',
+        price_user=request.user, price_client=sale.client,
+    )
+    form_valid = form.is_valid()
+    if form_valid:
+        formset.price_client = form.cleaned_data['client']
+    if form_valid and formset.is_valid():
         sale = form.save(commit=False)
         sale.total = calculate_sale_total(sale, formset)
         if sale.total < 0:
@@ -355,6 +367,11 @@ def sale_update(request, pk):
                     _set_formset_stock_user(formset, request.user)
                     formset.save()
                     refresh_invoice_snapshot(sale)
+                    record_sale_price_overrides(
+                        sale=sale,
+                        overrides=getattr(formset, 'price_overrides', ()),
+                        user=request.user,
+                    )
                     remaining = _money(sale.balance_due)
                     action = form.cleaned_data['settlement_action']
                     if action == SaleForm.PAY_FULL:

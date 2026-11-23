@@ -626,6 +626,7 @@ class SaleSerializer(serializers.ModelSerializer):
             'can_view_pdf': has_permission(user, 'accounts.download_invoice_pdf'),
             'can_print': has_permission(user, 'accounts.print_invoice'),
             'can_add_payment': has_permission(user, 'commerce.change_sale'),
+            'can_override_price': has_permission(user, 'commerce.override_sale_price'),
             'can_cancel': False,
         }
     def create(self, validated_data):
@@ -655,6 +656,8 @@ class SaleSerializer(serializers.ModelSerializer):
                 code = 'INSUFFICIENT_STOCK'
             elif 'sale_price_below_cost' in error_codes:
                 code = 'SALE_PRICE_BELOW_COST'
+            elif 'sale_price_override_forbidden' in error_codes:
+                code = 'SALE_PRICE_OVERRIDE_FORBIDDEN'
             else:
                 code = 'SALE_VALIDATION_ERROR'
             raise BusinessAPIException(code, flattened, details) from exc
@@ -690,6 +693,8 @@ class SaleSerializer(serializers.ModelSerializer):
                 code = 'INSUFFICIENT_STOCK'
             elif 'sale_price_below_cost' in error_codes:
                 code = 'SALE_PRICE_BELOW_COST'
+            elif 'sale_price_override_forbidden' in error_codes:
+                code = 'SALE_PRICE_OVERRIDE_FORBIDDEN'
             else:
                 code = 'SALE_VALIDATION_ERROR'
             raise BusinessAPIException(code, flattened, details) from exc

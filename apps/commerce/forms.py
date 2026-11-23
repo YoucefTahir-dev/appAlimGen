@@ -13,6 +13,11 @@ from apps.inventory.pricing import sale_base_unit_allowed, sale_packaging_allowe
 from .models import Payment, Purchase, PurchaseLine, Sale, SaleLine
 from .widgets import ClientAutocomplete, ProductAutocomplete
 from .services import validate_tax_rate
+from .price_controls import (
+    can_override_sale_price,
+    historical_line_signatures,
+    validate_sale_price,
+)
 from .web_idempotency import new_web_token
 
 
@@ -243,6 +248,7 @@ class SaleLineForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
         self._original_product_id = self.instance.product_id if self.instance and self.instance.pk else None
         self._original_packaging_id = self.instance.packaging_id if self.instance and self.instance.pk else None
@@ -268,6 +274,11 @@ class SaleLineForm(forms.ModelForm):
             self.initial['quantity'] = self.instance.packaging_quantity
         self.fields['quantity'].widget.attrs['min'] = 1
         self.fields['product'].error_messages['invalid_choice'] = _('Veuillez sélectionner un produit dans les résultats proposés.')
+        if not can_override_sale_price(user):
+            self.fields['unit_price'].widget.attrs['readonly'] = True
+            self.fields['unit_price'].help_text = _(
+                'Tarif calculé automatiquement. Une permission spécifique est requise pour le modifier.'
+            )
 
     def clean(self):
         cleaned_data = super().clean()
@@ -328,6 +339,13 @@ class SaleLineForm(forms.ModelForm):
 
 
 class BaseSaleLineFormSet(BaseInlineFormSet):
+    def __init__(self, *args, **kwargs):
+        self.price_user = kwargs.pop('price_user', None)
+        self.price_client = kwargs.pop('price_client', None)
+        form_kwargs = dict(kwargs.pop('form_kwargs', {}))
+        form_kwargs['user'] = self.price_user
+        super().__init__(*args, form_kwargs=form_kwargs, **kwargs)
+
     def clean(self):
         super().clean()
         if any(self.errors):
@@ -335,6 +353,14 @@ class BaseSaleLineFormSet(BaseInlineFormSet):
 
         required_by_product = {}
         available_by_product = {}
+
+        unchanged_historical_lines = (
+            historical_line_signatures(
+                self.instance.lines.select_related('product', 'packaging').order_by('pk')
+            )
+            if self.instance and self.instance.pk else None
+        )
+        self.price_overrides = []
 
         for form in self.forms:
             cleaned_data = getattr(form, 'cleaned_data', None)
@@ -346,6 +372,29 @@ class BaseSaleLineFormSet(BaseInlineFormSet):
             quantity = cleaned_data.get('quantity') or 0
             if not product:
                 continue
+
+            try:
+                actual, tariff, overridden = validate_sale_price(
+                    product=product,
+                    client=self.price_client,
+                    packaging=packaging,
+                    quantity=quantity,
+                    requested_price=cleaned_data.get('unit_price'),
+                    user=self.price_user,
+                    unchanged_historical_lines=unchanged_historical_lines,
+                )
+            except ValidationError as exc:
+                form.add_error(
+                    'unit_price',
+                    exc.message_dict.get('unit_price', exc.messages),
+                )
+                continue
+            if overridden:
+                self.price_overrides.append({
+                    'product_id': product.pk,
+                    'tariff': tariff,
+                    'actual': actual,
+                })
 
             factor = packaging.conversion_factor if packaging else 1
             required_by_product[product.pk] = required_by_product.get(product.pk, 0) + (quantity * factor)

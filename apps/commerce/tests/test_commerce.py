@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.contrib.messages import get_messages
+from django.contrib.auth.models import Permission
 from django.db import transaction
 from django.test import TestCase
 from django.urls import reverse
@@ -129,6 +130,10 @@ class CommerceTests(TestCase):
         self.assertEqual(self.product.quantity, 4)
 
     def test_backend_total_matches_instant_preview_rules_for_mixed_units(self):
+        self.user.user_permissions.add(Permission.objects.get(
+            content_type__app_label='commerce',
+            codename='override_sale_price',
+        ))
         self.product.quantity = 20
         self.product.save(update_fields=['quantity'])
         packaging = ProductPackaging.objects.create(

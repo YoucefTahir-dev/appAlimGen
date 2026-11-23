@@ -244,6 +244,7 @@ class PostgreSQLDeploymentLockTests(TransactionTestCase):
         expected_pending = {
             ('core', '0006_companysettings_share_capital'),
             ('commerce', '0018_sale_company_share_capital_snapshot'),
+            ('commerce', '0019_alter_sale_options'),
         }
         executor = MigrationExecutor(connection)
         original_targets = executor.loader.graph.leaf_nodes()
@@ -276,7 +277,7 @@ class PostgreSQLDeploymentLockTests(TransactionTestCase):
             output = StringIO()
             with CaptureQueriesContext(connection) as captured:
                 call_command('deploy_migrate', plan_only=True, stdout=output, verbosity=0)
-            self.assertIn('Reviewed pending migrations: 2. No migration applied.', output.getvalue())
+            self.assertIn('Reviewed pending migrations: 3. No migration applied.', output.getvalue())
             for query in captured.captured_queries:
                 self.assertFalse(query['sql'].lstrip().upper().startswith(
                     ('INSERT', 'UPDATE', 'DELETE', 'CREATE', 'ALTER', 'DROP', 'TRUNCATE'),
@@ -284,7 +285,7 @@ class PostgreSQLDeploymentLockTests(TransactionTestCase):
 
             output = StringIO()
             call_command('deploy_migrate', direct_connection_confirmed=True, stdout=output, verbosity=0)
-            self.assertIn('Applying reviewed forward expansions: 2', output.getvalue())
+            self.assertIn('Applying reviewed forward expansions: 3', output.getvalue())
             self.assertEqual(forward_plan(connection), [])
 
             from apps.commerce.models import Sale

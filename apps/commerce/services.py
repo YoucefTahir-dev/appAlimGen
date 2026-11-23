@@ -11,6 +11,11 @@ from apps.inventory.services import active_loading_for_operator
 from apps.core.models import CompanySettings
 
 from .models import InvoiceSequence, Payment, Purchase, PurchaseLine, Sale, SaleLine, TicketSequence
+from .price_controls import (
+    historical_line_signatures,
+    record_sale_price_overrides,
+    validate_sale_price,
+)
 
 
 MONEY_QUANTUM = Decimal('0.01')
@@ -160,6 +165,7 @@ def create_sale(
     subtotal = Decimal('0')
     margin = Decimal('0')
     normalized_lines = []
+    price_overrides = []
     for raw_line in lines:
         product_id = raw_line['product'].pk if isinstance(raw_line['product'], Product) else int(raw_line['product'])
         product = products[product_id]
@@ -174,11 +180,14 @@ def create_sale(
         if packaging_quantity <= 0:
             raise ValidationError({'quantity': _('La quantité doit être strictement positive.')})
         factor = packaging.conversion_factor if packaging else 1
-        tariff_price = get_sale_price(product, client, packaging)
-        package_price = raw_line.get('unit_price')
-        if package_price is None:
-            package_price = tariff_price
-        package_price = money(package_price)
+        package_price, tariff_price, price_overridden = validate_sale_price(
+            product=product,
+            client=client,
+            packaging=packaging,
+            quantity=packaging_quantity,
+            requested_price=raw_line.get('unit_price'),
+            user=user,
+        )
         stock_quantity = packaging_quantity * factor
         requested[product.pk] = requested.get(product.pk, 0) + stock_quantity
         minimum_price = product.purchase_price * factor
@@ -200,6 +209,12 @@ def create_sale(
             'packaging_quantity': packaging_quantity,
             'unit_price': package_price,
         })
+        if price_overridden:
+            price_overrides.append({
+                'product_id': product.pk,
+                'tariff': tariff_price,
+                'actual': package_price,
+            })
 
     operator_stocks = {}
     if active_loading:
@@ -278,6 +293,7 @@ def create_sale(
         raise ValidationError({'amount_received': _('Un paiement partiel doit être strictement positif et inférieur au total.')})
     if payment_amount > 0:
         Payment.objects.create(sale=sale, amount=payment_amount, payment_type=payment_type, created_by=user)
+    record_sale_price_overrides(sale=sale, overrides=price_overrides, user=user)
     return sale
 
 
@@ -349,6 +365,10 @@ def update_sale(
         subtotal = Decimal('0')
         margin = Decimal('0')
         normalized_lines = []
+        price_overrides = []
+        unchanged_historical_lines = historical_line_signatures(
+            sale.lines.select_related('product', 'packaging').order_by('pk')
+        )
         requested = {}
         for raw_line in lines:
             product_id = raw_line['product'].pk if isinstance(raw_line['product'], Product) else int(raw_line['product'])
@@ -364,10 +384,15 @@ def update_sale(
             if packaging_quantity <= 0:
                 raise ValidationError({'quantity': _('La quantité doit être strictement positive.')})
             factor = packaging.conversion_factor if packaging else 1
-            package_price = raw_line.get('unit_price')
-            if package_price is None:
-                package_price = get_sale_price(product, client, packaging)
-            package_price = money(package_price)
+            package_price, tariff_price, price_overridden = validate_sale_price(
+                product=product,
+                client=client,
+                packaging=packaging,
+                quantity=packaging_quantity,
+                requested_price=raw_line.get('unit_price'),
+                user=user,
+                unchanged_historical_lines=unchanged_historical_lines,
+            )
             minimum_price = product.purchase_price * factor
             if package_price < minimum_price:
                 raise ValidationError({
@@ -385,6 +410,12 @@ def update_sale(
                 'quantity': packaging_quantity * factor,
                 'unit_price': package_price,
             })
+            if price_overridden:
+                price_overrides.append({
+                    'product_id': product.pk,
+                    'tariff': tariff_price,
+                    'actual': package_price,
+                })
             requested[product.pk] = requested.get(product.pk, 0) + packaging_quantity * factor
 
         old_quantities = {}
@@ -477,6 +508,8 @@ def update_sale(
             payment_type=payment_type,
             created_by=user,
         )
+    if normalized_lines is not None:
+        record_sale_price_overrides(sale=sale, overrides=price_overrides, user=user)
     return sale
 
 
